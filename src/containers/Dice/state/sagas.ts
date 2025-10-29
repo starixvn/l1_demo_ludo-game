@@ -42,8 +42,8 @@ function * rollDieSaga() {
 
   yield put(addLogEntry({
     player: playerColor,
-    action: 'Rolled dice',
-    details: `Rolled a ${dieRoll}`,
+    action: `Rolled ${dieRoll}`,
+    details: `Dice roll: ${dieRoll}`,
   }));
 
   yield put(rollDieComplete(dieRoll));
