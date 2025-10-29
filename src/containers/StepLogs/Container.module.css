@@ -19,6 +19,39 @@
   padding-bottom: 8px;
 }
 
+.ControlsGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.TimeoutControl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.TimeoutLabel {
+  color: #666;
+  white-space: nowrap;
+}
+
+.TimeoutInput {
+  width: 60px;
+  padding: 2px 4px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.TimeoutUnit {
+  color: #666;
+  font-size: 11px;
+}
+
 .ButtonGroup {
   display: flex;
   gap: 6px;
@@ -98,6 +131,28 @@
 
 .LogEntry:last-child {
   margin-bottom: 0;
+}
+
+.HighlightedLogEntry {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border-left: 4px solid #ffc107;
+  box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+  animation: highlightPulse 2s ease-in-out;
+}
+
+@keyframes highlightPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.4);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+  }
 }
 
 .Timestamp {

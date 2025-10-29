@@ -20,7 +20,7 @@ import { IBase, ICoin } from 'containers/Ludo/state/interfaces';
 import { getMovableCoins } from 'containers/Ludo/state/sagas';
 import { basesSelector, coinsSelector, currentTurnSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
-import { autoActionsEnabledSelector } from 'containers/StepLogs/state/selectors';
+import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
 
 import { currentDieRollSelector } from './selectors';
 
@@ -132,10 +132,11 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
       const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
 
       if (autoActionsEnabled) {
-        // Race between user input and 0.2s timeout
+        // Race between user input and configurable timeout
+        const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
         const { timeout } = yield race({
           userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
-          timeout: delay(200), // 0.2 seconds
+          timeout: delay(timeoutDuration),
         });
 
         if (timeout) {
@@ -157,9 +158,10 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
             const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
             if (newAutoActionsEnabled) {
               // Auto-actions were re-enabled - start the timeout
+              const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
               const { timeout } = yield race({
                 userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
-                timeout: delay(200), // 0.2 seconds
+                timeout: delay(timeoutDuration),
               });
 
               if (timeout) {
@@ -196,9 +198,10 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
 
       if (autoActionsEnabled) {
         // Multiple movable coins - wait for user input with timeout
+        const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
         const { timeout } = yield race({
           userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
-          timeout: delay(200), // 0.2 seconds
+          timeout: delay(timeoutDuration),
         });
 
         if (timeout) {
@@ -234,9 +237,10 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
             const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
             if (newAutoActionsEnabled) {
               // Auto-actions were re-enabled - start the timeout
+              const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
               const { timeout } = yield race({
                 userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
-                timeout: delay(200), // 0.2 seconds
+                timeout: delay(timeoutDuration),
               });
 
               if (timeout) {

@@ -20,3 +20,8 @@ export const autoActionsEnabledSelector = createSelector(
   [stepLogsStateSelector],
   (state) => state.autoActionsEnabled,
 );
+
+export const autoActionTimeoutSelector = createSelector(
+  [stepLogsStateSelector],
+  (state) => state.autoActionTimeout,
+);

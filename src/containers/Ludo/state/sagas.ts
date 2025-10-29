@@ -290,6 +290,7 @@ function * disqualifyCoinSaga(action: ReturnType<typeof disqualifyCoin>) {
     player: bases[coin.baseID].color,
     action: 'Coin disqualified',
     details: `Coin ${coinID.split('_')[1]} was sent back to base`,
+    highlight: true,
   }));
 }
 
@@ -310,6 +311,7 @@ function * homeCoinSaga(action: ReturnType<typeof homeCoin>) {
     player: base.color,
     action: 'Coin reached home',
     details: `Coin ${coinID.split('_')[1]} completed the journey!`,
+    highlight: true,
   }));
 
   const hasWon = retiredCoins.length === base.coinIDs.length;
@@ -318,6 +320,7 @@ function * homeCoinSaga(action: ReturnType<typeof homeCoin>) {
       player: base.color,
       action: 'Game won!',
       details: `${base.color} player has won the game!`,
+      highlight: true,
     }));
     yield put(markWinner(baseID));
   }

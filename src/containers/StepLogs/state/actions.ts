@@ -7,6 +7,7 @@ export enum ActionTypes {
   CLEAR_LOGS = 'stepLogs/CLEAR_LOGS',
   SET_MAX_LOGS = 'stepLogs/SET_MAX_LOGS',
   SET_AUTO_ACTIONS_ENABLED = 'stepLogs/SET_AUTO_ACTIONS_ENABLED',
+  SET_AUTO_ACTION_TIMEOUT = 'stepLogs/SET_AUTO_ACTION_TIMEOUT',
 }
 
 export const addLogEntry = (entry: Omit<ILogEntry, 'id' | 'timestamp'>): IReduxAction<ActionTypes.ADD_LOG_ENTRY, { entry: Omit<ILogEntry, 'id' | 'timestamp'> }> => ({
@@ -28,8 +29,14 @@ export const setAutoActionsEnabled = (enabled: boolean): IReduxAction<ActionType
   type: ActionTypes.SET_AUTO_ACTIONS_ENABLED,
 });
 
+export const setAutoActionTimeout = (timeout: number): IReduxAction<ActionTypes.SET_AUTO_ACTION_TIMEOUT, { timeout: number }> => ({
+  data: { timeout },
+  type: ActionTypes.SET_AUTO_ACTION_TIMEOUT,
+});
+
 export type Actions =
   | ReturnType<typeof addLogEntry>
   | ReturnType<typeof clearLogs>
   | ReturnType<typeof setMaxLogs>
-  | ReturnType<typeof setAutoActionsEnabled>;
+  | ReturnType<typeof setAutoActionsEnabled>
+  | ReturnType<typeof setAutoActionTimeout>;

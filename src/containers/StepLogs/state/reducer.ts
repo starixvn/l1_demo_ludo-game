@@ -5,6 +5,7 @@ const initialState: IState = {
   logs: [],
   maxLogs: 50,
   autoActionsEnabled: true,
+  autoActionTimeout: 200, // 0.2 seconds default
 };
 
 export const reducer = (state: IState = initialState, action: Actions): IState => {
@@ -47,6 +48,13 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
       return {
         ...state,
         autoActionsEnabled: enabled,
+      };
+    }
+    case ActionTypes.SET_AUTO_ACTION_TIMEOUT: {
+      const { timeout } = action.data!;
+      return {
+        ...state,
+        autoActionTimeout: Math.max(50, timeout), // Minimum 50ms
       };
     }
     default:
