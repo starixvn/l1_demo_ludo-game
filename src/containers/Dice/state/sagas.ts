@@ -19,11 +19,14 @@ import {
 import { IBase, ICoin } from 'containers/Ludo/state/interfaces';
 import { getMovableCoins } from 'containers/Ludo/state/sagas';
 import { basesSelector, coinsSelector, currentTurnSelector } from 'containers/Ludo/state/selectors';
+import { addLogEntry } from 'containers/StepLogs/state/actions';
+import { autoActionsEnabledSelector } from 'containers/StepLogs/state/selectors';
 
 import { currentDieRollSelector } from './selectors';
 
 import { enableDie, invalidateDieRoll, rollDieComplete, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
+import { ActionTypes as StepLogsActionTypes } from 'containers/StepLogs/state/actions';
 
 function * watchForRollDie() {
   yield takeLatest(ActionTypes.ROLL_DIE, rollDieSaga);
@@ -32,6 +35,17 @@ function * watchForRollDie() {
 function * rollDieSaga() {
   const mt = MersenneTwister19937.autoSeed();
   const dieRoll: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
+
+  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const playerColor = bases[currentTurn].color;
+
+  yield put(addLogEntry({
+    player: playerColor,
+    action: 'Rolled dice',
+    details: `Rolled a ${dieRoll}`,
+  }));
+
   yield put(rollDieComplete(dieRoll));
 }
 
@@ -44,6 +58,13 @@ function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICo
   if (movableCoins.length > 0) availableActions.push('move');
 
   const chosenAction = availableActions[integer(0, availableActions.length - 1)(mt)];
+
+  // Log the auto-action
+  yield put(addLogEntry({
+    player: currentTurnBase.color,
+    action: 'Auto-action',
+    details: `Automatically chose to ${chosenAction}`,
+  }));
 
   if (chosenAction === 'spawn') {
     // Double-check that there are still spawnable coins
@@ -107,16 +128,53 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
     } else {
       yield put(markCurrentBase(true));
 
-      // Race between user input and 0.2s timeout
-      const { timeout } = yield race({
-        userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
-        timeout: delay(200), // 0.2 seconds
-      });
+      // Check if auto-actions are enabled
+      const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
 
-      if (timeout) {
-        // Timeout won - auto choose an action
-        yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
-        yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+      if (autoActionsEnabled) {
+        // Race between user input and 0.2s timeout
+        const { timeout } = yield race({
+          userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
+          timeout: delay(200), // 0.2 seconds
+        });
+
+        if (timeout) {
+          // Timeout won - auto choose an action
+          yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
+          yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+        }
+      } else {
+        // Auto-actions disabled - wait for user input or auto-actions being re-enabled
+        while (true) {
+          const action = yield take([
+            LudoActionTypes.SPAWN_COIN_SUCCESS,
+            LudoActionTypes.MOVE_COIN_SUCCESS,
+            StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED
+          ]);
+
+          if (action.type === StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED) {
+            // Check if auto-actions are now enabled
+            const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+            if (newAutoActionsEnabled) {
+              // Auto-actions were re-enabled - start the timeout
+              const { timeout } = yield race({
+                userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
+                timeout: delay(200), // 0.2 seconds
+              });
+
+              if (timeout) {
+                // Timeout won - auto choose an action
+                yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
+                yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+              }
+              break; // Exit the loop
+            }
+            // If still disabled, continue waiting
+          } else {
+            // User performed an action - exit the loop
+            break;
+          }
+        }
       }
 
       yield put(markCurrentBase(false));
@@ -133,20 +191,81 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
       const coin = coins[coinID];
       yield put(moveCoin(coinID, coin.position, coin.cellID));
     } else if (movableCoins.length > 1) {
-      // Multiple movable coins - wait for user input with timeout
-      const { timeout } = yield race({
-        userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
-        timeout: delay(200), // 0.2 seconds
-      });
+      // Check if auto-actions are enabled
+      const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
 
-      if (timeout) {
-        // Timeout won - auto select a movable coin
-        const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
-        if (currentMovableCoins.length > 0) {
-          const mt = MersenneTwister19937.autoSeed();
-          const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-          const coin = coins[randomMoveCoin];
-          yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
+      if (autoActionsEnabled) {
+        // Multiple movable coins - wait for user input with timeout
+        const { timeout } = yield race({
+          userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
+          timeout: delay(200), // 0.2 seconds
+        });
+
+        if (timeout) {
+          // Timeout won - auto select a movable coin
+          const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
+          if (currentMovableCoins.length > 0) {
+            const mt = MersenneTwister19937.autoSeed();
+            const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
+            const coin = coins[randomMoveCoin];
+            const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+            const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+            const playerColor = bases[currentTurn].color;
+
+            yield put(addLogEntry({
+              player: playerColor,
+              action: 'Auto-moved coin',
+              details: `Automatically moved coin ${randomMoveCoin.split('_')[1]} ${value} spaces`,
+            }));
+
+            yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
+          }
+        }
+      } else {
+        // Auto-actions disabled - wait for user input or auto-actions being re-enabled
+        while (true) {
+          const action = yield take([
+            LudoActionTypes.MOVE_COIN_SUCCESS,
+            StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED
+          ]);
+
+          if (action.type === StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED) {
+            // Check if auto-actions are now enabled
+            const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+            if (newAutoActionsEnabled) {
+              // Auto-actions were re-enabled - start the timeout
+              const { timeout } = yield race({
+                userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
+                timeout: delay(200), // 0.2 seconds
+              });
+
+              if (timeout) {
+                // Timeout won - auto select a movable coin
+                const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
+                if (currentMovableCoins.length > 0) {
+                  const mt = MersenneTwister19937.autoSeed();
+                  const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
+                  const coin = coins[randomMoveCoin];
+                  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+                  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+                  const playerColor = bases[currentTurn].color;
+
+                  yield put(addLogEntry({
+                    player: playerColor,
+                    action: 'Auto-moved coin',
+                    details: `Automatically moved coin ${randomMoveCoin.split('_')[1]} ${value} spaces`,
+                  }));
+
+                  yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
+                }
+              }
+              break; // Exit the loop
+            }
+            // If still disabled, continue waiting
+          } else {
+            // User performed an action - exit the loop
+            break;
+          }
         }
       }
     }

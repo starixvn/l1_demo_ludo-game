@@ -3,6 +3,7 @@
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  position: relative;
 }
 
 .GameContainer {
@@ -37,4 +38,11 @@
   padding: 10px;
   color: #555;
   font-family: Arial;
+}
+
+.SidePanel {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
 }

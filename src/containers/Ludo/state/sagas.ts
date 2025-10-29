@@ -9,6 +9,7 @@ import {
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
 import { enableDie, invalidateDieRoll } from 'containers/Dice/state/actions';
+import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRollSelector } from 'containers/Dice/state/selectors';
 import { WINNING_MOVES } from 'globalConstants';
@@ -84,6 +85,12 @@ function * spawnCoinSaga(action: ReturnType<typeof spawnCoin>) {
   const walkwayCells = cells[walkway.position];
   const spawnCellForCoin = Object.values(walkwayCells).find((cell) => cell.cellType === CellType.SPAWN)!;
   const coinIDToSpawn = base.coinIDs.find((ID) => ID === coinID)!;
+
+  yield put(addLogEntry({
+    player: base.color,
+    action: 'Spawned coin',
+    details: `Spawned coin ${coinID.split('_')[1]}`,
+  }));
 
   yield put(spawnCoinSuccess(spawnCellForCoin.cellID, coinIDToSpawn, baseID, walkway.position));
   yield put(invalidateDieRoll());
@@ -170,6 +177,17 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   || (currentDieRoll === Rolls.SIX)
   ;
 
+  // Log the successful move
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const playerColor = bases[coins[coinID].baseID].color;
+
+  yield put(addLogEntry({
+    player: playerColor,
+    action: 'Moved coin',
+    details: `Moved coin ${coinID.split('_')[1]} ${currentDieRoll} spaces`,
+  }));
+
   yield put(moveCoinSuccess(bonusChance, coinID, currentDieRoll));
 
   if (!bonusChance) {
@@ -221,6 +239,13 @@ function * nextTurnSaga() {
       }
     }
   }
+
+  yield put(addLogEntry({
+    player: bases[nextTurn].color,
+    action: 'Turn started',
+    details: `${bases[nextTurn].color} player's turn`,
+  }));
+
   yield put(passTurnTo(nextTurn));
 }
 
@@ -251,6 +276,23 @@ function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
   }
 }
 
+function * watchForDisqualifyCoin() {
+  yield takeLatest(ActionTypes.DISQUALIFY_COIN, disqualifyCoinSaga);
+}
+
+function * disqualifyCoinSaga(action: ReturnType<typeof disqualifyCoin>) {
+  const { coinID } = action.data!;
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const coin = coins[coinID];
+
+  yield put(addLogEntry({
+    player: bases[coin.baseID].color,
+    action: 'Coin disqualified',
+    details: `Coin ${coinID.split('_')[1]} was sent back to base`,
+  }));
+}
+
 function * watchForHomeCoin() {
   yield takeLatest(ActionTypes.HOME_COIN, homeCoinSaga);
 }
@@ -264,8 +306,19 @@ function * homeCoinSaga(action: ReturnType<typeof homeCoin>) {
   const base = bases[baseID];
   const retiredCoins = base.coinIDs.filter((coinID) => coins[coinID].isRetired);
 
+  yield put(addLogEntry({
+    player: base.color,
+    action: 'Coin reached home',
+    details: `Coin ${coinID.split('_')[1]} completed the journey!`,
+  }));
+
   const hasWon = retiredCoins.length === base.coinIDs.length;
   if (hasWon) {
+    yield put(addLogEntry({
+      player: base.color,
+      action: 'Game won!',
+      details: `${base.color} player has won the game!`,
+    }));
     yield put(markWinner(baseID));
   }
 }
@@ -274,6 +327,7 @@ export const sagas = [
   watchForGetInitialGameData,
   watchForSpawnCoin,
   watchForMoveCoin,
+  watchForDisqualifyCoin,
   watchForNextTurn,
   watchForSetPlayers,
   watchForHomeCoin,
