@@ -106,6 +106,26 @@
   background: #388e3c;
 }
 
+.ExportButton {
+  background: #2196f3;
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ExportButton:hover:not(:disabled) {
+  background: #1976d2;
+}
+
+.ExportButton:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+  color: #666666;
+}
+
 .LogsContainer {
   flex: 1;
   overflow-y: auto;

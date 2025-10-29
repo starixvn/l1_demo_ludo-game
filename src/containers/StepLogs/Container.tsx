@@ -44,6 +44,32 @@ const mapDispatchToProps = {
 };
 
 class StepLogsBare extends React.PureComponent<IProps> {
+  private handleExportLogs = () => {
+    const { logs } = this.props;
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      totalLogs: logs.length,
+      logs: logs.map((log) => ({
+        ...log,
+        timestamp: new Date(log.timestamp).toISOString(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ludo-game-logs-${
+      new Date().toISOString().split("T")[0]
+    }.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   render() {
     const { logs, autoActionsEnabled, autoActionTimeout } = this.props;
 
@@ -77,6 +103,13 @@ class StepLogsBare extends React.PureComponent<IProps> {
                 }
               >
                 {autoActionsEnabled ? "Stop Auto" : "Continue Auto"}
+              </button>
+              <button
+                className={styles.ExportButton}
+                onClick={this.handleExportLogs}
+                disabled={logs.length === 0}
+              >
+                Export Logs
               </button>
               <button
                 className={styles.ClearButton}

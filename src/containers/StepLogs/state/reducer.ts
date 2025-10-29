@@ -3,7 +3,7 @@ import { ILogEntry, IState } from './interfaces';
 
 const initialState: IState = {
   logs: [],
-  maxLogs: 50,
+  maxLogs: 1000, // Increased to store more logs for export
   autoActionsEnabled: true,
   autoActionTimeout: 200, // 0.2 seconds default
 };
