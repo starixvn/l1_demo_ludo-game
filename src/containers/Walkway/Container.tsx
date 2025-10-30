@@ -1,61 +1,117 @@
-import React from 'react';
-import { connect } from 'react-redux';
-import { createStructuredSelector } from 'reselect';
+/**
+ * Walkway Container Component
+ *
+ * A development tool for creating and editing Ludo game board walkways.
+ * Allows designers to visually place cells, set cell types (normal, star, spawn, homepath),
+ * and link cells together to define valid movement paths.
+ *
+ * In production, this would be replaced with pre-configured walkway data.
+ */
 
-import { flatArray } from 'common/utils';
-import { Coin } from 'containers/Base/components/Coin';
-import { isDieRollValidSelector } from 'containers/Dice/state/selectors';
-import { moveCoin } from 'containers/Ludo/state/actions';
-import { CellType, ICell, ICoin, IServerGameData, IWalkway } from 'containers/Ludo/state/interfaces';
-import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
-import { getStyleObject } from 'containers/utils';
-import { COIN_SIZE, WALKWAY_LENGTH, WALKWAY_WIDTH } from 'globalConstants';
-import { hideContextMenu, showContextMenu } from 'services/contextMenu/service';
-import { WalkwayPosition } from 'state/interfaces';
+import React from "react";
+import { connect } from "react-redux"; // Redux connection
+import { createStructuredSelector } from "reselect"; // Optimized state selection
 
-import { Cell } from './components/Cell';
-import { IContextMenuOptions } from './interfaces';
-import { generateCellID } from './utils';
+import { flatArray } from "common/utils"; // Array flattening utility
+import { Coin } from "containers/Base/components/Coin"; // Coin component for rendering
+import { isDieRollValidSelector } from "containers/Dice/state/selectors"; // Die roll validation
+import { moveCoin } from "containers/Ludo/state/actions"; // Move coin action
+import {
+  CellType,
+  ICell,
+  ICoin,
+  IServerGameData,
+  IWalkway,
+} from "containers/Ludo/state/interfaces"; // Game data types
+import {
+  basesSelector,
+  cellsSelector,
+  coinsSelector,
+  currentTurnSelector,
+  linksSelector,
+} from "containers/Ludo/state/selectors"; // State selectors
+import { getStyleObject } from "containers/utils"; // Styling utilities
+import { COIN_SIZE, WALKWAY_LENGTH, WALKWAY_WIDTH } from "globalConstants"; // Size constants
+import { hideContextMenu, showContextMenu } from "services/contextMenu/service"; // Context menu service
+import { WalkwayPosition } from "state/interfaces"; // Position enums
 
-import styles from './Container.module.css';
+import { Cell } from "./components/Cell"; // Cell component
+import { IContextMenuOptions } from "./interfaces"; // Context menu types
+import { generateCellID } from "./utils"; // Cell ID generation utility
 
+import styles from "./Container.module.css"; // Component styles
+
+/**
+ * Public props for the Walkway component
+ */
 interface IPublicProps {
+  /** Configuration for this walkway segment */
   walkway: IWalkway;
 }
 
+/**
+ * Props from Redux state
+ */
 interface IStateProps {
-  bases: ReturnType<typeof basesSelector>;
-  cells: ReturnType<typeof cellsSelector>;
-  coins: ReturnType<typeof coinsSelector>;
-  links: ReturnType<typeof linksSelector>;
-  isDieRollValid: ReturnType<typeof isDieRollValidSelector>;
-  currentTurn: ReturnType<typeof currentTurnSelector>;
+  bases: ReturnType<typeof basesSelector>; // All player bases
+  cells: ReturnType<typeof cellsSelector>; // All game board cells
+  coins: ReturnType<typeof coinsSelector>; // All coins in the game
+  links: ReturnType<typeof linksSelector>; // Cell connectivity links
+  isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether die roll can be used
+  currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
 }
 
+/**
+ * Props for Redux dispatch actions
+ */
 interface IDispatchProps {
-  moveCoin: typeof moveCoin;
+  moveCoin: typeof moveCoin; // Action to move a coin
 }
 
+/** Combined component props */
 interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
 
-const cells: IServerGameData['cells'] = {};
-const cellLinks: { [cellID: string]: Set<ICell['cellID']> } = {};
+/**
+ * Global storage for cell configurations during development
+ * In production, this would be loaded from pre-configured data
+ */
+const cells: IServerGameData["cells"] = {};
 
+/**
+ * Global storage for cell links during development
+ * Stores which cells are connected for valid movement paths
+ */
+const cellLinks: { [cellID: string]: Set<ICell["cellID"]> } = {};
+
+/**
+ * Maps Redux state to component props
+ */
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  bases: basesSelector,
-  cells: cellsSelector,
-  coins: coinsSelector,
-  currentTurn: currentTurnSelector,
-  isDieRollValid: isDieRollValidSelector,
-  links: linksSelector,
+  bases: basesSelector, // Get all player bases
+  cells: cellsSelector, // Get all board cells
+  coins: coinsSelector, // Get all coins
+  currentTurn: currentTurnSelector, // Get current player turn
+  isDieRollValid: isDieRollValidSelector, // Get die roll validity
+  links: linksSelector, // Get cell connectivity links
 });
 
+/**
+ * Maps Redux dispatch actions to component props
+ */
 const mapDispatchToProps = {
-  moveCoin,
+  moveCoin, // Coin movement action
 };
 
+/**
+ * Walkway container component class
+ * Renders a segment of the game board walkway with interactive cells
+ */
 class WalkwayBare extends React.PureComponent<IProps> {
+  /**
+   * Renders the walkway container with appropriate dimensions
+   */
   render() {
+    // Determine if this walkway should be rendered horizontally or vertically
     const isHorizontal = this.isHorizontalWalkway();
 
     return (
@@ -63,147 +119,238 @@ class WalkwayBare extends React.PureComponent<IProps> {
         className={styles.Container}
         style={
           isHorizontal
-          ? getStyleObject(WALKWAY_LENGTH, WALKWAY_WIDTH)
-          : getStyleObject(WALKWAY_WIDTH, WALKWAY_LENGTH)
+            ? getStyleObject(WALKWAY_LENGTH, WALKWAY_WIDTH) // Horizontal walkway dimensions
+            : getStyleObject(WALKWAY_WIDTH, WALKWAY_LENGTH) // Vertical walkway dimensions
         }
       >
         {
-          this.renderCells()
+          this.renderCells() // Render all cells in this walkway
         }
       </div>
     );
   }
 
+  /**
+   * Renders all cells in this walkway segment
+   * Creates a 2D grid of Cell components with appropriate styling and coin placement
+   */
   private renderCells = () => {
     const {
-      walkway: { position, baseID },
-      cells: cellConfigurations,
-      bases,
-      coins,
+      walkway: { position, baseID }, // Walkway configuration
+      cells: cellConfigurations, // All cell configurations
+      bases, // Player base data
+      coins, // All coin data
     } = this.props;
 
+    // 2D array to hold cell components organized by row/column
     const cellComponents: any[][] = [[]];
 
-    const cellConfigurationsForWalkway = Object.values(cellConfigurations[position]);
-    const base = bases[baseID];
+    // Get all cells that belong to this walkway position
+    const cellConfigurationsForWalkway = Object.values(
+      cellConfigurations[position]
+    );
+    const base = bases[baseID]; // Base data for this walkway
 
+    // Process each cell configuration and create Cell components
     cellConfigurationsForWalkway.forEach((cellConfiguration, index) => {
       const { row, column, position } = cellConfiguration;
       const cellID = generateCellID(position, row, column);
       const cellType = cellConfigurations[position][cellID].cellType;
-      cellComponents[cellConfiguration.row] = cellComponents[cellConfiguration.row] || [];
-      cellComponents[cellConfiguration.row][cellConfiguration.column] =
-      <Cell
-        key={index}
-        column={column}
-        row={row}
-        walkwayPosition={position}
-        color={[CellType.HOMEPATH, CellType.SPAWN].includes(cellType) ? base.color : undefined}
-        isStar={cellType === CellType.STAR}
-        cellType={cellType}
-        onContextMenuOpened={this.onContextMenuOpened}
-        onHighlightNextCells={this.onHighlightNextCells}
-      >
-        {
-          cellConfiguration.coinIDs.map((coinID, index) => (
-            <Coin
-              baseColor={coins[coinID].color}
-              coinSize={cellConfiguration.coinIDs.length > 1 ? COIN_SIZE / 2 : COIN_SIZE}
-              onCoinClicked={() => this.onCoinClicked(coinID, position, cellID)}
-              key={index}
-            />
-          ))
-        }
-      </Cell>;
+
+      // Initialize row array if it doesn't exist
+      cellComponents[cellConfiguration.row] =
+        cellComponents[cellConfiguration.row] || [];
+
+      // Create Cell component at the correct grid position
+      cellComponents[cellConfiguration.row][cellConfiguration.column] = (
+        <Cell
+          key={index}
+          column={column}
+          row={row}
+          walkwayPosition={position}
+          baseID={cellConfiguration.baseID} // Base ID this cell belongs to
+          // Color special cells (spawn/homepath) with base color
+          color={
+            [CellType.HOMEPATH, CellType.SPAWN].includes(cellType)
+              ? base.color
+              : undefined
+          }
+          isStar={cellType === CellType.STAR} // Special star cell rendering
+          cellType={cellType}
+          onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
+          onHighlightNextCells={this.onHighlightNextCells} // Hover highlighting
+        >
+          {
+            // Render coins that are currently on this cell
+            cellConfiguration.coinIDs.map((coinID, index) => (
+              <Coin
+                baseColor={coins[coinID].color} // Coin color matches its base
+                // Smaller coins if multiple coins on same cell
+                coinSize={
+                  cellConfiguration.coinIDs.length > 1
+                    ? COIN_SIZE / 2
+                    : COIN_SIZE
+                }
+                onCoinClicked={() =>
+                  this.onCoinClicked(coinID, position, cellID)
+                }
+                key={index}
+              />
+            ))
+          }
+        </Cell>
+      );
     });
 
+    // Flatten the 2D array into a 1D array of components for rendering
     return flatArray(cellComponents);
-  }
+  };
 
-  private isHorizontalWalkway = () => [
-    WalkwayPosition.EAST,
-    WalkwayPosition.WEST,
-  ].includes(this.props.walkway.position)
+  /**
+   * Determines if this walkway should be rendered horizontally
+   * East and West walkways are horizontal, North and South are vertical
+   */
+  private isHorizontalWalkway = () =>
+    [
+      WalkwayPosition.EAST, // East walkway runs horizontally
+      WalkwayPosition.WEST, // West walkway runs horizontally
+    ].includes(this.props.walkway.position);
 
+  /**
+   * Handles right-click context menu for cell editing (development tool)
+   * Shows options to change cell type or link cells together
+   */
   private onContextMenuOpened = (options: IContextMenuOptions) => {
-    const { walkway: { baseID } } = this.props;
     const {
-      cellID,
-      cellType,
-      column,
-      position,
-      row,
-      x,
-      y,
-    } = options;
+      walkway: { baseID },
+    } = this.props;
+    const { cellID, cellType, column, position, row, x, y } = options;
+
+    // Create cell info object for the clicked cell
     const cellInfo: ICell = {
       baseID,
       cellID,
       cellType,
-      coinIDs: [],
+      coinIDs: [], // No coins during development
       column,
       position,
       row,
     };
+
+    // Show context menu with cell editing options
     showContextMenu(
       x,
-      y,
-      [{
-        action: () => this.markCells({ ...cellInfo, cellType: CellType.NORMAL }),
-        label: CellType.NORMAL,
-      }, {
-        action: () => this.markCells({ ...cellInfo, cellType: CellType.SPAWN }),
-        label: CellType.SPAWN,
-      }, {
-        action: () => this.markCells({ ...cellInfo, cellType: CellType.STAR }),
-        label: CellType.STAR,
-      }, {
-        action: () => this.markCells({ ...cellInfo, cellType: CellType.HOMEPATH }),
-        label: CellType.HOMEPATH,
-      }, {
-        action: () => this.linkCells(cellInfo),
-        label: 'Link',
-      }],
+      y, // Mouse position for menu placement
+      [
+        {
+          action: () =>
+            this.markCells({ ...cellInfo, cellType: CellType.NORMAL }),
+          label: CellType.NORMAL, // Change to normal walkway cell
+        },
+        {
+          action: () =>
+            this.markCells({ ...cellInfo, cellType: CellType.SPAWN }),
+          label: CellType.SPAWN, // Change to spawn cell (where coins enter)
+        },
+        {
+          action: () =>
+            this.markCells({ ...cellInfo, cellType: CellType.STAR }),
+          label: CellType.STAR, // Change to star cell (bonus moves)
+        },
+        {
+          action: () =>
+            this.markCells({ ...cellInfo, cellType: CellType.HOMEPATH }),
+          label: CellType.HOMEPATH, // Change to home path cell
+        },
+        {
+          action: () => this.linkCells(cellInfo),
+          label: "Link", // Link this cell to another cell
+        },
+      ]
     );
-  }
+  };
 
-  private onHighlightNextCells = (cellID: ICell['cellID']) => {
+  /**
+   * Highlights connected cells when hovering (development tool)
+   * Shows which cells are linked for valid movement paths
+   */
+  private onHighlightNextCells = (cellID: ICell["cellID"]) => {
     const { links } = this.props;
+    // Get all cells that this cell can move to
     const linkedCellIDs = links[cellID].map((cell) => cell.cellID);
-    console.log(`${cellID} -> ${linkedCellIDs}`);
-  }
+    console.log(`${cellID} -> ${linkedCellIDs}`); // Debug output
+  };
 
+  /**
+   * Marks a cell with a specific type (development tool)
+   * Updates the global cells configuration for board design
+   */
   private markCells = (cellInfo: ICell) => {
+    // Ensure position exists in cells configuration
     cells[cellInfo.position] = cells[cellInfo.position] || {};
+    // Store cell configuration
     cells[cellInfo.position][cellInfo.cellID] = cellInfo;
-    hideContextMenu();
-    console.log(JSON.stringify(cells));
-  }
+    hideContextMenu(); // Close the context menu
+    console.log(JSON.stringify(cells)); // Debug output of cell configuration
+  };
 
+  /**
+   * Initiates cell linking process (development tool)
+   * Allows clicking on another cell to create a movement path
+   */
   private linkCells = (cellInfo: ICell) => {
-    hideContextMenu();
+    hideContextMenu(); // Close context menu
+
+    // Set up click handler for linking cells
     const onClick = (event: MouseEvent) => {
       const element = event.target as HTMLDivElement;
-      const cellID = element.getAttribute('data-id') as string;
-      const shouldLink = window.confirm(`Link ${cellInfo.cellID} to ${cellID} ?`);
+      const cellID = element.getAttribute("data-id") as string;
+
+      // Confirm the link creation
+      const shouldLink = window.confirm(
+        `Link ${cellInfo.cellID} to ${cellID} ?`
+      );
 
       if (shouldLink) {
+        // Create or update the link set for this cell
         cellLinks[cellInfo.cellID] = cellLinks[cellInfo.cellID] || new Set();
         cellLinks[cellInfo.cellID].add(cellID);
       }
-      document.removeEventListener('click', onClick);
+
+      // Clean up event listener
+      document.removeEventListener("click", onClick);
+      // Make links available globally for debugging
       (window as any).cellLinks = cellLinks;
     };
-    document.addEventListener('click', onClick);
-  }
 
-  private onCoinClicked = (coinID: ICoin['coinID'], position: WalkwayPosition, cellID: ICell['cellID']) => {
+    // Listen for the next click to complete the link
+    document.addEventListener("click", onClick);
+  };
+
+  /**
+   * Handles coin click events during gameplay
+   * Validates that it's the player's turn and die roll is valid before moving
+   */
+  private onCoinClicked = (
+    coinID: ICoin["coinID"],
+    position: WalkwayPosition,
+    cellID: ICell["cellID"]
+  ) => {
     const { coins, currentTurn } = this.props;
     const coin = coins[coinID];
+
+    // Only allow move if die roll is valid and it's the coin's player's turn
     if (this.props.isDieRollValid && coin.baseID === currentTurn) {
-      this.props.moveCoin(coinID, position, cellID);
+      this.props.moveCoin(coinID, position, cellID); // Dispatch move action
     }
-  }
+  };
 }
 
-export const Walkway = connect(mapStateToProps, mapDispatchToProps)(WalkwayBare) as unknown as React.ComponentClass<IPublicProps>;
+/**
+ * Connected Walkway component with Redux state and actions
+ * Exports the component with proper TypeScript typing
+ */
+export const Walkway = connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(WalkwayBare) as unknown as React.ComponentClass<IPublicProps>;

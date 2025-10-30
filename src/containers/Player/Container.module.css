@@ -1,27 +1,39 @@
+/**
+ * Player Container Component Styles
+ *
+ * Styles for the player interface panels that appear on the sides of the game board.
+ */
+
+/* Main container for player interface */
 .Container {
-  display: flex;
-  flex-grow: 1;
+  display: flex;   /* Use flexbox for layout */
+  flex-grow: 1;    /* Expand to fill available space */
 }
 
+/* Top placement - elements arranged from top to bottom */
 .TopPlacement {
-  flex-direction: column;
+  flex-direction: column; /* Stack elements vertically */
 }
 
+/* Bottom placement - elements arranged from bottom to top */
 .BottomPlacement {
-  flex-direction: column-reverse;
+  flex-direction: column-reverse; /* Stack elements vertically in reverse order */
 }
 
+/* Disabled state - reduce opacity and disable interactions */
 .Disabled {
-  opacity: 0.3;
-  pointer-events: none;
+  opacity: 0.3;           /* Make semi-transparent */
+  pointer-events: none;   /* Disable mouse interactions */
 }
 
+/* Container for retired coins (coins that reached home) */
 .RetiredCoins {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: flex;          /* Use flexbox for coin layout */
+  flex-direction: column; /* Stack coins vertically */
+  align-items: center;    /* Center coins horizontally */
 }
 
+/* Remove bottom margin from individual retired coins */
 .RetiredCoins > div {
-  margin-bottom: 0;
+  margin-bottom: 0; /* Override default coin margin for tight spacing */
 }

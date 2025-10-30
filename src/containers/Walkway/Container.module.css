@@ -1,5 +1,12 @@
+/**
+ * Walkway Container Component Styles
+ *
+ * Styles for the walkway container that holds the game board cells.
+ */
+
+/* Main container for walkway cells */
 .Container {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  display: flex;        /* Use flexbox for layout */
+  flex-direction: row;  /* Arrange cells in rows */
+  flex-wrap: wrap;      /* Allow cells to wrap to new lines */
 }

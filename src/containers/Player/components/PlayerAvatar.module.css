@@ -1,3 +1,10 @@
+/**
+ * Player Avatar Component Styles
+ *
+ * Provides basic layout for the player avatar SVG icon.
+ */
+
+/* Container for the SVG avatar */
 .Container {
-  display: flex;
+  display: flex; /* Use flexbox for proper alignment and centering */
 }

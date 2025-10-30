@@ -1,13 +1,21 @@
+/**
+ * Coin Placeholder Component Styles
+ *
+ * Provides styling for the coin placeholder container and background circle.
+ */
+
+/* Container styles - centers the coin placeholder */
 .Container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex;           /* Use flexbox for centering */
+  align-items: center;     /* Center vertically */
+  justify-content: center; /* Center horizontally */
 }
 
+/* Circle background for the coin placeholder */
 .Circle {
-  box-shadow: inset 0px 2px 5px 0px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-shadow: inset 0px 2px 5px 0px; /* Inner shadow for depth effect */
+  border-radius: 50%;                /* Makes the background circular */
+  display: flex;                     /* Use flexbox for centering coin inside */
+  align-items: center;               /* Center coin vertically */
+  justify-content: center;           /* Center coin horizontally */
 }

@@ -1,12 +1,20 @@
+/**
+ * Context Menu Component Styles
+ *
+ * Styles for the right-click context menu used during development.
+ */
+
+/* Main container for the context menu */
 .Container {
-  position: absolute;
-  background-color: #ffffff;
-  border: 1px solid #ccc;
-  padding: 5px 10px;
-  color: #555;
-  cursor: pointer;
+  position: absolute;         /* Position absolutely on screen */
+  background-color: #ffffff;  /* White background */
+  border: 1px solid #ccc;     /* Light gray border */
+  padding: 5px 10px;          /* Internal spacing */
+  color: #555;                /* Dark gray text */
+  cursor: pointer;            /* Hand cursor on hover */
 }
 
+/* Individual menu item styling */
 .MenuItem {
-  padding: 5px 0;
+  padding: 5px 0; /* Vertical padding for each menu item */
 }

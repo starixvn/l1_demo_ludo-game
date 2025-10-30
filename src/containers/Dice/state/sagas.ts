@@ -1,3 +1,10 @@
+/**
+ * Dice Container Sagas
+ *
+ * Redux Sagas that handle asynchronous dice operations and automatic gameplay logic.
+ * Manages die rolling, auto-actions, and turn progression based on game rules.
+ */
+
 import { integer, MersenneTwister19937 } from 'random-js';
 import {
   call,
@@ -28,38 +35,56 @@ import { enableDie, invalidateDieRoll, rollDieComplete, ActionTypes } from './ac
 import { Rolls } from './interfaces';
 import { ActionTypes as StepLogsActionTypes } from 'containers/StepLogs/state/actions';
 
+/**
+ * Watcher saga that listens for ROLL_DIE actions and triggers the roll die saga
+ */
 function * watchForRollDie() {
   yield takeLatest(ActionTypes.ROLL_DIE, rollDieSaga);
 }
 
+/**
+ * Saga that handles the dice rolling process
+ * Generates a random die roll and logs the action
+ */
 function * rollDieSaga() {
+  // Generate random die roll using Mersenne Twister for better randomness
   const mt = MersenneTwister19937.autoSeed();
   const dieRoll: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
 
+  // Get current player info for logging
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const playerColor = bases[currentTurn].color;
 
+  // Log the die roll action
   yield put(addLogEntry({
     player: playerColor,
     action: `Rolled ${dieRoll}`,
     details: `Dice roll: ${dieRoll}`,
   }));
 
+  // Dispatch the roll completion action
   yield put(rollDieComplete(dieRoll));
 }
 
+/**
+ * Automatically chooses and executes an action when the player doesn't respond in time
+ * @param spawnableCoins - Array of coin IDs that can be spawned
+ * @param movableCoins - Array of coin IDs that can be moved
+ * @param currentTurnBase - The current player's base information
+ */
 function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICoin['coinID'][], currentTurnBase: IBase) {
   const mt = MersenneTwister19937.autoSeed();
 
-  // Randomly choose between spawn and move options
+  // Determine available actions based on game state
   const availableActions = [];
   if (spawnableCoins.length > 0) availableActions.push('spawn');
   if (movableCoins.length > 0) availableActions.push('move');
 
+  // Randomly select an action
   const chosenAction = availableActions[integer(0, availableActions.length - 1)(mt)];
 
-  // Log the auto-action
+  // Log the automatic action choice
   yield put(addLogEntry({
     player: currentTurnBase.color,
     action: 'Auto-action',
@@ -108,10 +133,18 @@ function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICo
   }
 }
 
+/**
+ * Watcher saga that listens for ROLL_DIE_COMPLETE actions
+ */
 function * watchForRollDieComplete() {
   yield takeLatest(ActionTypes.ROLL_DIE_COMPLETE, rollDieCompleteSaga);
 }
 
+/**
+ * Main saga that handles what happens after a die roll is complete
+ * Implements the core Ludo game logic for turn progression and auto-actions
+ * @param action - The roll die complete action with the rolled value
+ */
 function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
   const { value } = action.data!;
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
@@ -280,7 +313,11 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
   }
 }
 
+/**
+ * Array of all dice container sagas to be registered with the Redux store
+ * These sagas handle asynchronous dice operations and game logic
+ */
 export const sagas = [
-  watchForRollDie,
-  watchForRollDieComplete,
+  watchForRollDie,          // Watches for die roll requests
+  watchForRollDieComplete,  // Watches for die roll completions and handles game logic
 ];

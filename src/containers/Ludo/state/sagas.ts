@@ -1,3 +1,11 @@
+/**
+ * Ludo Game State Sagas
+ *
+ * Redux Sagas that handle all asynchronous game logic for the Ludo game.
+ * Manages game initialization, coin movement, turn progression, and game state changes.
+ * Acts as the central coordinator for all game mechanics and player interactions.
+ */
+
 import {
   call,
   delay,
@@ -50,132 +58,237 @@ import {
   walkwaysSelector,
 } from './selectors';
 
+/**
+ * Watcher saga for initial game data loading
+ * Listens for GET_INITIAL_GAME_DATA actions and triggers data loading
+ */
 function * watchForGetInitialGameData() {
   yield takeLatest(ActionTypes.GET_INITIAL_GAME_DATA, getInitialGameDataSaga);
 }
 
+/**
+ * Loads initial game data from JSON file
+ *
+ * This is the first saga that runs when the game starts. It:
+ * 1. Fetches board configuration from initialGameData.json
+ * 2. Processes and transforms the data for Redux state
+ * 3. Sets up all game entities (bases, coins, cells, walkways)
+ * 4. Initializes the game state with default values
+ */
 function * getInitialGameDataSaga() {
+  // Fetch complete board configuration from JSON file
   const data: IServerGameData = yield call(api.get, { url: '/initialGameData.json' });
+
+  // Process bases - add spawnable state (initially false for all players)
   const basesArray = data.bases.map((base) => ({ ...base, spawnable: false }));
   const bases = mapByProperty(basesArray, 'ID');
+
+  // Process coins - assign colors based on their base ownership
   const coins = data.coins.map((coin) => ({ ...coin, color: bases[coin.baseID].color }));
+
+  // Create complete game state object
   const gameData: IState = {
-    bases,
-    cells: data.cells,
-    coins: mapByProperty(coins, 'coinID'),
-    currentTurn: BaseID.BASE_3,
-    links: data.links,
-    relationships: data.relationships,
-    walkways: mapByProperty(data.walkways, 'ID'),
+    bases,                              // Player bases with spawnable state
+    cells: data.cells,                  // All board cells with positions and types
+    coins: mapByProperty(coins, 'coinID'), // All game coins mapped by ID
+    currentTurn: BaseID.BASE_3,         // Start with red player (arbitrary choice)
+    links: data.links,                  // Movement connectivity between cells
+    relationships: data.relationships,  // Component relationships for rendering
+    walkways: mapByProperty(data.walkways, 'ID'), // Walkway configurations
   };
+
+  // Dispatch success action to update Redux store
   yield put(getInitialGameDataSuccess(gameData));
 }
 
+/**
+ * Watcher saga for coin spawning actions
+ * Triggers when a player attempts to spawn a coin from their base
+ */
 function * watchForSpawnCoin() {
   yield takeLatest(ActionTypes.SPAWN_COIN, spawnCoinSaga);
 }
 
+/**
+ * Handles spawning a coin from base onto the board
+ *
+ * This saga executes when a player rolls a 6 and chooses to spawn a coin.
+ * It finds the appropriate spawn cell for the player's base and moves the coin there.
+ * After spawning, the die roll becomes invalid (can't be used again).
+ *
+ * @param action - Contains baseID and coinID to spawn
+ */
 function * spawnCoinSaga(action: ReturnType<typeof spawnCoin>) {
   const { baseID, coinID } = action.data!;
+
+  // Get current game state
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+
+  // Find the player's base and their walkway
   const base = bases[baseID];
   const walkway = Object.values(walkways).find((walkway) => walkway.baseID === baseID)!;
+
+  // Get cells for this player's walkway and find the spawn cell
   const walkwayCells = cells[walkway.position];
   const spawnCellForCoin = Object.values(walkwayCells).find((cell) => cell.cellType === CellType.SPAWN)!;
+
+  // Find the specific coin ID to spawn from the base's coin list
   const coinIDToSpawn = base.coinIDs.find((ID) => ID === coinID)!;
 
+  // Log the spawn action for game history
   yield put(addLogEntry({
     player: base.color,
     action: 'Spawned coin',
     details: `Spawned coin ${coinID.split('_')[1]}`,
   }));
 
+  // Execute the spawn - move coin from base to spawn cell
   yield put(spawnCoinSuccess(spawnCellForCoin.cellID, coinIDToSpawn, baseID, walkway.position));
+
+  // Invalidate the die roll so it can't be used again
   yield put(invalidateDieRoll());
 }
 
+/**
+ * Watcher saga for coin movement actions
+ * Triggers when a player attempts to move a coin along the board
+ */
 function * watchForMoveCoin() {
   yield takeLatest(ActionTypes.MOVE_COIN, moveCoinSaga);
 }
 
+/**
+ * Validates if a coin can make a specific move
+ *
+ * Checks if moving the coin by the given number of steps would exceed
+ * the total distance needed to reach home (WINNING_MOVES = 56).
+ *
+ * @param coinID - The coin to validate movement for
+ * @param stepsToTake - Number of steps from the die roll
+ * @returns true if the move is valid (won't overshoot home)
+ */
 function * isCurrentMoveValid(coinID: ICoin['coinID'], stepsToTake: Rolls) {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const coin = coins[coinID];
   return coin.steps + stepsToTake <= WINNING_MOVES;
 }
 
+/**
+ * Gets all coins that can be moved by the current player
+ *
+ * Filters the current player's coins to find those that:
+ * - Are spawned on the board (not in base)
+ * - Are not retired (haven't reached home)
+ * - Can move the rolled number of spaces without overshooting
+ *
+ * @param stepsToTake - Number of steps from the die roll
+ * @returns Array of coin IDs that can be moved
+ */
 export function * getMovableCoins(stepsToTake: Rolls) {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const currentTurnBase: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+
+  // Filter coins that meet all movement criteria
   const movableCoins =
     bases[currentTurnBase].coinIDs
     .filter((coinID) =>
-      coins[coinID].isSpawned
-      && !coins[coinID].isRetired
-      && coins[coinID].steps + stepsToTake <= WINNING_MOVES,
+      coins[coinID].isSpawned              // Must be on the board
+      && !coins[coinID].isRetired         // Must not be home yet
+      && coins[coinID].steps + stepsToTake <= WINNING_MOVES, // Must not overshoot
     );
+
   return movableCoins;
 }
 
+/**
+ * Main saga for handling coin movement along the board
+ *
+ * This is the most complex saga in the game. It handles:
+ * 1. Validating the move is possible
+ * 2. Moving the coin step-by-step with animation
+ * 3. Handling special cases (home path entry, reaching home)
+ * 4. Checking for coin disqualifications (captures)
+ * 5. Determining if the player gets a bonus turn
+ *
+ * The movement happens one cell at a time with 100ms delays for smooth animation.
+ *
+ * @param action - Contains coinID, target cellID, and walkway position
+ */
 function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   let { cellID, walkwayPosition } = { ...action.data! };
   const { coinID } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
 
+  // Validate that this move is possible
   const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
   const isCurrentMovePossible: boolean = yield call(isCurrentMoveValid, coinID, currentDieRoll);
 
+  // If no coins can move, skip turn
   if (movableCoins.length === 0) {
     yield put(moveCoinFailure());
     yield put(nextTurn());
     yield put(enableDie());
     return;
-  } else if (!isCurrentMovePossible) {
+  }
+  // If this specific coin can't move, reject the action
+  else if (!isCurrentMovePossible) {
     yield put(moveCoinFailure());
     return;
   }
 
+  // Lock the die roll so it can't be used again
   yield put(invalidateDieRoll());
 
+  // Track if coin reached home during movement
   let bonusChanceForHomeCoin = false;
 
+  // Move the coin step-by-step based on die roll value
   for (let i = 0; i < currentDieRoll; i++) {
+    // Get fresh state for each step (state may change during movement)
     const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
     const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
     const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+
+    // Find next possible cells from current position
     const nextCells = links[cellID];
     let nextCell;
 
-    // Possibility of entering HOMEPATH
+    // Special logic for entering home path - prefer same-base home path cells
     nextCell = nextCells.length > 1
     ? nextCells.find(
       (cell) =>
         cells[cell.position][cell.cellID].cellType === CellType.HOMEPATH
         && coins[coinID].baseID === cells[cell.position][cell.cellID].baseID,
-    ) || nextCells[0]
-    : nextCells[0];
+    ) || nextCells[0]  // Fallback to first option if no home path found
+    : nextCells[0];    // Single option available
 
+    // Animate: lift coin from current cell
     yield put(liftCoin(cellID, coinID, walkwayPosition));
+
+    // Check if we've reached the home position
     if (nextCell.cellID === 'HOME') {
       yield put(homeCoin(coinID));
       bonusChanceForHomeCoin = true;
     } else {
+      // Place coin on next cell
       yield put(placeCoin(nextCell.cellID, coinID, nextCell.position));
     }
 
+    // Animation delay for smooth movement
     yield delay(100);
 
+    // Update position for next iteration
     cellID = nextCell.cellID;
     walkwayPosition = nextCell.position;
   }
 
-  const bonusChance = bonusChanceForHomeCoin
-  || (yield call(performDisqualificationCheck, action.data!.coinID, walkwayPosition, cellID))
-  || (currentDieRoll === Rolls.SIX)
-  ;
+  // Determine if player gets a bonus turn
+  const bonusChance = bonusChanceForHomeCoin                          // Reached home
+  || (yield call(performDisqualificationCheck, action.data!.coinID, walkwayPosition, cellID)) // Captured opponent
+  || (currentDieRoll === Rolls.SIX);                                  // Rolled a 6
 
   // Log the successful move
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
@@ -188,51 +301,89 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
     details: `Moved coin ${coinID.split('_')[1]} ${currentDieRoll} spaces`,
   }));
 
+  // Complete the move and handle turn progression
   yield put(moveCoinSuccess(bonusChance, coinID, currentDieRoll));
 
+  // Advance to next turn unless player gets bonus
   if (!bonusChance) {
     yield put(nextTurn());
   }
+
+  // Re-enable die for next turn
   yield put(enableDie());
 }
 
+/**
+ * Checks if the moving coin captures any opponent coins
+ *
+ * When a coin lands on a normal cell, it checks if there are any opponent coins
+ * on that cell. If found, those coins are sent back to their base (disqualified).
+ * This gives the player a bonus turn for successful captures.
+ *
+ * @param activeCoinID - The coin that just moved
+ * @param walkwayPosition - Position where the coin landed
+ * @param cellID - Specific cell where the coin landed
+ * @returns true if any coins were captured (player gets bonus turn)
+ */
 function * performDisqualificationCheck(activeCoinID: ICoin['coinID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']) {
+  // No captures possible at home position
   if (cellID === 'HOME') {
     return false;
   }
+
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
 
   const activeCoin = coins[activeCoinID];
   const cellInWhichCoinLanded = cells[walkwayPosition][cellID];
+
+  // Debug logging for development
   console.log(cellInWhichCoinLanded, activeCoin);
+
+  // Only normal cells allow captures (not spawn or home path cells)
   if (cellInWhichCoinLanded.cellType === CellType.NORMAL) {
-    // Check if the coin disqualifies another of a different base
+    // Check each coin on the target cell
     for (const coinID of cellInWhichCoinLanded.coinIDs) {
       const coin = coins[coinID];
+      // If it's an opponent coin, disqualify it
       if (activeCoin.baseID !== coin.baseID) {
         yield put(disqualifyCoin(coinID, walkwayPosition, cellID));
-        return true;
+        return true; // Bonus turn for successful capture
       }
     }
   }
 
-  return false;
+  return false; // No captures occurred
 }
 
+/**
+ * Watcher saga for turn progression
+ * Advances to the next player's turn when current turn ends
+ */
 function * watchForNextTurn() {
   yield takeLatest(ActionTypes.NEXT_TURN, nextTurnSaga);
 }
 
+/**
+ * Advances the game to the next player's turn
+ *
+ * Finds the next active player who hasn't won yet, skipping disabled players
+ * or players who have already completed the game. Logs the turn transition.
+ */
 function * nextTurnSaga() {
   const currentTurnBase: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+
+  // Start with the configured next turn
   let nextTurn = bases[currentTurnBase].nextTurn;
   let nextBaseID = currentTurnBase;
+
+  // Find next valid player (enabled and hasn't won)
   for (const key in bases) {
     if (bases[key]) {
       nextBaseID = bases[nextBaseID].nextTurn;
       const nextBase = bases[nextBaseID];
+      // Skip players who are disabled or have already won
       if (nextBase.enabled && !nextBase.hasWon) {
         nextTurn = nextBaseID;
         break;
@@ -240,98 +391,161 @@ function * nextTurnSaga() {
     }
   }
 
+  // Log the turn transition
   yield put(addLogEntry({
     player: bases[nextTurn].color,
     action: 'Turn started',
     details: `${bases[nextTurn].color} player's turn`,
   }));
 
+  // Update current turn in state
   yield put(passTurnTo(nextTurn));
 }
 
+/**
+ * Watcher saga for player setup
+ * Configures which players are active based on selected player count
+ */
 function * watchForSetPlayers() {
   yield takeLatest(ActionTypes.SET_PLAYERS, setPlayersSaga);
 }
 
+/**
+ * Sets up the game for the specified number of players
+ *
+ * Enables the appropriate player bases based on player count:
+ * - 2 players: Enables BASE_2 and BASE_3 (Blue and Red)
+ * - 3 players: Enables BASE_2, BASE_3, and BASE_4 (Blue, Red, Yellow)
+ * - 4 players: Enables all bases (Blue, Green, Red, Yellow)
+ *
+ * @param action - Contains the desired player count (2, 3, or 4)
+ */
 function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
   const { playerCount } = action.data!;
+
   switch (playerCount) {
     case 2:
+      // 2-player game: Blue and Red players
       yield put(enableBase(BaseID.BASE_2));
       yield put(enableBase(BaseID.BASE_3));
       break;
     case 3:
+      // 3-player game: Blue, Red, and Yellow players
       yield put(enableBase(BaseID.BASE_2));
       yield put(enableBase(BaseID.BASE_3));
       yield put(enableBase(BaseID.BASE_4));
       break;
     case 4:
+      // 4-player game: All players enabled
       yield put(enableBase(BaseID.BASE_1));
       yield put(enableBase(BaseID.BASE_2));
       yield put(enableBase(BaseID.BASE_3));
       yield put(enableBase(BaseID.BASE_4));
       break;
     default:
+      // Invalid player count - do nothing
       return;
   }
 }
 
+/**
+ * Watcher saga for coin disqualification
+ * Handles when coins are captured and sent back to base
+ */
 function * watchForDisqualifyCoin() {
   yield takeLatest(ActionTypes.DISQUALIFY_COIN, disqualifyCoinSaga);
 }
 
+/**
+ * Logs when a coin is disqualified (captured by opponent)
+ *
+ * Called when one player's coin lands on the same cell as an opponent's coin,
+ * sending the opponent's coin back to their base. This is logged for game history.
+ *
+ * @param action - Contains coinID that was disqualified
+ */
 function * disqualifyCoinSaga(action: ReturnType<typeof disqualifyCoin>) {
   const { coinID } = action.data!;
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const coin = coins[coinID];
 
+  // Log the disqualification with highlight for importance
   yield put(addLogEntry({
     player: bases[coin.baseID].color,
     action: 'Coin disqualified',
     details: `Coin ${coinID.split('_')[1]} was sent back to base`,
-    highlight: true,
+    highlight: true, // Important event gets visual highlighting
   }));
 }
 
+/**
+ * Watcher saga for coins reaching home
+ * Celebrates when players successfully get coins to the finish
+ */
 function * watchForHomeCoin() {
   yield takeLatest(ActionTypes.HOME_COIN, homeCoinSaga);
 }
 
+/**
+ * Handles when a coin successfully reaches home
+ *
+ * This is the victory condition! When a coin reaches home:
+ * 1. Logs the achievement
+ * 2. Checks if the player has won (all 4 coins home)
+ * 3. If won, marks the player as winner and logs victory
+ *
+ * @param action - Contains coinID that reached home
+ */
 function * homeCoinSaga(action: ReturnType<typeof homeCoin>) {
   const { coinID } = action.data!;
 
+  // Get current game state
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+
+  // Find which player owns this coin
   const { baseID } = coins[coinID];
   const base = bases[baseID];
+
+  // Count how many of this player's coins are retired (at home)
   const retiredCoins = base.coinIDs.filter((coinID) => coins[coinID].isRetired);
 
+  // Log the successful home arrival
   yield put(addLogEntry({
     player: base.color,
     action: 'Coin reached home',
     details: `Coin ${coinID.split('_')[1]} completed the journey!`,
-    highlight: true,
+    highlight: true, // Important achievement gets highlighting
   }));
 
+  // Check for victory condition - all coins must be home
   const hasWon = retiredCoins.length === base.coinIDs.length;
   if (hasWon) {
+    // Player has won! Log victory and mark as winner
     yield put(addLogEntry({
       player: base.color,
       action: 'Game won!',
       details: `${base.color} player has won the game!`,
-      highlight: true,
+      highlight: true, // Victory is the most important event
     }));
     yield put(markWinner(baseID));
   }
 }
 
+/**
+ * Root saga configuration for Ludo game
+ *
+ * Exports all watcher sagas that handle different aspects of the game.
+ * Redux-Saga middleware will fork these sagas when the store is created.
+ * Each saga listens for specific actions and handles the corresponding game logic.
+ */
 export const sagas = [
-  watchForGetInitialGameData,
-  watchForSpawnCoin,
-  watchForMoveCoin,
-  watchForDisqualifyCoin,
-  watchForNextTurn,
-  watchForSetPlayers,
-  watchForHomeCoin,
+  watchForGetInitialGameData, // Game initialization from JSON
+  watchForSpawnCoin,          // Coin spawning from base
+  watchForMoveCoin,           // Coin movement along board
+  watchForDisqualifyCoin,     // Coin captures (logging only)
+  watchForNextTurn,           // Turn progression
+  watchForSetPlayers,         // Player count configuration
+  watchForHomeCoin,           // Victory detection
 ];

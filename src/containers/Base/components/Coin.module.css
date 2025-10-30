@@ -1,18 +1,27 @@
+/**
+ * Coin Component Styles
+ *
+ * Creates a 3D-looking coin with a tilted appearance.
+ * The coin has a circular shape with a highlight to give depth.
+ */
+
+/* Main coin container - creates the base coin shape */
 .Container {
-  border-radius: 50% 50% 50% 0;
-  background: #89849b;
-  transform: rotate(-45deg);
-  box-shadow: 0 0 5px;
-  margin-bottom: 50%;
+  border-radius: 50% 50% 50% 0;    /* Creates a slightly tilted circle shape */
+  background: #89849b;             /* Base gray color for the coin */
+  transform: rotate(-45deg);       /* Rotates the coin to give 3D appearance */
+  box-shadow: 0 0 5px;             /* Subtle shadow for depth */
+  margin-bottom: 50%;              /* Spacing between coins */
 }
 
+/* Pseudo-element creates a highlight circle on top of the coin */
 .Container:after {
-  content: '';
-  width: 50%;
-  height: 50%;
-  margin: 25% 0 0 25%;
-  background: #FFFFFF;
-  position: absolute;
-  border-radius: 50%;
-  box-shadow: inset -3px 3px 5px #999999;
+  content: '';                      /* Required for pseudo-element */
+  width: 50%;                       /* Highlight covers half the coin width */
+  height: 50%;                      /* Highlight covers half the coin height */
+  margin: 25% 0 0 25%;             /* Centers the highlight */
+  background: #FFFFFF;              /* White highlight color */
+  position: absolute;               /* Positions relative to container */
+  border-radius: 50%;               /* Makes highlight circular */
+  box-shadow: inset -3px 3px 5px #999999; /* Inner shadow for 3D effect */
 }

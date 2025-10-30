@@ -1,17 +1,83 @@
+/**
+ * Base Container Component Styles
+ *
+ * Styles for the player base containers where coins start the game.
+ */
+
+/* Outer container - provides centering and positioning */
 .OuterContainer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex;           /* Use flexbox for centering */
+  align-items: center;     /* Center vertically */
+  justify-content: center; /* Center horizontally */
+  position: relative;      /* Required for absolute positioning of base info */
 }
 
+/* Inner container - holds the coin placeholders in a grid */
 .InnerContainer {
-  display: flex;
-  flex-direction: row;
-  background-color: #FFFFFF;
-  flex-wrap: wrap;
-  box-shadow: 0px 2px 5px 0px;
+  display: flex;                /* Use flexbox for coin layout */
+  flex-direction: row;          /* Arrange coins in rows */
+  background-color: #FFFFFF;    /* White background for contrast */
+  flex-wrap: wrap;              /* Allow coins to wrap to new lines */
+  box-shadow: 0px 2px 5px 0px;  /* Subtle shadow for depth */
 }
 
+/* Special styling when base is spawnable (player rolled a 6) */
 .Spawnable {
-  box-shadow: 0px 2px 30px 0px #FFFFFF;
+  box-shadow: 0px 2px 30px 0px #FFFFFF; /* Bright glow effect to indicate spawnable */
+}
+
+/* Base information display container */
+.BaseInfo {
+  position: absolute;           /* Position relative to outer container */
+  top: 2px;                  /* Position above the base */
+  left: 50%;                   /* Center horizontally */
+  transform: translateX(-50%); /* Perfect centering */
+  background-color: rgba(255, 255, 255, 0.95); /* Semi-transparent white background */
+  border-radius: 4px;          /* Rounded corners */
+  padding: 2px 6px;            /* Small padding */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+  font-size: 8px;              /* Small text */
+  font-family: monospace;      /* Monospace for consistent spacing */
+  text-align: center;          /* Center text */
+  min-width: 60px;             /* Minimum width for consistency */
+  pointer-events: none;        /* Don't interfere with clicks */
+  z-index: 10;                 /* Appear above other elements */
+}
+
+/* Base ID display */
+.BaseID {
+  font-weight: bold;           /* Make base ID stand out */
+  color: #333;                 /* Dark text */
+  margin-bottom: 1px;          /* Small spacing */
+  font-size: 9px;              /* Slightly larger for ID */
+}
+
+/* Base color display */
+.BaseColor {
+  color: #666;                 /* Medium gray for color name */
+  margin-bottom: 1px;          /* Small spacing */
+}
+
+/* Base status display (DISABLED, WINNER, SPAWN READY) */
+.BaseStatus {
+  color: #e74c3c;              /* Red color for status */
+  font-weight: bold;           /* Bold status text */
+  font-size: 7px;              /* Small but bold */
+  margin-bottom: 1px;          /* Small spacing */
+}
+
+/* Coin status display (counts of coins in different states) */
+.CoinStatus {
+  font-size: 7px;              /* Very small text */
+  color: #27ae60;              /* Green color for coin counts */
+  line-height: 1.2;            /* Tight line spacing */
+}
+
+.CoinStatus span {
+  display: block;              /* Each status on new line */
+  margin-bottom: 1px;          /* Spacing between lines */
+}
+
+.CoinStatus span:last-child {
+  margin-bottom: 0;            /* No margin on last item */
 }
