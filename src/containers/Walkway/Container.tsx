@@ -113,6 +113,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
   render() {
     // Determine if this walkway should be rendered horizontally or vertically
     const isHorizontal = this.isHorizontalWalkway();
+    const { walkway } = this.props;
 
     return (
       <div
@@ -123,6 +124,8 @@ class WalkwayBare extends React.PureComponent<IProps> {
             : getStyleObject(WALKWAY_WIDTH, WALKWAY_LENGTH) // Vertical walkway dimensions
         }
       >
+        {/* Walkway ID display */}
+        <div className={styles.WalkwayID}>{walkway.ID.replace("_", " ")}</div>
         {
           this.renderCells() // Render all cells in this walkway
         }

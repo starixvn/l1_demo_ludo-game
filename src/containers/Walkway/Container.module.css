@@ -9,4 +9,25 @@
   display: flex;        /* Use flexbox for layout */
   flex-direction: row;  /* Arrange cells in rows */
   flex-wrap: wrap;      /* Allow cells to wrap to new lines */
+  position: relative;   /* Required for absolute positioning of walkway ID */
+}
+
+/* Walkway ID display */
+.WalkwayID {
+  position: absolute;           /* Position relative to container */
+  top: -15px;                  /* Position above the walkway */
+  left: 50%;                   /* Center horizontally */
+  transform: translateX(-50%); /* Perfect centering */
+  background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent white background */
+  border-radius: 3px;          /* Rounded corners */
+  padding: 1px 4px;            /* Small padding */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); /* Subtle shadow */
+  font-size: 7px;              /* Very small text */
+  font-weight: bold;           /* Make it stand out */
+  color: #2c3e50;              /* Dark blue text */
+  font-family: monospace;      /* Monospace for consistent spacing */
+  text-align: center;          /* Center text */
+  min-width: 50px;             /* Minimum width for consistency */
+  pointer-events: none;        /* Don't interfere with clicks */
+  z-index: 5;                  /* Appear above cells but below base info */
 }
