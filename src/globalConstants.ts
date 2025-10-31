@@ -2,13 +2,13 @@ import { BaseColors } from 'state/interfaces';
 
 export const CELL_DIMENSION = 40;                             // Pixels
 export const CELL_SIZE = 1;                                   // Pixels
-export const BOARD_SIZE = 15;                                 // Cells
-export const BOARD_DIMENSION = CELL_DIMENSION * BOARD_SIZE;   // Pixels
+export const BOARD_SIZE = 17;                                 // Cells (increased to accommodate 7 columns in both WEST and EAST walkways)
+export const BOARD_DIMENSION = CELL_DIMENSION * BOARD_SIZE;   // Pixels (680px × 680px)
 export const BASE_SIZE = 6;                                   // Cells
 export const INNER_BASE_SIZE = 4;                             // Cells
 export const COIN_PLACEHOLDER_SIZE = 2;                       // Cells
 export const COIN_SIZE = 1;                                   // Cells
-export const WALKWAY_LENGTH = 6;                              // Cells
+export const WALKWAY_LENGTH = 7;                              // Cells (updated for WEST/EAST with column 6)
 export const WALKWAY_WIDTH = 3;                               // Cells
 export const HOME_SIZE = 3;                                   // Cells
 export const DICE_SIZE = 1;                                   // Cells
