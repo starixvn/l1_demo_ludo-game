@@ -355,7 +355,7 @@
         "column": 2,
         "position": "SOUTH",
         "row": 3,
-        "cellType": "STAR",
+        "cellType": "NORMAL",
         "coinIDs": []
       },
       "SOUTH_2_0": {
@@ -483,7 +483,7 @@
         "column": 2,
         "position": "WEST",
         "row": 2,
-        "cellType": "STAR",
+        "cellType": "NORMAL",
         "coinIDs": []
       },
       "WEST_2_1": {
@@ -665,7 +665,7 @@
         "column": 0,
         "position": "NORTH",
         "row": 2,
-        "cellType": "STAR",
+        "cellType": "NORMAL",
         "coinIDs": []
       },
       "NORTH_1_0": {
@@ -856,7 +856,7 @@
         "column": 3,
         "position": "EAST",
         "row": 0,
-        "cellType": "STAR",
+        "cellType": "NORMAL",
         "coinIDs": []
       },
       "EAST_0_4": {

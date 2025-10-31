@@ -2,7 +2,7 @@
  * Cell Component
  *
  * Represents a single cell/space on the Ludo game board walkway.
- * Cells can contain coins, have different types (normal, star, spawn, etc.),
+ * Cells can contain coins, have different types (normal, spawn, homepath, etc.),
  * and handle user interactions like right-click context menus.
  */
 
@@ -11,7 +11,7 @@ import React from "react";
 
 import { CellType, ICell } from "containers/Ludo/state/interfaces"; // Cell type definitions
 import { getStyleObject } from "containers/utils"; // Style utility
-import { CELL_SIZE, STAR_BASE64 } from "globalConstants"; // Size and star image constants
+import { CELL_SIZE } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Color and position types
 
 import { IContextMenuOptions } from "../interfaces"; // Context menu options type
@@ -31,9 +31,7 @@ interface ICellProps {
   walkwayPosition: WalkwayPosition;
   /** Base ID this cell belongs to */
   baseID: string;
-  /** Whether this cell displays a star (special bonus cell) */
-  isStar: boolean;
-  /** Type of cell (spawn, star, homepath, normal) */
+  /** Type of cell (spawn, homepath, normal) */
   cellType: CellType;
   /** Optional background color for the cell */
   color?: BaseColors;
@@ -57,11 +55,10 @@ export class Cell extends React.PureComponent<ICellProps> {
     const {
       color, // Background color of the cell
       column, // Column position
-      cellType, // Type of cell (normal, star, spawn, etc.)
+      cellType, // Type of cell (normal, spawn, homepath, etc.)
       row, // Row position
       walkwayPosition, // Which walkway this cell belongs to
       baseID, // Base ID this cell belongs to
-      isStar, // Whether to show star background
       nextLinkCellIDs, // Next link cell IDs for verification
     } = this.props;
 
@@ -79,7 +76,6 @@ export class Cell extends React.PureComponent<ICellProps> {
         className={classnames(styles.Container, mutipleCoinClassName)} // Base styles + multiple coin handling
         style={{
           ...getStyleObject(CELL_SIZE, CELL_SIZE, color), // Size and color styling
-          backgroundImage: isStar ? `url(${STAR_BASE64})` : undefined, // Star image if applicable
         }}
         // Data attributes for event handling and identification
         data-id={cellID} // Unique cell identifier

@@ -2,7 +2,7 @@
  * Walkway Container Component
  *
  * A development tool for creating and editing Ludo game board walkways.
- * Allows designers to visually place cells, set cell types (normal, star, spawn, homepath),
+ * Allows designers to visually place cells, set cell types (normal, spawn, homepath),
  * and link cells together to define valid movement paths.
  *
  * In production, this would be replaced with pre-configured walkway data.
@@ -187,7 +187,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
               ? base.color
               : undefined
           }
-          isStar={cellType === CellType.STAR} // Special star cell rendering
           cellType={cellType}
           nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
           showDebugText={this.props.showDebugText} // Whether to show debug text
@@ -265,11 +264,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
           action: () =>
             this.markCells({ ...cellInfo, cellType: CellType.SPAWN }),
           label: CellType.SPAWN, // Change to spawn cell (where coins enter)
-        },
-        {
-          action: () =>
-            this.markCells({ ...cellInfo, cellType: CellType.STAR }),
-          label: CellType.STAR, // Change to star cell (bonus moves)
         },
         {
           action: () =>

@@ -15,7 +15,7 @@ import { WalkwayPosition } from 'state/interfaces';           // Position enums
 export interface IContextMenuOptions {
   /** Unique identifier of the cell that was clicked */
   cellID: string,
-  /** Type of the cell (normal, star, spawn, homepath) */
+  /** Type of the cell (normal, spawn, homepath) */
   cellType: CellType;
   /** Base ID that this cell belongs to */
   baseID: string,

@@ -20,7 +20,7 @@ Here is a link to try it out - [Demo](https://ludo.avinashv.dev)
   [BASE3, WALKWAY_SOUTH, BASE4]
   - Each Walkway has 18 cells, either 6 x 3 or 3 x 6, depending on orientation
   - Each cell would have an ID
-  - Cell can be of type - NORMAL, STAR, SPAWN and HOMEPATH
+  - Cell can be of type - NORMAL, SPAWN and HOMEPATH
   - In dev build, there is a context menu that can be opened for each of the cell. This context menu was created and used to mark cells and to link them. This is how coins "know" which cell to go to next.
   - After generating the data needed for the game visuals, the data is put into a json file which the application fetches upon start. This data is supposed to come from BE, the application should work the same if this JSON was replaced by BE in future.
   - Each Coin, Base and Cell have properties with which Game rules have been implemented.

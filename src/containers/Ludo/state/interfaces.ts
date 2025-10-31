@@ -86,7 +86,6 @@ export enum BoardEntities {
  */
 export enum CellType {
   SPAWN = 'SPAWN',      // Cells where coins spawn from base
-  STAR = 'STAR',        // Special cells that give bonus moves
   HOMEPATH = 'HOMEPATH', // Cells on the path to home
   NORMAL = 'NORMAL',    // Regular walkway cells
 }
@@ -103,7 +102,7 @@ export interface ICell {
   position: WalkwayPosition;
   /** Row position on the board grid */
   row: number;
-  /** Type of cell (spawn, star, homepath, normal) */
+  /** Type of cell (spawn, homepath, normal) */
   cellType: CellType;
   /** ID of the base this cell belongs to */
   baseID: IBase['ID'];

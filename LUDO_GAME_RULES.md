@@ -48,12 +48,6 @@ Be the first player to move all 4 of your coins from your base to your home posi
 
 ### 4. Special Cells
 
-#### Star Cells (⭐)
-
-- **Bonus Move**: Landing on a star gives you an extra turn
-- **Effect**: Roll the die again immediately after landing on a star
-- **Strategic**: Stars provide additional movement opportunities
-
 #### Spawn Cells
 
 - **Starting Point**: Where coins first enter the board after spawning
@@ -92,7 +86,7 @@ The game includes automatic actions for faster gameplay:
 ### Turn Progression
 
 - **Forced Spawning**: If you roll a 6 and have coins in your base, you must spawn one
-- **Bonus Turns**: Rolling a 6 or landing on a star gives you an extra turn
+- **Bonus Turns**: Rolling a 6 gives you an extra turn
 - **Skip Turns**: If you have no legal moves, your turn is skipped
 
 ### Game End Conditions
@@ -107,15 +101,13 @@ The game includes automatic actions for faster gameplay:
 
 - **Central Path**: Main circular path where all coins travel
 - **Home Paths**: Individual colored paths leading to each player's home
-- **Star Positions**: Special bonus squares marked with stars
 - **Base Areas**: Colored starting areas for each player's coins
 
 ### Cell Types
 
 1. **Normal Cells**: Standard movement squares
-2. **Star Cells**: Bonus turn squares (⭐)
-3. **Spawn Cells**: Where coins enter the board
-4. **Home Path Cells**: Safe path to home position
+2. **Spawn Cells**: Where coins enter the board
+3. **Home Path Cells**: Safe path to home position
 
 ## 🔧 Technical Implementation Notes
 
@@ -181,7 +173,6 @@ The game includes automatic actions for faster gameplay:
 
 - **Focus on Spawning**: Get multiple coins onto the board quickly
 - **Position Advantage**: Try to block opponent paths when possible
-- **Star Hunting**: Position coins to land on stars for bonus turns
 
 ### Mid Game
 
@@ -209,9 +200,6 @@ The game includes automatic actions for faster gameplay:
 - **Rule**: Only one coin can be captured per move
 - **Strategy**: Choose which opponent coin to eliminate strategically
 
-### Star Bonus Chain
-
-- **Situation**: Landing on star, then rolling another 6
 - **Result**: Can spawn AND get another turn
 - **Advantage**: Maximum movement potential in one turn
 
