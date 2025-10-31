@@ -1098,6 +1098,6 @@
     "SOUTH_1_1": [{"cellID": "SOUTH_0_1", "position": "SOUTH"}],
     "SOUTH_0_1": [{"cellID": "HOME", "position": "HOME"}],
     "EAST_1_0": [{"cellID": "HOME", "position": "HOME"}],
-    "NORTH_5_1": [{"cellID": "NORTH_6_1", "position": "HOME"}]
+    "NORTH_5_1": [{"cellID": "NORTH_6_1", "position": "NORTH"}]
   }
 }
