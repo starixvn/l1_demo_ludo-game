@@ -52,4 +52,20 @@
   border-radius: 2px;          /* Rounded corners */
   font-family: monospace;      /* Monospace font for consistent spacing */
   display: block;              /* Ensure block display */
+  margin-bottom: 1px;          /* Space between base ID and next links */
+}
+
+/* Next link cell IDs display */
+.NextLinks {
+  font-size: 5px;              /* Very small text for link IDs */
+  font-weight: normal;         /* Normal weight */
+  color: #0066cc;              /* Blue color to distinguish links */
+  background-color: rgba(200, 230, 255, 0.9); /* Light blue background */
+  padding: 1px 2px;            /* Small padding around text */
+  border-radius: 2px;          /* Rounded corners */
+  font-family: monospace;      /* Monospace font for consistent spacing */
+  display: block;              /* Ensure block display */
+  max-width: 100%;            /* Prevent overflow */
+  word-break: break-all;       /* Break long cell IDs to fit */
+  line-height: 1.1;           /* Tight line spacing */
 }

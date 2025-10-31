@@ -37,6 +37,8 @@ interface ICellProps {
   cellType: CellType;
   /** Optional background color for the cell */
   color?: BaseColors;
+  /** Next link cell IDs for this cell (for verifying movement paths) */
+  nextLinkCellIDs?: string[];
 
   /** Callback when right-click context menu is opened */
   onContextMenuOpened: (options: IContextMenuOptions) => void;
@@ -58,6 +60,7 @@ export class Cell extends React.PureComponent<ICellProps> {
       walkwayPosition, // Which walkway this cell belongs to
       baseID, // Base ID this cell belongs to
       isStar, // Whether to show star background
+      nextLinkCellIDs, // Next link cell IDs for verification
     } = this.props;
 
     // Generate the cell ID for display
@@ -90,6 +93,11 @@ export class Cell extends React.PureComponent<ICellProps> {
         <div className={styles.CellInfo}>
           <div className={styles.CellID}>{cellID}</div>
           <div className={styles.BaseID}>{baseID}</div>
+          {nextLinkCellIDs && nextLinkCellIDs.length > 0 && (
+            <div className={styles.NextLinks}>
+              → {nextLinkCellIDs.join(", ")}
+            </div>
+          )}
         </div>
         {
           children // Render child components (coins)

@@ -143,6 +143,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
       cells: cellConfigurations, // All cell configurations
       bases, // Player base data
       coins, // All coin data
+      links, // Cell connectivity links
     } = this.props;
 
     // 2D array to hold cell components organized by row/column
@@ -164,6 +165,10 @@ class WalkwayBare extends React.PureComponent<IProps> {
       cellComponents[cellConfiguration.row] =
         cellComponents[cellConfiguration.row] || [];
 
+      // Get next link cell IDs for this cell (for UI verification)
+      const cellLinks = links[cellID] || [];
+      const nextLinkCellIDs = cellLinks.map((link) => link.cellID);
+
       // Create Cell component at the correct grid position
       cellComponents[cellConfiguration.row][cellConfiguration.column] = (
         <Cell
@@ -180,6 +185,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
           }
           isStar={cellType === CellType.STAR} // Special star cell rendering
           cellType={cellType}
+          nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
           onHighlightNextCells={this.onHighlightNextCells} // Hover highlighting
         >
