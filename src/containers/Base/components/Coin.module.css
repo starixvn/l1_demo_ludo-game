@@ -1,27 +1,16 @@
 /**
  * Coin Component Styles
  *
- * Creates a 3D-looking coin with a tilted appearance.
- * The coin has a circular shape with a highlight to give depth.
+ * Displays a Unicode chess piece character (Black Knight - ♞) as the coin.
  */
 
-/* Main coin container - creates the base coin shape */
+/* Main coin container - displays the Unicode character */
 .Container {
-  border-radius: 50% 50% 50% 0;    /* Creates a slightly tilted circle shape */
-  background: #89849b;             /* Base gray color for the coin */
-  transform: rotate(-45deg);       /* Rotates the coin to give 3D appearance */
-  box-shadow: 0 0 5px;             /* Subtle shadow for depth */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
   margin-bottom: 50%;              /* Spacing between coins */
-}
-
-/* Pseudo-element creates a highlight circle on top of the coin */
-.Container:after {
-  content: '';                      /* Required for pseudo-element */
-  width: 50%;                       /* Highlight covers half the coin width */
-  height: 50%;                      /* Highlight covers half the coin height */
-  margin: 25% 0 0 25%;             /* Centers the highlight */
-  background: #FFFFFF;              /* White highlight color */
-  position: absolute;               /* Positions relative to container */
-  border-radius: 50%;               /* Makes highlight circular */
-  box-shadow: inset -3px 3px 5px #999999; /* Inner shadow for 3D effect */
+  font-size: 250%;                 /* 10x larger font size for the Unicode character */
+  line-height: 1;
 }

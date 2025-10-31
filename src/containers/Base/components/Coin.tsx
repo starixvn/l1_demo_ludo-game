@@ -35,12 +35,22 @@ export class Coin extends React.PureComponent<IProps> {
     // Use default coin size if not specified
     const { coinSize = COIN_SIZE } = this.props;
 
+    const style = getStyleObject(coinSize * 0.8, coinSize * 0.8, this.props.baseColor);
+    // Override backgroundColor with color so the Unicode character uses the player's color
+    const finalStyle = {
+      ...style,
+      backgroundColor: 'transparent',
+      color: style.backgroundColor, // Use the background color as text color for the Unicode character
+    };
+
     return (
       <div
         className={styles.Container}                                       // CSS module class for styling
-        style={getStyleObject(coinSize * 0.8, coinSize * 0.8, this.props.baseColor)} // Dynamic size and color
+        style={finalStyle}                                                 // Dynamic size and color
         onClick={() => this.props.onCoinClicked()}                       // Handle click events
-      />
+      >
+        &#9822;
+      </div>
     );
   }
 }
