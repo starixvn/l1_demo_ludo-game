@@ -39,6 +39,8 @@ interface ICellProps {
   color?: BaseColors;
   /** Next link cell IDs for this cell (for verifying movement paths) */
   nextLinkCellIDs?: string[];
+  /** Whether to show debug text (cell ID, base ID, etc.) */
+  showDebugText?: boolean;
 
   /** Callback when right-click context menu is opened */
   onContextMenuOpened: (options: IContextMenuOptions) => void;
@@ -90,15 +92,17 @@ export class Cell extends React.PureComponent<ICellProps> {
         onMouseEnter={(event) => this.highlightNextCells(event)} // Hover highlighting
       >
         {/* Display cell information for debugging/development */}
-        <div className={styles.CellInfo}>
-          <div className={styles.CellID}>{cellID}</div>
-          <div className={styles.BaseID}>{baseID}</div>
-          {nextLinkCellIDs && nextLinkCellIDs.length > 0 && (
-            <div className={styles.NextLinks}>
-              → {nextLinkCellIDs.join(", ")}
-            </div>
-          )}
-        </div>
+        {this.props.showDebugText !== false && (
+          <div className={styles.CellInfo}>
+            <div className={styles.CellID}>{cellID}</div>
+            <div className={styles.BaseID}>{baseID}</div>
+            {nextLinkCellIDs && nextLinkCellIDs.length > 0 && (
+              <div className={styles.NextLinks}>
+                → {nextLinkCellIDs.join(", ")}
+              </div>
+            )}
+          </div>
+        )}
         {
           children // Render child components (coins)
         }

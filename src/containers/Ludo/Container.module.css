@@ -46,3 +46,24 @@
   right: 20px;
   z-index: 10;
 }
+
+.CheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  user-select: none;
+}
+
+.CheckboxLabel:hover {
+  background-color: rgba(255, 255, 255, 1);
+}
+
+.Checkbox {
+  cursor: pointer;
+}

@@ -57,6 +57,7 @@ interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
 /** Local component state */
 interface IState {
   showPlayerConfiguration: boolean; // Whether to show player setup screen
+  showDebugText: boolean; // Whether to show debug text (cell IDs, base IDs, etc.)
 }
 
 /**
@@ -83,7 +84,10 @@ const mapDispatchToProps = {
  */
 class LudoBare extends React.PureComponent<IProps, IState> {
   /** Initial state shows player configuration screen */
-  state: IState = { showPlayerConfiguration: true };
+  state: IState = { 
+    showPlayerConfiguration: true,
+    showDebugText: false, // Hide debug text by default
+  };
 
   /**
    * Load initial game data when component mounts
@@ -139,6 +143,21 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           </div>
         </div>
 
+        {/* Debug text toggle checkbox - shown at all times */}
+        <div className={styles.SidePanel}>
+          <label className={styles.CheckboxLabel}>
+            <input
+              type="checkbox"
+              checked={this.state.showDebugText}
+              onChange={(e) => this.setState({ showDebugText: e.target.checked })}
+              className={styles.Checkbox}
+            />
+            <span>Show Debug Text</span>
+          </label>
+          {/* Game log panel (shown only during gameplay) */}
+          {!this.state.showPlayerConfiguration && <StepLogs />}
+        </div>
+
         {/* Player configuration screen (shown before game starts) */}
         {this.state.showPlayerConfiguration ? (
           <div className={styles.GameConfiguration}>
@@ -153,13 +172,6 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             </button>
           </div>
         ) : null}
-
-        {/* Game log panel (shown during gameplay) */}
-        {!this.state.showPlayerConfiguration && (
-          <div className={styles.SidePanel}>
-            <StepLogs />                               {/* Game action history */}
-          </div>
-        )}
 
         {/* Development-only context menu */}
         {process.env.NODE_ENV === "development" ? <ContextMenu /> : null}
@@ -186,6 +198,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
               key={index}                            // React key for list rendering
               enabled={base.enabled}                 // Whether base is active
               hasWon={base.hasWon}                   // Whether player has won
+              showDebugText={this.state.showDebugText} // Whether to show debug text
             />
           );
         case BoardEntities.HOME:
@@ -197,6 +210,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           return <Walkway
             walkway={walkway!}                      // Walkway configuration
             key={index}
+            showDebugText={this.state.showDebugText} // Whether to show debug text
           />;
         default:
           return null;                              // Unknown entity type

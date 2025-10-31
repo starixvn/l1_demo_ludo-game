@@ -47,6 +47,8 @@ import styles from "./Container.module.css"; // Component styles
 interface IPublicProps {
   /** Configuration for this walkway segment */
   walkway: IWalkway;
+  /** Whether to show debug text (walkway ID, cell IDs, etc.) */
+  showDebugText?: boolean;
 }
 
 /**
@@ -125,7 +127,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
         }
       >
         {/* Walkway ID display */}
-        <div className={styles.WalkwayID}>{walkway.ID.replace("_", " ")}</div>
+        {this.props.showDebugText !== false && (
+          <div className={styles.WalkwayID}>{walkway.ID.replace("_", " ")}</div>
+        )}
         {
           this.renderCells() // Render all cells in this walkway
         }
@@ -186,6 +190,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
           isStar={cellType === CellType.STAR} // Special star cell rendering
           cellType={cellType}
           nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
+          showDebugText={this.props.showDebugText} // Whether to show debug text
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
           onHighlightNextCells={this.onHighlightNextCells} // Hover highlighting
         >

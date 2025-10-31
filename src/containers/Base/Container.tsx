@@ -32,6 +32,8 @@ interface IPublicProps {
   enabled: boolean;
   /** Whether the player of this base has won the game */
   hasWon: boolean;
+  /** Whether to show debug text (base ID, color, etc.) */
+  showDebugText?: boolean;
 }
 
 /**
@@ -102,20 +104,22 @@ class BaseBare extends React.PureComponent<IProps> {
         style={getStyleObject(BASE_SIZE, BASE_SIZE, base.color)} // Colored outer border
       >
         {/* Base information display */}
-        <div className={styles.BaseInfo}>
-          <div className={styles.BaseID}>{baseID.replace('_', ' ')}</div>
-          <div className={styles.BaseColor}>{base.color}</div>
-          <div className={styles.BaseStatus}>
-            {!enabled && 'DISABLED'}
-            {hasWon && 'WINNER!'}
-            {enabled && !hasWon && base.spawnable && 'SPAWN READY'}
+        {this.props.showDebugText !== false && (
+          <div className={styles.BaseInfo}>
+            <div className={styles.BaseID}>{baseID.replace('_', ' ')}</div>
+            <div className={styles.BaseColor}>{base.color}</div>
+            <div className={styles.BaseStatus}>
+              {!enabled && 'DISABLED'}
+              {hasWon && 'WINNER!'}
+              {enabled && !hasWon && base.spawnable && 'SPAWN READY'}
+            </div>
+            <div className={styles.CoinStatus}>
+              {coinsInBase > 0 && <span>In Base: {coinsInBase}</span>}
+              {coinsSpawned > 0 && <span>On Board: {coinsSpawned}</span>}
+              {coinsHome > 0 && <span>Home: {coinsHome}</span>}
+            </div>
           </div>
-          <div className={styles.CoinStatus}>
-            {coinsInBase > 0 && <span>In Base: {coinsInBase}</span>}
-            {coinsSpawned > 0 && <span>On Board: {coinsSpawned}</span>}
-            {coinsHome > 0 && <span>Home: {coinsHome}</span>}
-          </div>
-        </div>
+        )}
 
         <div
           className={classnames(styles.InnerContainer, spawnableClass)}
