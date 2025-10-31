@@ -1,17 +1,30 @@
 import { BaseColors } from 'state/interfaces';
 
-export const CELL_DIMENSION = 40;                             // Pixels
-export const CELL_SIZE = 1;                                   // Pixels
+// Base size constants (in cells)
+export const UNIT_SIZE = 1;                                   // Base unit size: 1 cell
+export const WALKWAY_ROW_COUNT = 7;                           // Number of rows/columns in walkway (WALKWAY_LENGTH and BASE_SIZE both use this)
+export const WALKWAY_COLUMN_COUNT = 3;                        // Number of columns/rows in walkway (WALKWAY_WIDTH and HOME_SIZE both use this)
+export const INNER_BASE_DIMENSION = 4;                        // Inner base dimension (INNER_BASE_SIZE)
+export const COIN_PLACEHOLDER_DIMENSION = 2;                  // Coin placeholder dimension
+
+// Pixel dimensions
+export const CELL_DIMENSION = 40;                             // Pixels per cell
 export const BOARD_SIZE = 17;                                 // Cells (increased to accommodate 7 columns in both WEST and EAST walkways)
 export const BOARD_DIMENSION = CELL_DIMENSION * BOARD_SIZE;   // Pixels (680px × 680px)
-export const BASE_SIZE = 6;                                   // Cells
-export const INNER_BASE_SIZE = 4;                             // Cells
-export const COIN_PLACEHOLDER_SIZE = 2;                       // Cells
-export const COIN_SIZE = 1;                                   // Cells
-export const WALKWAY_LENGTH = 7;                              // Cells (updated for WEST/EAST with column 6)
-export const WALKWAY_WIDTH = 3;                               // Cells
-export const HOME_SIZE = 3;                                   // Cells
-export const DICE_SIZE = 1;                                   // Cells
+
+// Size constants mapped to base constants (for backward compatibility and semantic clarity)
+export const CELL_SIZE = UNIT_SIZE;                           // Size of a single cell (1)
+export const COIN_SIZE = UNIT_SIZE;                           // Size of a coin (1)
+export const DICE_SIZE = UNIT_SIZE;                           // Size of a die (1)
+
+export const BASE_SIZE = WALKWAY_ROW_COUNT;                   // Base size (7) - same as walkway length
+export const WALKWAY_LENGTH = WALKWAY_ROW_COUNT;              // Walkway length (7)
+export const WALKWAY_WIDTH = WALKWAY_COLUMN_COUNT;           // Walkway width (3)
+export const HOME_SIZE = WALKWAY_COLUMN_COUNT;                // Home size (3) - same as walkway width
+export const INNER_BASE_SIZE = INNER_BASE_DIMENSION;         // Inner base size (4)
+export const COIN_PLACEHOLDER_SIZE = COIN_PLACEHOLDER_DIMENSION; // Coin placeholder size (2)
+
+// Game rules
 export const WINNING_MOVES = 56;
 export const BASE_COLORS: { [key: string]: string } = {
   [BaseColors.RED]: '#D22E2E',

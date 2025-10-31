@@ -254,16 +254,133 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
 
     // Find next possible cells from current position
     const nextCells = links[cellID];
+    
+    // Safety check: if no links found, this is a configuration error
+    if (!nextCells || nextCells.length === 0) {
+      console.error(`No links found for cell ${cellID} - coin ${coinID} cannot move forward`);
+      yield put(moveCoinFailure());
+      yield put(nextTurn());
+      yield put(enableDie());
+      return; // Exit movement saga to prevent hanging
+    }
+    
     let nextCell;
 
-    // Special logic for entering home path - prefer same-base home path cells
-    nextCell = nextCells.length > 1
-    ? nextCells.find(
-      (cell) =>
-        cells[cell.position][cell.cellID].cellType === CellType.HOMEPATH
-        && coins[coinID].baseID === cells[cell.position][cell.cellID].baseID,
-    ) || nextCells[0]  // Fallback to first option if no home path found
-    : nextCells[0];    // Single option available
+    // Special logic for entering home path - ONLY allow same-base home path cells
+    if (nextCells.length > 1) {
+      // Multiple options available
+      // Priority 0: Check if HOME is available - it's always the best choice
+      const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
+      if (homeCell) {
+        // HOME is always allowed - it's the final destination
+        nextCell = homeCell;
+      } else {
+        // Priority 1: Try to find a home path cell that matches this coin's base
+        const matchingHomePath = nextCells.find(
+          (cell) => {
+            // Skip HOME cells - they're handled above
+            if (cell.cellID === 'HOME') {
+              return false;
+            }
+            const cellData = cells[cell.position]?.[cell.cellID];
+            if (!cellData) {
+              console.warn(`Cell data not found for ${cell.cellID} at position ${cell.position}`);
+              return false;
+            }
+            return cellData.cellType === CellType.HOMEPATH
+              && coins[coinID].baseID === cellData.baseID;
+          }
+        );
+
+        if (matchingHomePath) {
+          // Use the matching home path if found - PRIORITIZE this!
+          nextCell = matchingHomePath;
+        } else {
+          // No matching home path found - filter valid cells
+          // Filter out any home path cells that don't match this coin's base
+          const validCells = nextCells.filter((cell) => {
+            // HOME is always valid (handled above, but include it here as safety)
+            if (cell.cellID === 'HOME') {
+              return true;
+            }
+            const cellData = cells[cell.position]?.[cell.cellID];
+            if (!cellData) {
+              console.warn(`Cell data not found for ${cell.cellID} at position ${cell.position}`);
+              return false;
+            }
+            // Allow: non-home-path cells OR home path cells that match this coin's base
+            return cellData.cellType !== CellType.HOMEPATH
+              || cellData.baseID === coins[coinID].baseID;
+          });
+
+          if (validCells.length > 0) {
+            // Among valid cells, prioritize any matching home path cells
+            // (in case the filter didn't catch it earlier)
+            const homePathInValid = validCells.find((cell) => {
+              if (cell.cellID === 'HOME') {
+                return false; // Already handled
+              }
+              const cellData = cells[cell.position]?.[cell.cellID];
+              return cellData?.cellType === CellType.HOMEPATH
+                && cellData.baseID === coins[coinID].baseID;
+            });
+            
+            nextCell = homePathInValid || validCells[0]; // Prefer home path, otherwise first valid
+          } else {
+            // No valid cells found after filtering - this is a configuration error
+            // Prefer non-home-path cells, or if all are home paths, fail the move
+            const nonHomePathCells = nextCells.filter((cell) => {
+              // HOME is always valid
+              if (cell.cellID === 'HOME') {
+                return true;
+              }
+              const cellData = cells[cell.position]?.[cell.cellID];
+              return cellData?.cellType !== CellType.HOMEPATH;
+            });
+            
+            if (nonHomePathCells.length > 0) {
+              nextCell = nonHomePathCells[0]; // Use non-home-path cell as last resort
+            } else {
+              // All cells are home paths but none match this coin's base
+              // This is a configuration error - log and fail the move
+              console.error(`Coin ${coinID} at ${cellID} has no valid moves - all next cells are other bases' home paths`);
+              yield put(moveCoinFailure());
+              yield put(nextTurn());
+              yield put(enableDie());
+              return; // Exit movement saga to prevent hanging
+            }
+          }
+        }
+      }
+    } else {
+      // Single option available - validate it's not someone else's home path
+      // Special case: HOME is a valid destination (not stored in cells structure)
+      if (nextCells[0].cellID === 'HOME') {
+        // HOME is always allowed - it's the final destination
+        nextCell = nextCells[0];
+      } else {
+        // For non-HOME cells, check cell data exists and validate home path access
+        const cellData = cells[nextCells[0].position]?.[nextCells[0].cellID];
+        if (!cellData) {
+          console.error(`Cell data not found for ${nextCells[0].cellID} at position ${nextCells[0].position}`);
+          yield put(moveCoinFailure());
+          yield put(nextTurn());
+          yield put(enableDie());
+          return;
+        }
+        
+        if (cellData.cellType === CellType.HOMEPATH && cellData.baseID !== coins[coinID].baseID) {
+          // Prevent entering another base's home path
+          console.warn(`Coin ${coinID} cannot enter ${nextCells[0].cellID} - wrong base home path (expected ${coins[coinID].baseID}, got ${cellData.baseID})`);
+          yield put(moveCoinFailure());
+          yield put(nextTurn());
+          yield put(enableDie());
+          return; // Fail the move instead of allowing it
+        } else {
+          nextCell = nextCells[0];
+        }
+      }
+    }
 
     // Animate: lift coin from current cell
     yield put(liftCoin(cellID, coinID, walkwayPosition));
@@ -377,17 +494,54 @@ function * nextTurnSaga() {
   // Start with the configured next turn
   let nextTurn = bases[currentTurnBase].nextTurn;
   let nextBaseID = currentTurnBase;
+  let validPlayerFound = false;
+  const maxIterations = 4; // Maximum number of players to check
+  let iterations = 0;
 
   // Find next valid player (enabled and hasn't won)
-  for (const key in bases) {
-    if (bases[key]) {
-      nextBaseID = bases[nextBaseID].nextTurn;
-      const nextBase = bases[nextBaseID];
-      // Skip players who are disabled or have already won
-      if (nextBase.enabled && !nextBase.hasWon) {
-        nextTurn = nextBaseID;
+  // Iterate through players with a maximum limit to prevent infinite loops
+  while (iterations < maxIterations && !validPlayerFound) {
+    nextBaseID = bases[nextBaseID].nextTurn;
+    const nextBase = bases[nextBaseID];
+    
+    // Check if this player is valid (enabled and hasn't won)
+    if (nextBase && nextBase.enabled && !nextBase.hasWon) {
+      nextTurn = nextBaseID;
+      validPlayerFound = true;
+      break;
+    }
+    
+    iterations++;
+    
+    // Prevent infinite loop if we've checked all players
+    if (nextBaseID === currentTurnBase) {
+      // We've cycled back to the starting player - no valid players found
+      console.warn('No valid players found for next turn - all players disabled or won');
+      break;
+    }
+  }
+
+  // Validate that we found a valid player before proceeding
+  if (!validPlayerFound || !bases[nextTurn]) {
+    console.error('Failed to find valid next player - game may be in invalid state');
+    // Try to find any enabled player as fallback
+    for (const key in bases) {
+      if (bases[key] && bases[key].enabled && !bases[key].hasWon) {
+        nextTurn = key as BaseID;
+        validPlayerFound = true;
         break;
       }
+    }
+    
+    // If still no valid player found, log error and exit
+    if (!validPlayerFound || !bases[nextTurn]) {
+      console.error('Cannot proceed - no valid players available');
+      yield put(addLogEntry({
+        player: 'SYSTEM',
+        action: 'Game Error',
+        details: 'No valid players found - game cannot continue',
+      }));
+      return; // Exit saga without updating turn
     }
   }
 

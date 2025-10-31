@@ -23,9 +23,10 @@ import {
   spawnCoin,
   ActionTypes as LudoActionTypes,
 } from 'containers/Ludo/state/actions';
-import { IBase, ICoin } from 'containers/Ludo/state/interfaces';
+import { rollDie } from './actions';
+import { BaseID, CellType, IBase, ICoin } from 'containers/Ludo/state/interfaces';
 import { getMovableCoins } from 'containers/Ludo/state/sagas';
-import { basesSelector, coinsSelector, currentTurnSelector } from 'containers/Ludo/state/selectors';
+import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
 
@@ -68,30 +69,252 @@ function * rollDieSaga() {
 }
 
 /**
+ * Checks if a coin can reach HOME or HOMEPATH after moving the specified number of steps
+ * @param coinID - The coin to check
+ * @param stepsToTake - Number of steps to simulate
+ * @returns 'HOME' if coin can reach HOME, 'HOMEPATH' if it can reach HOMEPATH, null otherwise
+ */
+function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<any, 'HOME' | 'HOMEPATH' | null, any> {
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+  
+  const coin = coins[coinID];
+  if (!coin || !coin.isSpawned || coin.isRetired) {
+    return null;
+  }
+
+  // Simulate the path the coin would take
+  let currentCellID = coin.cellID;
+  
+  for (let step = 0; step < stepsToTake; step++) {
+    const nextCells = links[currentCellID];
+    if (!nextCells || nextCells.length === 0) {
+      return null; // No path available
+    }
+
+    // First, check if any option leads directly to HOME
+    const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
+    if (homeCell) {
+      return 'HOME'; // Can reach HOME!
+    }
+
+    let nextCell;
+    
+    // Try to find a home path cell that matches this coin's base
+    const matchingHomePath = nextCells.find((cell) => {
+      // Skip HOME cells - they don't exist in the cells structure
+      if (cell.cellID === 'HOME') {
+        return false;
+      }
+      const cellData = cells[cell.position]?.[cell.cellID];
+      if (!cellData) {
+        return false;
+      }
+      return cellData.cellType === CellType.HOMEPATH && coin.baseID === cellData.baseID;
+    });
+
+    if (matchingHomePath) {
+      nextCell = matchingHomePath;
+      // Continue checking if we can reach HOME from this home path
+    } else {
+      // Check if any option is a home path (even if not matching, to see if we're close)
+      const anyHomePath = nextCells.find((cell) => {
+        // Skip HOME cells
+        if (cell.cellID === 'HOME') {
+          return false;
+        }
+        const cellData = cells[cell.position]?.[cell.cellID];
+        if (!cellData) {
+          return false;
+        }
+        return cellData.cellType === CellType.HOMEPATH && coin.baseID === cellData.baseID;
+      });
+      if (anyHomePath) {
+        // Check if we can reach HOME from this position
+        const remainingSteps = stepsToTake - step - 1;
+        if (remainingSteps > 0) {
+          const deepCheck = yield call(canReachHomeFromCell, anyHomePath.cellID, coin.baseID, remainingSteps);
+          if (deepCheck === 'HOME') {
+            return 'HOME';
+          }
+          if (deepCheck === 'HOMEPATH') {
+            return 'HOMEPATH';
+          }
+        }
+      }
+      
+      // Use first available option for simulation (skip HOME if it's the only option, as it means we can reach it)
+      nextCell = nextCells.find((cell) => cell.cellID !== 'HOME') || nextCells[0];
+    }
+
+    // Check if we're moving to HOME
+    if (nextCell.cellID === 'HOME') {
+      return 'HOME';
+    }
+
+    currentCellID = nextCell.cellID;
+    
+    // Check if we're on a home path (only if not HOME)
+    if (nextCell.cellID !== 'HOME') {
+      const cellData = cells[nextCell.position]?.[currentCellID];
+      if (cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === coin.baseID) {
+        return 'HOMEPATH'; // Can reach home path
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Helper to check if a coin can reach HOME from a specific cell
+ */
+function * canReachHomeFromCell(cellID: string, baseID: BaseID, remainingSteps: number): Generator<any, 'HOME' | 'HOMEPATH' | null, any> {
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+  
+  if (remainingSteps <= 0) {
+    return null;
+  }
+
+  let currentCellID = cellID;
+  
+  for (let step = 0; step < remainingSteps; step++) {
+    const nextCells = links[currentCellID];
+    if (!nextCells || nextCells.length === 0) {
+      return null;
+    }
+
+    // Check if HOME is reachable
+    const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
+    if (homeCell) {
+      return 'HOME';
+    }
+
+    // Check for matching home path
+    const matchingHomePath = nextCells.find((cell) => {
+      // Skip HOME cells - they don't exist in the cells structure
+      if (cell.cellID === 'HOME') {
+        return false;
+      }
+      const cellData = cells[cell.position]?.[cell.cellID];
+      if (!cellData) {
+        return false;
+      }
+      return cellData.cellType === CellType.HOMEPATH && baseID === cellData.baseID;
+    });
+
+    if (matchingHomePath) {
+      currentCellID = matchingHomePath.cellID;
+      const cellData = cells[matchingHomePath.position]?.[currentCellID];
+      if (cellData && cellData.cellType === CellType.HOMEPATH) {
+        return 'HOMEPATH';
+      }
+    } else {
+      // Use first available option (prefer non-HOME cells for simulation)
+      const nonHomeCell = nextCells.find((cell) => cell.cellID !== 'HOME');
+      currentCellID = nonHomeCell ? nonHomeCell.cellID : nextCells[0].cellID;
+      
+      // If we're moving to HOME, return immediately
+      if (currentCellID === 'HOME') {
+        return 'HOME';
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Automatically chooses and executes an action when the player doesn't respond in time
+ * Prioritizes moves that can reach HOME or HOMEPATH cells
  * @param spawnableCoins - Array of coin IDs that can be spawned
  * @param movableCoins - Array of coin IDs that can be moved
  * @param currentTurnBase - The current player's base information
  */
 function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICoin['coinID'][], currentTurnBase: IBase) {
   const mt = MersenneTwister19937.autoSeed();
+  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
 
-  // Determine available actions based on game state
+  // Priority 1: Check if any movable coins can reach HOME
+  const coinsThatCanReachHome: ICoin['coinID'][] = [];
+  const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
+  const otherCoins: ICoin['coinID'][] = [];
+
+  if (movableCoins.length > 0) {
+    for (const coinID of movableCoins) {
+      const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, currentDieRoll);
+      if (result === 'HOME') {
+        coinsThatCanReachHome.push(coinID);
+      } else if (result === 'HOMEPATH') {
+        coinsThatCanReachHomePath.push(coinID);
+      } else {
+        otherCoins.push(coinID);
+      }
+    }
+  }
+
+  // Priority 1: Choose coin that can reach HOME
+  if (coinsThatCanReachHome.length > 0) {
+    const chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
+    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+    const coin = coins[chosenCoinID];
+    
+    yield put(addLogEntry({
+      player: currentTurnBase.color,
+      action: 'Auto-action',
+      details: `Automatically chose to move coin ${chosenCoinID.split('_')[1]} (can reach HOME)`,
+    }));
+    
+    yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+    return;
+  }
+
+  // Priority 2: Choose coin that can reach HOMEPATH
+  if (coinsThatCanReachHomePath.length > 0) {
+    const chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
+    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+    const coin = coins[chosenCoinID];
+    
+    yield put(addLogEntry({
+      player: currentTurnBase.color,
+      action: 'Auto-action',
+      details: `Automatically chose to move coin ${chosenCoinID.split('_')[1]} (can reach HOMEPATH)`,
+    }));
+    
+    yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+    return;
+  }
+
+  // Priority 3: Choose between spawn and move (prefer move if available)
   const availableActions = [];
-  if (spawnableCoins.length > 0) availableActions.push('spawn');
   if (movableCoins.length > 0) availableActions.push('move');
+  if (spawnableCoins.length > 0) availableActions.push('spawn');
 
-  // Randomly select an action
-  const chosenAction = availableActions[integer(0, availableActions.length - 1)(mt)];
+  // Prefer move if available, otherwise spawn
+  const chosenAction = availableActions[0] || (availableActions.length > 0 ? availableActions[integer(0, availableActions.length - 1)(mt)] : null);
 
-  // Log the automatic action choice
-  yield put(addLogEntry({
-    player: currentTurnBase.color,
-    action: 'Auto-action',
-    details: `Automatically chose to ${chosenAction}`,
-  }));
+  if (chosenAction === 'move' && movableCoins.length > 0) {
+    // Double-check that the selected coin is still movable before dispatching
+    const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
+    if (currentMovableCoins.length > 0) {
+      const chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
+      const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+      const coin = coins[chosenCoinID];
+      
+      yield put(addLogEntry({
+        player: currentTurnBase.color,
+        action: 'Auto-action',
+        details: `Automatically chose to move coin ${chosenCoinID.split('_')[1]}`,
+      }));
+      
+      yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+      return;
+    }
+  }
 
-  if (chosenAction === 'spawn') {
+  if (chosenAction === 'spawn' && spawnableCoins.length > 0) {
     // Double-check that there are still spawnable coins
     const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
     const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
@@ -99,36 +322,27 @@ function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICo
     const currentSpawnableCoins = bases[currentTurn].coinIDs.filter((coinID) => !coins[coinID].isSpawned && !coins[coinID].isRetired);
 
     if (currentSpawnableCoins.length > 0) {
-      const randomSpawnCoin = currentSpawnableCoins[integer(0, currentSpawnableCoins.length - 1)(mt)];
-      yield put(spawnCoin(currentTurnBase.ID, randomSpawnCoin));
-    } else {
-      // Fallback to move if no spawnable coins
-      const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, yield select(currentDieRollSelector));
-      if (currentMovableCoins.length > 0) {
-        const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-        const coin = coins[randomMoveCoin];
-        yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
-      }
+      const chosenCoinID = currentSpawnableCoins[integer(0, currentSpawnableCoins.length - 1)(mt)];
+      
+      yield put(addLogEntry({
+        player: currentTurnBase.color,
+        action: 'Auto-action',
+        details: `Automatically chose to spawn coin ${chosenCoinID.split('_')[1]}`,
+      }));
+      
+      yield put(spawnCoin(currentTurnBase.ID, chosenCoinID));
+      return;
     }
-  } else {
-    // Double-check that the selected coin is still movable before dispatching
-    const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, yield select(currentDieRollSelector));
-    if (currentMovableCoins.length > 0) {
-      const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-      const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-      const coin = coins[randomMoveCoin];
-      yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
-    } else {
-      // Fallback to spawn if no movable coins
-      const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-      const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-      const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-      const currentSpawnableCoins = bases[currentTurn].coinIDs.filter((coinID) => !coins[coinID].isSpawned && !coins[coinID].isRetired);
+  }
 
-      if (currentSpawnableCoins.length > 0) {
-        const randomSpawnCoin = currentSpawnableCoins[integer(0, currentSpawnableCoins.length - 1)(mt)];
-        yield put(spawnCoin(currentTurnBase.ID, randomSpawnCoin));
-      }
+  // Fallback: try move if spawn failed
+  if (movableCoins.length > 0) {
+    const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
+    if (currentMovableCoins.length > 0) {
+      const chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
+      const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+      const coin = coins[chosenCoinID];
+      yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
     }
   }
 }
@@ -145,7 +359,7 @@ function * watchForRollDieComplete() {
  * Implements the core Ludo game logic for turn progression and auto-actions
  * @param action - The roll die complete action with the rolled value
  */
-function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
+function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Generator<any, void, any> {
   const { value } = action.data!;
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
@@ -180,7 +394,7 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
       } else {
         // Auto-actions disabled - wait for user input or auto-actions being re-enabled
         while (true) {
-          const action = yield take([
+          const action: any = yield take([
             LudoActionTypes.SPAWN_COIN_SUCCESS,
             LudoActionTypes.MOVE_COIN_SUCCESS,
             StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED
@@ -215,6 +429,15 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
       yield put(markCurrentBase(false));
     }
     yield put(enableDie());
+    
+    // After rolling a 6, player gets a bonus turn - automatically roll again in auto-play mode
+    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+    if (autoActionsEnabled) {
+      // Small delay before auto-rolling for the bonus turn
+      yield delay(500);
+      // Automatically roll the die for the bonus turn
+      yield put(rollDie());
+    }
   } else if (spawnedCoinIDs.length > 0) {
     // Automove if only one coin is spawned
     if (spawnedCoinIDs.length === 1) {
@@ -238,29 +461,59 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
         });
 
         if (timeout) {
-          // Timeout won - auto select a movable coin
+          // Timeout won - auto select a movable coin (prioritizing HOME/HOMEPATH)
           const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
           if (currentMovableCoins.length > 0) {
             const mt = MersenneTwister19937.autoSeed();
-            const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-            const coin = coins[randomMoveCoin];
             const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
             const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
             const playerColor = bases[currentTurn].color;
 
+            // Prioritize coins that can reach HOME or HOMEPATH
+            const coinsThatCanReachHome: ICoin['coinID'][] = [];
+            const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
+
+            for (const coinID of currentMovableCoins) {
+              const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, value);
+              if (result === 'HOME') {
+                coinsThatCanReachHome.push(coinID);
+              } else if (result === 'HOMEPATH') {
+                coinsThatCanReachHomePath.push(coinID);
+              }
+            }
+
+            // Priority 1: Choose coin that can reach HOME
+            let chosenCoinID: ICoin['coinID'];
+            if (coinsThatCanReachHome.length > 0) {
+              chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
+            } else if (coinsThatCanReachHomePath.length > 0) {
+              // Priority 2: Choose coin that can reach HOMEPATH
+              chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
+            } else {
+              // Priority 3: Random selection
+              chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
+            }
+
+            const coin = coins[chosenCoinID];
+            const details = coinsThatCanReachHome.length > 0
+              ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOME)`
+              : coinsThatCanReachHomePath.length > 0
+              ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOMEPATH)`
+              : `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces`;
+
             yield put(addLogEntry({
               player: playerColor,
               action: 'Auto-moved coin',
-              details: `Automatically moved coin ${randomMoveCoin.split('_')[1]} ${value} spaces`,
+              details,
             }));
 
-            yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
+            yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
           }
         }
       } else {
         // Auto-actions disabled - wait for user input or auto-actions being re-enabled
         while (true) {
-          const action = yield take([
+          const action: any = yield take([
             LudoActionTypes.MOVE_COIN_SUCCESS,
             StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED
           ]);
@@ -277,23 +530,53 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
               });
 
               if (timeout) {
-                // Timeout won - auto select a movable coin
+                // Timeout won - auto select a movable coin (prioritizing HOME/HOMEPATH)
                 const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
                 if (currentMovableCoins.length > 0) {
                   const mt = MersenneTwister19937.autoSeed();
-                  const randomMoveCoin = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-                  const coin = coins[randomMoveCoin];
                   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
                   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
                   const playerColor = bases[currentTurn].color;
 
+                  // Prioritize coins that can reach HOME or HOMEPATH
+                  const coinsThatCanReachHome: ICoin['coinID'][] = [];
+                  const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
+
+                  for (const coinID of currentMovableCoins) {
+                    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, value);
+                    if (result === 'HOME') {
+                      coinsThatCanReachHome.push(coinID);
+                    } else if (result === 'HOMEPATH') {
+                      coinsThatCanReachHomePath.push(coinID);
+                    }
+                  }
+
+                  // Priority 1: Choose coin that can reach HOME
+                  let chosenCoinID: ICoin['coinID'];
+                  if (coinsThatCanReachHome.length > 0) {
+                    chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
+                  } else if (coinsThatCanReachHomePath.length > 0) {
+                    // Priority 2: Choose coin that can reach HOMEPATH
+                    chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
+                  } else {
+                    // Priority 3: Random selection
+                    chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
+                  }
+
+                  const coin = coins[chosenCoinID];
+                  const details = coinsThatCanReachHome.length > 0
+                    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOME)`
+                    : coinsThatCanReachHomePath.length > 0
+                    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOMEPATH)`
+                    : `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces`;
+
                   yield put(addLogEntry({
                     player: playerColor,
                     action: 'Auto-moved coin',
-                    details: `Automatically moved coin ${randomMoveCoin.split('_')[1]} ${value} spaces`,
+                    details,
                   }));
 
-                  yield put(moveCoin(randomMoveCoin, coin.position, coin.cellID));
+                  yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
                 }
               }
               break; // Exit the loop
@@ -307,9 +590,59 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
       }
     }
   } else {
+    // No valid moves available - invalidate roll and pass to next player
     yield put(invalidateDieRoll());
     yield put(nextTurn());
-    yield put(enableDie());
+    // Note: enableDie() and auto-roll will be handled by passTurnToSaga
+  }
+}
+
+/**
+ * Watcher saga that listens for MOVE_COIN_SUCCESS actions
+ * Handles automatic die rolling for bonus turns in auto-play mode
+ */
+function * watchForMoveCoinSuccess() {
+  yield takeLatest(LudoActionTypes.MOVE_COIN_SUCCESS, moveCoinSuccessSaga);
+}
+
+/**
+ * Watcher saga that listens for PASS_TURN_TO actions
+ * Automatically rolls the die for the next player in auto-play mode
+ */
+function * watchForPassTurnTo() {
+  yield takeLatest(LudoActionTypes.PASS_TURN_TO, passTurnToSaga);
+}
+
+/**
+ * Saga that handles turn changes - enables die and auto-rolls in auto-play mode
+ */
+function * passTurnToSaga() {
+  yield put(enableDie());
+  
+  // In auto-play mode, automatically roll for the new player
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  if (autoActionsEnabled) {
+    yield delay(500);
+    yield put(rollDie());
+  }
+}
+
+/**
+ * Saga that handles bonus turns after a successful coin move
+ * If the player got a bonus turn (rolled 6, reached home, or captured), automatically roll again in auto-play mode
+ */
+function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boolean; coinID: string; currentDieRoll: Rolls } }) {
+  const { bonusChance } = action.data!;
+  
+  if (bonusChance) {
+    // Player got a bonus turn - check if we should auto-roll
+    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+    if (autoActionsEnabled) {
+      // Small delay before auto-rolling for the bonus turn
+      yield delay(500);
+      // Automatically roll the die for the bonus turn
+      yield put(rollDie());
+    }
   }
 }
 
@@ -320,4 +653,6 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>) {
 export const sagas = [
   watchForRollDie,          // Watches for die roll requests
   watchForRollDieComplete,  // Watches for die roll completions and handles game logic
+  watchForMoveCoinSuccess,  // Watches for successful moves and handles bonus turns
+  watchForPassTurnTo,       // Watches for turn changes and auto-rolls in auto-play mode
 ];
