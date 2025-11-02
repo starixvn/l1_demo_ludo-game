@@ -1,31 +1,13 @@
 import React from 'react';
-import { connect } from 'react-redux';
-import { createStructuredSelector } from 'reselect';
 
 import { ContextMenu as ContextMenuComponent } from './components/ContextMenu';
-import {
-  contextMenuPositionSelector,
-  isContextMenuVisibleSelector,
-  menuContentsSelector,
-} from './selectors';
+import { useContextMenuSelectors } from './store';
 
-interface IStateProps {
-  visible: ReturnType<typeof isContextMenuVisibleSelector>;
-  position: ReturnType<typeof contextMenuPositionSelector>;
-  menuContents: ReturnType<typeof menuContentsSelector>;
-}
-
-interface IProps extends IStateProps {}
-
-const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  menuContents: menuContentsSelector,
-  position: contextMenuPositionSelector,
-  visible: isContextMenuVisibleSelector,
-})
+interface IProps {}
 
 class ContextMenuBare extends React.PureComponent<IProps> {
   render() {
-    const { menuContents, position, visible } = this.props;
+    const { menuContents, position, visible } = useContextMenuSelectors();
     return visible
     ? (
       <ContextMenuComponent
@@ -37,4 +19,4 @@ class ContextMenuBare extends React.PureComponent<IProps> {
   }
 }
 
-export const ContextMenu = connect(mapStateToProps)(ContextMenuBare) as unknown as React.ComponentClass<{}>;
+export const ContextMenu = ContextMenuBare;

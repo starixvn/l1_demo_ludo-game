@@ -1,55 +1,36 @@
 import React from "react";
-import { connect } from "react-redux";
-import { createStructuredSelector } from "reselect";
 
-import {
-  clearLogs,
-  setAutoActionsEnabled,
-  setAutoActionTimeout,
-} from "./state/actions";
-import {
-  autoActionsEnabledSelector,
-  autoActionTimeoutSelector,
-  logsSelector,
-} from "./state/selectors";
+import { stepLogsStore } from "./state/store";
 
 import styles from "./Container.module.css";
 
-interface IStateProps {
-  logs: ReturnType<typeof logsSelector>;
-  autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
-  autoActionTimeout: ReturnType<typeof autoActionTimeoutSelector>;
-}
-
-interface IDispatchProps {
-  clearLogs: typeof clearLogs;
-  setAutoActionsEnabled: typeof setAutoActionsEnabled;
-  setAutoActionTimeout: typeof setAutoActionTimeout;
-}
-
 interface IPublicProps {}
 
-interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
-
-const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  logs: logsSelector,
-  autoActionsEnabled: autoActionsEnabledSelector,
-  autoActionTimeout: autoActionTimeoutSelector,
-});
-
-const mapDispatchToProps = {
-  clearLogs,
-  setAutoActionsEnabled,
-  setAutoActionTimeout,
-};
+interface IProps extends IPublicProps {}
 
 class StepLogsBare extends React.PureComponent<IProps> {
+  private unsubscribe?: () => void;
+
+  componentDidMount() {
+    // Subscribe to store changes to trigger re-renders
+    this.unsubscribe = stepLogsStore.subscribe(() => {
+      // Force re-render when store changes
+      this.forceUpdate();
+    });
+  }
+
+  componentWillUnmount() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+  }
+
   private handleExportLogs = () => {
-    const { logs } = this.props;
+    const logs = stepLogsStore.getState().logs;
     const exportData = {
       exportedAt: new Date().toISOString(),
       totalLogs: logs.length,
-      logs: logs.map((log) => ({
+      logs: logs.map((log: any) => ({
         ...log,
         timestamp: new Date(log.timestamp).toISOString(),
       })),
@@ -71,7 +52,10 @@ class StepLogsBare extends React.PureComponent<IProps> {
   };
 
   render() {
-    const { logs, autoActionsEnabled, autoActionTimeout } = this.props;
+    const state = stepLogsStore.getState();
+    const logs = state.logs;
+    const autoActionsEnabled = state.autoActionsEnabled;
+    const autoActionTimeout = state.autoActionTimeout;
 
     return (
       <div className={styles.Container}>
@@ -85,7 +69,9 @@ class StepLogsBare extends React.PureComponent<IProps> {
                 className={styles.TimeoutInput}
                 value={autoActionTimeout}
                 onChange={(e) =>
-                  this.props.setAutoActionTimeout(Number(e.target.value))
+                  stepLogsStore
+                    .getState()
+                    .setAutoActionTimeout(Number(e.target.value))
                 }
                 min="50"
                 max="10000"
@@ -99,7 +85,9 @@ class StepLogsBare extends React.PureComponent<IProps> {
                   autoActionsEnabled ? styles.StopButton : styles.ContinueButton
                 }
                 onClick={() =>
-                  this.props.setAutoActionsEnabled(!autoActionsEnabled)
+                  stepLogsStore
+                    .getState()
+                    .setAutoActionsEnabled(!autoActionsEnabled)
                 }
               >
                 {autoActionsEnabled ? "Stop Auto" : "Continue Auto"}
@@ -113,7 +101,7 @@ class StepLogsBare extends React.PureComponent<IProps> {
               </button>
               <button
                 className={styles.ClearButton}
-                onClick={this.props.clearLogs}
+                onClick={() => stepLogsStore.getState().clearLogs()}
               >
                 Clear
               </button>
@@ -124,7 +112,7 @@ class StepLogsBare extends React.PureComponent<IProps> {
           {logs.length === 0 ? (
             <div className={styles.EmptyMessage}>No game events yet</div>
           ) : (
-            logs.map((log) => (
+            logs.map((log: any) => (
               <div
                 key={log.id}
                 className={`${styles.LogEntry} ${
@@ -148,7 +136,4 @@ class StepLogsBare extends React.PureComponent<IProps> {
   }
 }
 
-export const StepLogs = connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(StepLogsBare) as unknown as React.ComponentClass<IPublicProps>;
+export const StepLogs = StepLogsBare;

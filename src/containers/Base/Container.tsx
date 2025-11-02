@@ -6,28 +6,25 @@
  * The base becomes "spawnable" when the player rolls a 6 on the die.
  */
 
-import classnames from 'classnames';                             // Utility for conditional CSS classes
-import React from 'react';
-import { connect } from 'react-redux';                    // Redux connection
-import { createStructuredSelector } from 'reselect';      // Optimized state selection
+import classnames from "classnames"; // Utility for conditional CSS classes
+import React from "react";
 
-import { isDieRollValidSelector } from 'containers/Dice/state/selectors'; // Die roll validation
-import { spawnCoin } from 'containers/Ludo/state/actions'; // Spawn coin action
-import { IBase, ICoin } from 'containers/Ludo/state/interfaces'; // Game data types
-import { basesSelector, coinsSelector } from 'containers/Ludo/state/selectors'; // State selectors
-import { getStyleObject } from 'containers/utils';        // Styling utilities
-import { BASE_SIZE, INNER_BASE_SIZE } from 'globalConstants'; // Size constants
+import { diceStore } from "containers/Dice/state/store"; // Dice Zustand store
+import { IBase, ICoin } from "containers/Ludo/state/interfaces"; // Game data types
+import { ludoStore } from "containers/Ludo/state/store"; // Ludo Zustand store
+import { getStyleObject } from "containers/utils"; // Styling utilities
+import { BASE_SIZE, INNER_BASE_SIZE } from "globalConstants"; // Size constants
 
-import { CoinPlaceholder } from './components/CoinPlaceholder'; // Coin placeholder component
+import { CoinPlaceholder } from "./components/CoinPlaceholder"; // Coin placeholder component
 
-import styles from './Container.module.css';              // Component styles
+import styles from "./Container.module.css"; // Component styles
 
 /**
  * Public props for the Base component
  */
 interface IPublicProps {
   /** Unique identifier for this base (BASE_1, BASE_2, etc.) */
-  baseID: IBase['ID'];
+  baseID: IBase["ID"];
   /** Whether this base is enabled/active in the current game */
   enabled: boolean;
   /** Whether the player of this base has won the game */
@@ -36,66 +33,55 @@ interface IPublicProps {
   showDebugText?: boolean;
 }
 
-/**
- * Props from Redux state
- */
-interface IStateProps {
-  bases: ReturnType<typeof basesSelector>;           // All player bases
-  coins: ReturnType<typeof coinsSelector>;           // All coins in the game
-  isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether die roll can be used
-}
-
-/**
- * Props for Redux dispatch actions
- */
-interface IDispatchProps {
-  spawnCoin: typeof spawnCoin; // Action to spawn a coin from base
-}
-
 /** Combined component props */
-interface IProps extends IPublicProps, IDispatchProps, IStateProps {}
-
-/**
- * Maps Redux dispatch actions to component props
- */
-const mapDispatchToProps = {
-  spawnCoin, // Spawn coin action
-};
-
-/**
- * Maps Redux state to component props using reselect
- */
-const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  bases: basesSelector,                     // Get all player bases
-  coins: coinsSelector,                     // Get all coins
-  isDieRollValid: isDieRollValidSelector,   // Get die roll validity
-});
+interface IProps extends IPublicProps {}
 
 /**
  * Base container component class
  * Renders a player's base with coin placeholders that can spawn coins
  */
 class BaseBare extends React.PureComponent<IProps> {
+  private unsubscribe?: () => void;
+
+  componentDidMount() {
+    // Subscribe to store changes to trigger re-renders
+    this.unsubscribe = ludoStore.subscribe(() => {
+      // Force re-render when store changes
+      this.forceUpdate();
+    });
+  }
+
+  componentWillUnmount() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+  }
+
   /**
    * Renders the base with outer and inner containers
    * Shows coin placeholders that change appearance based on game state
    */
   render() {
-    const { baseID, bases, enabled, hasWon } = this.props;
+    const { baseID, enabled, hasWon } = this.props;
+    const state = ludoStore.getState();
+    const bases = state.bases;
+    const coins = state.coins;
     const base = bases[baseID];
 
     // Add special styling when base is spawnable (player rolled a 6)
     const spawnableClass = base.spawnable ? styles.Spawnable : null;
 
     // Count coins in different states for display
-    const coinsInBase = base.coinIDs.filter(coinID =>
-      this.props.coins[coinID] && !this.props.coins[coinID].isSpawned && !this.props.coins[coinID].isRetired
+    const coinsInBase = base.coinIDs.filter(
+      (coinID: ICoin["coinID"]) =>
+        coins[coinID] && !coins[coinID].isSpawned && !coins[coinID].isRetired
     ).length;
-    const coinsSpawned = base.coinIDs.filter(coinID =>
-      this.props.coins[coinID] && this.props.coins[coinID].isSpawned && !this.props.coins[coinID].isRetired
+    const coinsSpawned = base.coinIDs.filter(
+      (coinID: ICoin["coinID"]) =>
+        coins[coinID] && coins[coinID].isSpawned && !coins[coinID].isRetired
     ).length;
-    const coinsHome = base.coinIDs.filter(coinID =>
-      this.props.coins[coinID] && this.props.coins[coinID].isRetired
+    const coinsHome = base.coinIDs.filter(
+      (coinID: ICoin["coinID"]) => coins[coinID] && coins[coinID].isRetired
     ).length;
 
     return (
@@ -106,12 +92,12 @@ class BaseBare extends React.PureComponent<IProps> {
         {/* Base information display */}
         {this.props.showDebugText !== false && (
           <div className={styles.BaseInfo}>
-            <div className={styles.BaseID}>{baseID.replace('_', ' ')}</div>
+            <div className={styles.BaseID}>{baseID.replace("_", " ")}</div>
             <div className={styles.BaseColor}>{base.color}</div>
             <div className={styles.BaseStatus}>
-              {!enabled && 'DISABLED'}
-              {hasWon && 'WINNER!'}
-              {enabled && !hasWon && base.spawnable && 'SPAWN READY'}
+              {!enabled && "DISABLED"}
+              {hasWon && "WINNER!"}
+              {enabled && !hasWon && base.spawnable && "SPAWN READY"}
             </div>
             <div className={styles.CoinStatus}>
               {coinsInBase > 0 && <span>In Base: {coinsInBase}</span>}
@@ -127,14 +113,14 @@ class BaseBare extends React.PureComponent<IProps> {
         >
           {
             // Render 4 coin placeholders (one for each coin in the base)
-            base.coinIDs.map((coinID, index) => {
-              const coin = this.props.coins[coinID];
+            base.coinIDs.map((coinID: ICoin["coinID"], index: number) => {
+              const coin = coins[coinID];
               return (
                 <CoinPlaceholder
                   key={index}
                   baseColor={base.color} // Coin color matches base color
                   // Hide coin if base is disabled OR coin is already spawned/retired
-                  isCoinHidden={!this.props.enabled || (coin.isSpawned || coin.isRetired)}
+                  isCoinHidden={!enabled || coin.isSpawned || coin.isRetired}
                   onCoinClicked={() => this.onCoinClicked(base, coin)}
                 />
               );
@@ -151,14 +137,13 @@ class BaseBare extends React.PureComponent<IProps> {
    */
   private onCoinClicked = (base: IBase, coin: ICoin) => {
     // Check if player can spawn (rolled 6) and die roll is still valid
-    if (base.spawnable && this.props.isDieRollValid) {
-      this.props.spawnCoin(base.ID, coin.coinID); // Dispatch spawn action
+    if (base.spawnable && diceStore.getState().isDieRollValid) {
+      ludoStore.getState().spawnCoin(base.ID, coin.coinID); // Dispatch spawn action
     }
-  }
+  };
 }
 
 /**
- * Connected Base component with Redux state and actions
- * Exports the component with proper TypeScript typing
+ * Base component with Zustand state management
  */
-export const Base = connect(mapStateToProps, mapDispatchToProps)(BaseBare) as unknown as React.ComponentClass<IPublicProps>;
+export const Base = BaseBare;

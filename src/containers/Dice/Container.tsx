@@ -1,73 +1,61 @@
 import classnames from "classnames";
 import React from "react";
 
-import { connect } from "react-redux";
-import { createStructuredSelector } from "reselect";
-
 import { getStyleObject } from "containers/utils";
 import { DICE_SIZE } from "globalConstants";
 import { BaseColors } from "state/interfaces";
 
-import { rollDie } from "./state/actions";
+import { diceStore } from "./state/store";
 import { CONFIGURATIONS } from "./state/constants";
-import {
-  currentDieRollSelector,
-  isDieRollAllowedSelector,
-} from "./state/selectors";
 
 import styles from "./Container.module.css";
-
-interface IStateProps {
-  currentDieRoll: ReturnType<typeof currentDieRollSelector>;
-  isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
-}
-
-interface IDispatchProps {
-  rollDie: typeof rollDie;
-}
 
 interface IPublicProps {
   baseColor: BaseColors;
 }
 
-interface IProps extends IStateProps, IDispatchProps, IPublicProps {}
-
-const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  currentDieRoll: currentDieRollSelector,
-  isDieRollAllowed: isDieRollAllowedSelector,
-});
-
-const mapDispatchToProps = {
-  rollDie,
-};
+interface IProps extends IPublicProps {}
 
 class DiceBare extends React.PureComponent<IProps> {
   private autoRollTimeout: NodeJS.Timeout | null = null;
+  private wasDieRollAllowed: boolean = true;
+  private unsubscribe?: () => void;
 
   componentDidMount() {
     this.startAutoRollTimer();
+    
+    // Subscribe to store changes to trigger re-renders
+    this.unsubscribe = diceStore.subscribe(() => {
+      // Force re-render when store changes
+      this.forceUpdate();
+    });
   }
 
-  componentDidUpdate(prevProps: IProps) {
+  componentDidUpdate() {
     // Start timer when die becomes rollable again
-    if (!prevProps.isDieRollAllowed && this.props.isDieRollAllowed) {
+    const isDieRollAllowed = diceStore.getState().isDieRollAllowed;
+    if (isDieRollAllowed && !this.wasDieRollAllowed) {
       this.startAutoRollTimer();
     }
     // Clear timer when die is no longer rollable
-    if (prevProps.isDieRollAllowed && !this.props.isDieRollAllowed) {
+    if (!isDieRollAllowed && this.wasDieRollAllowed) {
       this.clearAutoRollTimer();
     }
+    this.wasDieRollAllowed = isDieRollAllowed;
   }
 
   componentWillUnmount() {
     this.clearAutoRollTimer();
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
   }
 
   private startAutoRollTimer = () => {
     this.clearAutoRollTimer(); // Clear any existing timer
-    if (this.props.isDieRollAllowed) {
+    if (diceStore.getState().isDieRollAllowed) {
       this.autoRollTimeout = setTimeout(() => {
-        this.props.rollDie();
+        diceStore.getState().rollDie();
       }, 200); // 0.2 second delay
     }
   };
@@ -81,12 +69,15 @@ class DiceBare extends React.PureComponent<IProps> {
 
   private handleDieClick = () => {
     this.clearAutoRollTimer(); // Clear the auto-roll timer when manually clicked
-    this.props.rollDie();
+    diceStore.getState().rollDie();
   };
 
   render() {
     const { baseColor } = this.props;
-    const dieClassNames = this.props.isDieRollAllowed
+    const state = diceStore.getState();
+    const currentDieRoll = state.roll;
+    const isDieRollAllowed = state.isDieRollAllowed;
+    const dieClassNames = isDieRollAllowed
       ? styles.Die
       : [styles.Die, styles.Disabled];
     return (
@@ -96,16 +87,16 @@ class DiceBare extends React.PureComponent<IProps> {
           style={getStyleObject(DICE_SIZE, DICE_SIZE, baseColor)}
           onClick={this.handleDieClick}
         >
-          {this.renderDots()}
+          {this.renderDots(currentDieRoll)}
         </div>
       </div>
     );
   }
 
-  private renderDots = () => {
+  private renderDots = (currentDieRoll: number) => {
     const elements: any[] = [];
     const configurationForCurrentRoll =
-      CONFIGURATIONS[this.props.currentDieRoll];
+      CONFIGURATIONS[currentDieRoll];
 
     for (let i = 0; i < configurationForCurrentRoll.length; i++) {
       const isVisible = Boolean(configurationForCurrentRoll[i]);
@@ -119,7 +110,4 @@ class DiceBare extends React.PureComponent<IProps> {
   };
 }
 
-export const Dice = connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(DiceBare) as unknown as React.ComponentClass<IPublicProps>;
+export const Dice = DiceBare;

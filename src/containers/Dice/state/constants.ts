@@ -1,51 +1,21 @@
 /**
  * Dice Container Constants
  *
- * Contains visual configurations and constants for dice rendering and gameplay.
+ * Constants used by the dice functionality, including die face configurations.
  */
-
-import { Rolls } from './interfaces';
-
-/** Redux state slice name for the dice container */
-export const NAME = 'dice';
 
 /**
- * Visual dot configurations for each die face
- * Each array represents a 3x3 grid where 1 = dot present, 0 = empty
- * Used for rendering the dice UI component
+ * Die face configurations for each possible roll (1-6)
+ * Each array represents the 7 dots on a standard die face:
+ * [center, top-left, top-right, middle-left, middle-right, bottom-left, bottom-right]
+ * true = dot visible, false = dot hidden
  */
-export const CONFIGURATIONS: { [key: number]: number[] } = {
-  [Rolls.ONE]: [  // Single dot in center
-    0, 0, 0,
-    0, 1, 0,
-    0, 0, 0,
-  ],
-  [Rolls.TWO]: [  // Two dots in diagonal corners
-    0, 0, 1,
-    0, 0, 0,
-    1, 0, 0,
-  ],
-  [Rolls.THREE]: [ // Three dots forming diagonal
-    0, 0, 1,
-    0, 1, 0,
-    1, 0, 0,
-  ],
-  [Rolls.FOUR]: [ // Four dots in corners
-    1, 0, 1,
-    0, 0, 0,
-    1, 0, 1,
-  ],
-  [Rolls.FIVE]: [ // Five dots (four corners + center)
-    1, 0, 1,
-    0, 1, 0,
-    1, 0, 1,
-  ],
-  [Rolls.SIX]: [ // Six dots (two rows of three)
-    1, 1, 1,
-    0, 0, 0,
-    1, 1, 1,
-  ],
-};
-
-/** Array of all possible die roll values for random selection */
-export const allPossibleRolls = [Rolls.ONE, Rolls.TWO, Rolls.THREE, Rolls.FOUR, Rolls.FIVE, Rolls.SIX];
+export const CONFIGURATIONS: boolean[][] = [
+  [], // Index 0 - not used
+  [false, false, false, false, true, false, false], // 1 - center dot
+  [false, true, false, false, false, false, true], // 2 - top-right and bottom-left
+  [false, true, false, false, true, false, true], // 3 - top-right, center, bottom-left
+  [true, false, true, false, false, true, false], // 4 - top-left, top-right, bottom-right, bottom-left
+  [true, false, true, false, true, true, false], // 5 - all except middle-left and bottom-left
+  [true, true, true, false, false, true, true], // 6 - all except middle positions
+];

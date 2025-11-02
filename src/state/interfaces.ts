@@ -1,16 +1,9 @@
 /**
- * Global Application State Interfaces
+ * Global Application Types and Enums
  *
- * Defines the overall structure of the Redux application state and common types
- * used throughout the Ludo game application.
+ * Defines common types and enumerations used throughout the Ludo game application.
+ * These are shared constants and types that don't belong to any specific module.
  */
-
-import { ForkEffect } from 'redux-saga/effects';
-
-import { IState as IDiceState } from 'containers/Dice/state/interfaces';
-import { IState as ILudoState } from 'containers/Ludo/state/interfaces';
-import { IState as IContextMenuState } from 'services/contextMenu/interfaces';
-import { IState as IStepLogsState } from 'containers/StepLogs/state/interfaces';
 
 /**
  * Available colors for player bases in the Ludo game
@@ -32,32 +25,4 @@ export enum WalkwayPosition {
   EAST = 'EAST',    // Right side of board
   WEST = 'WEST',    // Left side of board
   SOUTH = 'SOUTH',  // Bottom side of board
-}
-
-/**
- * Complete application state structure
- * Contains state slices for all major features of the Ludo game
- */
-export interface IApplicationState {
-  ludo: ILudoState;           // Main Ludo game state (coins, bases, cells)
-  contextMenu: IContextMenuState; // Right-click context menu state
-  dice: IDiceState;           // Dice rolling and turn management state
-  stepLogs: IStepLogsState;   // Game action logging and auto-play settings
-}
-
-/**
- * Generic Redux action interface
- * All actions in the app follow this structure
- */
-export interface IReduxAction<T = any, D = any> {
-  type: T;      // Action type string
-  data?: D;     // Optional payload data
-}
-
-/**
- * Saga function interface
- * Defines the shape of Redux-Saga generator functions
- */
-export interface ISaga {
-  (): IterableIterator<ForkEffect>; // Generator function that yields ForkEffects
 }

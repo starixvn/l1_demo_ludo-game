@@ -7,52 +7,26 @@
  */
 
 import React from "react";
-import { connect } from "react-redux";                    // Redux connection
-import { createStructuredSelector } from "reselect";      // Optimized state selection
 
-import { Base } from "containers/Base/Container";         // Player base components
-import { Home } from "containers/Home/Container";         // Home/finish area components
-import { Player } from "containers/Player/Container";     // Player info panels
+import { Base } from "containers/Base/Container"; // Player base components
+import { Home } from "containers/Home/Container"; // Home/finish area components
+import { Player } from "containers/Player/Container"; // Player info panels
 import { StepLogs } from "containers/StepLogs/Container"; // Game action log
-import { Walkway } from "containers/Walkway/Container";   // Game board walkway
-import { getStyleObject } from "containers/utils";        // Styling utilities
-import { BOARD_SIZE } from "globalConstants";             // Board dimensions
+import { Walkway } from "containers/Walkway/Container"; // Game board walkway
+import { getStyleObject } from "containers/utils"; // Styling utilities
+import { BOARD_SIZE } from "globalConstants"; // Board dimensions
 import { ContextMenu } from "services/contextMenu/Container"; // Right-click menu
 
-import { getInitialGameData, setPlayers } from "./state/actions"; // Ludo actions
-import { BaseID, BoardEntities } from "./state/interfaces"; // Game data types
-import {
-  basesSelector,
-  currentTurnSelector,
-  relationshipsSelector,
-  walkwaysSelector,
-} from "./state/selectors"; // State selectors
+import { ludoStore } from "./state/store"; // Ludo Zustand store
+import { BaseID, BoardEntities, IRelationship } from "./state/interfaces"; // Game data types
 
-import styles from "./Container.module.css";              // Component styles
-
-/**
- * Props dispatched to Redux actions
- */
-interface IDispatchProps {
-  getInitialGameData: typeof getInitialGameData; // Initialize game data
-  setPlayers: typeof setPlayers;                 // Configure number of players
-}
-
-/**
- * Props from Redux state
- */
-interface IStateProps {
-  bases: ReturnType<typeof basesSelector>;           // All player bases
-  relationships: ReturnType<typeof relationshipsSelector>; // Board entity relationships
-  walkways: ReturnType<typeof walkwaysSelector>;     // Walkway configurations
-  currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
-}
+import styles from "./Container.module.css"; // Component styles
 
 /** Public props (none in this case) */
 interface IPublicProps {}
 
 /** Combined props for the component */
-interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
+interface IProps extends IPublicProps {}
 
 /** Local component state */
 interface IState {
@@ -61,46 +35,45 @@ interface IState {
 }
 
 /**
- * Maps Redux state to component props using reselect for performance
- */
-const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  bases: basesSelector,           // Get all player bases
-  currentTurn: currentTurnSelector, // Get current player's turn
-  relationships: relationshipsSelector, // Get board entity relationships
-  walkways: walkwaysSelector,     // Get walkway configurations
-});
-
-/**
- * Maps Redux dispatch actions to component props
- */
-const mapDispatchToProps = {
-  setPlayers,                    // Action to set number of players
-  getInitialGameData,           // Action to load initial game data
-};
-
-/**
  * Main Ludo container component class
  * Manages game initialization and renders the complete game interface
  */
 class LudoBare extends React.PureComponent<IProps, IState> {
+  private unsubscribe?: () => void;
+
   /** Initial state shows player configuration screen */
-  state: IState = { 
+  state: IState = {
     showPlayerConfiguration: true,
     showDebugText: false, // Hide debug text by default
   };
 
   /**
-   * Load initial game data when component mounts
+   * Load initial game data when component mounts and subscribe to store changes
    */
   componentDidMount() {
-    this.props.getInitialGameData();
+    ludoStore.getState().getInitialGameData();
+
+    // Subscribe to store changes to trigger re-renders
+    this.unsubscribe = ludoStore.subscribe(() => {
+      // Force re-render when store changes
+      this.forceUpdate();
+    });
+  }
+
+  /**
+   * Unsubscribe from store changes when component unmounts
+   */
+  componentWillUnmount() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
   }
 
   /**
    * Renders the complete Ludo game interface
    */
   render() {
-    const { currentTurn } = this.props;
+    const { currentTurn } = ludoStore.getState();
 
     return (
       <div className={styles.Container}>
@@ -109,13 +82,13 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           {/* Left side players (Base 1 & 3) */}
           <div className={styles.PlayerContainer}>
             <Player
-              baseID={BaseID.BASE_1}                    // Red player
-              placement="top"                           // Position at top of container
+              baseID={BaseID.BASE_1} // Red player
+              placement="top" // Position at top of container
               disabled={currentTurn !== BaseID.BASE_1} // Disable if not their turn
             />
             <Player
-              baseID={BaseID.BASE_3}                    // Yellow player
-              placement="bottom"                        // Position at bottom of container
+              baseID={BaseID.BASE_3} // Yellow player
+              placement="bottom" // Position at bottom of container
               disabled={currentTurn !== BaseID.BASE_3} // Disable if not their turn
             />
           </div>
@@ -125,18 +98,18 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             className={styles.Board}
             style={getStyleObject(BOARD_SIZE, BOARD_SIZE)} // Size the board
           >
-            {this.renderBoardEntities()}               {/* Render bases, walkways, homes */}
+            {this.renderBoardEntities()} {/* Render bases, walkways, homes */}
           </div>
 
           {/* Right side players (Base 2 & 4) */}
           <div className={styles.PlayerContainer}>
             <Player
-              baseID={BaseID.BASE_2}                    // Blue player
+              baseID={BaseID.BASE_2} // Blue player
               placement="top"
               disabled={currentTurn !== BaseID.BASE_2}
             />
             <Player
-              baseID={BaseID.BASE_4}                    // Green player
+              baseID={BaseID.BASE_4} // Green player
               placement="bottom"
               disabled={currentTurn !== BaseID.BASE_4}
             />
@@ -149,7 +122,9 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <input
               type="checkbox"
               checked={this.state.showDebugText}
-              onChange={(e) => this.setState({ showDebugText: e.target.checked })}
+              onChange={(e) =>
+                this.setState({ showDebugText: e.target.checked })
+              }
               className={styles.Checkbox}
             />
             <span>Show Debug Text</span>
@@ -184,36 +159,46 @@ class LudoBare extends React.PureComponent<IProps, IState> {
    * Dynamically creates the appropriate components for each board entity
    */
   private renderBoardEntities = () => {
-    const { bases, relationships, walkways } = this.props;
+    const { bases, relationships, walkways } = ludoStore.getState();
 
-    return relationships.map((relationship, index) => {
-      const base = bases[relationship.ID];          // Get base data if applicable
-      const walkway = walkways[relationship.ID];    // Get walkway data if applicable
+    if (!relationships || relationships.length === 0) {
+      return null; // Don't render anything if data hasn't loaded yet
+    }
+
+    return relationships.map((relationship: IRelationship, index: number) => {
+      const base = bases[relationship.ID]; // Get base data if applicable
+      const walkway = walkways[relationship.ID]; // Get walkway data if applicable
 
       switch (relationship.type) {
         case BoardEntities.BASE:
+          if (!base) return null; // Skip if base data not found
           return (
             <Base
-              baseID={base.ID}                       // Player base identifier
-              key={index}                            // React key for list rendering
-              enabled={base.enabled}                 // Whether base is active
-              hasWon={base.hasWon}                   // Whether player has won
+              baseID={base.ID} // Player base identifier
+              key={index} // React key for list rendering
+              enabled={base.enabled} // Whether base is active
+              hasWon={base.hasWon} // Whether player has won
               showDebugText={this.state.showDebugText} // Whether to show debug text
             />
           );
         case BoardEntities.HOME:
-          return <Home
-            baseIDs={relationship.baseIDs}          // Which bases this home belongs to
-            key={index}
-          />;
+          return (
+            <Home
+              baseIDs={relationship.baseIDs} // Which bases this home belongs to
+              key={index}
+            />
+          );
         case BoardEntities.WALKWAY:
-          return <Walkway
-            walkway={walkway!}                      // Walkway configuration
-            key={index}
-            showDebugText={this.state.showDebugText} // Whether to show debug text
-          />;
+          if (!walkway) return null; // Skip if walkway data not found
+          return (
+            <Walkway
+              walkway={walkway} // Walkway configuration
+              key={index}
+              showDebugText={this.state.showDebugText} // Whether to show debug text
+            />
+          );
         default:
-          return null;                              // Unknown entity type
+          return null; // Unknown entity type
       }
     });
   };
@@ -223,18 +208,14 @@ class LudoBare extends React.PureComponent<IProps, IState> {
    * Hides the configuration screen and initializes the game state
    */
   private startGame = (playerCount: number) => {
-    this.props.setPlayers(playerCount);             // Set number of players in state
+    ludoStore.getState().setPlayers(playerCount); // Set number of players in state
     this.setState({
-      showPlayerConfiguration: false,              // Hide configuration screen
+      showPlayerConfiguration: false, // Hide configuration screen
     });
   };
 }
 
 /**
- * Connected Ludo component with Redux state and actions
- * Exports the component with proper TypeScript typing
+ * Ludo component with Zustand state management
  */
-export const Ludo = connect(
-  mapStateToProps,                                 // State mapping
-  mapDispatchToProps                               // Dispatch mapping
-)(LudoBare) as unknown as React.ComponentClass<IPublicProps>;
+export const Ludo = LudoBare;
