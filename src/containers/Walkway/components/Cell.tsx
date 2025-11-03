@@ -10,7 +10,7 @@ import classnames from "classnames"; // Utility for conditional CSS classes
 import React from "react";
 
 import { CellType, ICell } from "containers/Ludo/state/interfaces"; // Cell type definitions
-import { getStyleObject } from "containers/utils"; // Style utility
+import { getBaseHexColor, getStyleObject } from "containers/utils"; // Style utility
 import { CELL_SIZE, WALKWAY_LENGTH } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Color and position types
 
@@ -87,12 +87,37 @@ export class Cell extends React.PureComponent<ICellProps> {
     const mutipleCoinClassName =
       children && children?.length > 1 ? styles.MultipleCoins : null;
 
+    // Helper function to convert hex to rgba with opacity
+    const hexToRgba = (hex: string, opacity: number): string => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      if (!result) return hex; // Return original if invalid hex
+      const r = parseInt(result[1], 16);
+      const g = parseInt(result[2], 16);
+      const b = parseInt(result[3], 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    };
+
+    // For SPAWN and NORMAL cells, don't apply background color (we'll show a circle instead)
+    // For HOMEPATH cells, apply background color with 0.5 opacity
+    // For other cells, apply normal background color
+    let cellStyle: React.CSSProperties;
+    if (cellType === CellType.SPAWN || cellType === CellType.NORMAL) {
+      cellStyle = getStyleObject(CELL_SIZE, CELL_SIZE); // Only size, no background color
+    } else if (cellType === CellType.HOMEPATH && color) {
+      const baseStyle = getStyleObject(CELL_SIZE, CELL_SIZE);
+      const hexColor = getBaseHexColor(color);
+      cellStyle = {
+        ...baseStyle,
+        backgroundColor: hexToRgba(hexColor, 0.5), // Apply color with 0.5 opacity
+      };
+    } else {
+      cellStyle = getStyleObject(CELL_SIZE, CELL_SIZE, color); // Size and color styling
+    }
+
     return (
       <div
         className={classnames(styles.Container, mutipleCoinClassName)} // Base styles + multiple coin handling
-        style={{
-          ...getStyleObject(CELL_SIZE, CELL_SIZE, color), // Size and color styling
-        }}
+        style={cellStyle}
         // Data attributes for event handling and identification
         data-id={cellID} // Unique cell identifier
         data-base-id={baseID} // Base identifier
@@ -118,6 +143,19 @@ export class Cell extends React.PureComponent<ICellProps> {
         {/* Display index for homepath cells */}
         {cellType === CellType.HOMEPATH && homePathIndex !== undefined && (
           <div className={styles.HomePathIndex}>{homePathIndex}</div>
+        )}
+        {/* Display circle border for spawn and normal cells */}
+        {cellType === CellType.SPAWN && color && (
+          <div
+            className={styles.SpawnCircle}
+            style={{ borderColor: getBaseHexColor(color) }}
+          />
+        )}
+        {cellType === CellType.NORMAL && color && (
+          <div
+            className={styles.NormalCircle}
+            style={{ borderColor: getBaseHexColor(color) }}
+          />
         )}
         {
           children // Render child components (coins)

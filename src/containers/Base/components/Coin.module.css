@@ -10,7 +10,8 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-bottom: 50%;              /* Spacing between coins */
+  margin-bottom: 10%;              /* Spacing between coins */
   font-size: 250%;                 /* 10x larger font size for the Unicode character */
   line-height: 1;
+  z-index: 6;
 }

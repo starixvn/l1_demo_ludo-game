@@ -181,9 +181,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
           row={row}
           walkwayPosition={position}
           baseID={cellConfiguration.baseID} // Base ID this cell belongs to
-          // Color special cells (spawn/homepath) with base color
+          // Color special cells (spawn/homepath/normal) with base color
           color={
-            [CellType.HOMEPATH, CellType.SPAWN].includes(cellType)
+            [CellType.HOMEPATH, CellType.SPAWN, CellType.NORMAL].includes(cellType)
               ? base.color
               : undefined
           }
