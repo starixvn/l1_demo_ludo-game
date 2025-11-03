@@ -17,7 +17,7 @@ import { ILogEntry, IState } from './interfaces';
 const initialState: IState = {
   logs: [],                      // Start with empty log history
   maxLogs: 1000,                // Store up to 1000 log entries (increased for export)
-  autoActionsEnabled: true,     // Enable automatic actions by default
+  autoActionsEnabled: false,     // Disable automatic actions by default
   autoActionTimeout: AUTO_ACTION_TIMEOUT,       // Default timeout for auto-actions from globalConstants
 };
 

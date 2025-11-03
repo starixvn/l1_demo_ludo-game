@@ -4,11 +4,9 @@ import { createStructuredSelector } from "reselect";
 
 import {
   clearLogs,
-  setAutoActionsEnabled,
   setAutoActionTimeout,
 } from "./state/actions";
 import {
-  autoActionsEnabledSelector,
   autoActionTimeoutSelector,
   logsSelector,
 } from "./state/selectors";
@@ -17,13 +15,11 @@ import styles from "./Container.module.css";
 
 interface IStateProps {
   logs: ReturnType<typeof logsSelector>;
-  autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
   autoActionTimeout: ReturnType<typeof autoActionTimeoutSelector>;
 }
 
 interface IDispatchProps {
   clearLogs: typeof clearLogs;
-  setAutoActionsEnabled: typeof setAutoActionsEnabled;
   setAutoActionTimeout: typeof setAutoActionTimeout;
 }
 
@@ -33,13 +29,11 @@ interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
 
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   logs: logsSelector,
-  autoActionsEnabled: autoActionsEnabledSelector,
   autoActionTimeout: autoActionTimeoutSelector,
 });
 
 const mapDispatchToProps = {
   clearLogs,
-  setAutoActionsEnabled,
   setAutoActionTimeout,
 };
 
@@ -71,7 +65,7 @@ class StepLogsBare extends React.PureComponent<IProps> {
   };
 
   render() {
-    const { logs, autoActionsEnabled, autoActionTimeout } = this.props;
+    const { logs, autoActionTimeout } = this.props;
 
     return (
       <div className={styles.Container}>
@@ -94,16 +88,6 @@ class StepLogsBare extends React.PureComponent<IProps> {
               <span className={styles.TimeoutUnit}>ms</span>
             </div>
             <div className={styles.ButtonGroup}>
-              <button
-                className={
-                  autoActionsEnabled ? styles.StopButton : styles.ContinueButton
-                }
-                onClick={() =>
-                  this.props.setAutoActionsEnabled(!autoActionsEnabled)
-                }
-              >
-                {autoActionsEnabled ? "Stop Auto" : "Continue Auto"}
-              </button>
               <button
                 className={styles.ExportButton}
                 onClick={this.handleExportLogs}

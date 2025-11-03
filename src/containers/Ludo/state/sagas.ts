@@ -17,8 +17,7 @@ import {
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
 import { enableDie, invalidateDieRoll } from 'containers/Dice/state/actions';
-import { addLogEntry, setAutoActionsEnabled } from 'containers/StepLogs/state/actions';
-import { autoActionsEnabledSelector } from 'containers/StepLogs/state/selectors';
+import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRollSelector } from 'containers/Dice/state/selectors';
 import { WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } from 'globalConstants';
@@ -578,9 +577,6 @@ function * watchForSetPlayers() {
 function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
   const { playerCount } = action.data!;
 
-  // Explicitly disable auto-actions when starting a new game
-  yield put(setAutoActionsEnabled(false));
-  
   // Small delay to ensure state is updated before proceeding
   yield delay(LUDO_STATE_UPDATE_DELAY);
 
@@ -616,17 +612,8 @@ function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
   const firstEnabledBase = Object.values(updatedBases).find((base) => base.enabled);
   
   if (firstEnabledBase) {
-    // Double-check that auto-actions are disabled before setting turn
-    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-    
-    if (autoActionsEnabled) {
-      // Force disable again if somehow still enabled
-      yield put(setAutoActionsEnabled(false));
-      yield delay(LUDO_STATE_UPDATE_DELAY);
-    }
-    
     // Set the first enabled player's turn directly (this will trigger passTurnToSaga)
-    // Auto-actions are explicitly disabled above, so it won't auto-roll
+    // passTurnToSaga will respect the auto-actions setting from the user's checkbox
     yield put(passTurnTo(firstEnabledBase.ID));
   }
 }

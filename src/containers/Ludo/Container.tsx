@@ -30,6 +30,7 @@ import {
   clearLogs,
   setAutoActionsEnabled,
 } from "containers/StepLogs/state/actions"; // StepLogs actions
+import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors"; // StepLogs selectors
 import { BaseID, BoardEntities } from "./state/interfaces"; // Game data types
 import {
   basesSelector,
@@ -61,6 +62,7 @@ interface IStateProps {
   relationships: ReturnType<typeof relationshipsSelector>; // Board entity relationships
   walkways: ReturnType<typeof walkwaysSelector>; // Walkway configurations
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
+  autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>; // Whether auto-actions are enabled
 }
 
 /** Public props (none in this case) */
@@ -84,6 +86,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentTurn: currentTurnSelector, // Get current player's turn
   relationships: relationshipsSelector, // Get board entity relationships
   walkways: walkwaysSelector, // Get walkway configurations
+  autoActionsEnabled: autoActionsEnabledSelector, // Get auto-actions enabled state
 });
 
 /**
@@ -177,6 +180,18 @@ class LudoBare extends React.PureComponent<IProps, IState> {
               Reset Game
             </button>
           )}
+          {/* Auto-actions toggle - shown at all times */}
+          <label className={styles.CheckboxLabel}>
+            <input
+              type="checkbox"
+              checked={this.props.autoActionsEnabled}
+              onChange={(e) =>
+                this.props.setAutoActionsEnabled(e.target.checked)
+              }
+              className={styles.Checkbox}
+            />
+            <span>Auto Run</span>
+          </label>
           <label className={styles.CheckboxLabel}>
             <input
               type="checkbox"
