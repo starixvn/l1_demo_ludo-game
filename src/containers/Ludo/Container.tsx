@@ -58,6 +58,7 @@ interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
 interface IState {
   showPlayerConfiguration: boolean; // Whether to show player setup screen
   showDebugText: boolean; // Whether to show debug text (cell IDs, base IDs, etc.)
+  showGameLog: boolean; // Whether to show the game log panel
 }
 
 /**
@@ -87,6 +88,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   state: IState = { 
     showPlayerConfiguration: true,
     showDebugText: false, // Hide debug text by default
+    showGameLog: true, // Show game log by default
   };
 
   /**
@@ -154,8 +156,20 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             />
             <span>Show Debug Text</span>
           </label>
-          {/* Game log panel (shown only during gameplay) */}
-          {!this.state.showPlayerConfiguration && <StepLogs />}
+          {/* Game log toggle checkbox - shown only during gameplay */}
+          {!this.state.showPlayerConfiguration && (
+            <label className={styles.CheckboxLabel}>
+              <input
+                type="checkbox"
+                checked={this.state.showGameLog}
+                onChange={(e) => this.setState({ showGameLog: e.target.checked })}
+                className={styles.Checkbox}
+              />
+              <span>Show Game Log</span>
+            </label>
+          )}
+          {/* Game log panel (shown only during gameplay and when enabled) */}
+          {!this.state.showPlayerConfiguration && this.state.showGameLog && <StepLogs />}
         </div>
 
         {/* Player configuration screen (shown before game starts) */}
