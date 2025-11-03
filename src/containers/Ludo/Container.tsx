@@ -15,6 +15,7 @@ import { Home } from "containers/Home/Container"; // Home/finish area components
 import { Player } from "containers/Player/Container"; // Player info panels
 import { StepLogs } from "containers/StepLogs/Container"; // Game action log
 import { Walkway } from "containers/Walkway/Container"; // Game board walkway
+import { ActionSelection } from "containers/ActionSelection/Container"; // Action selection UI
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import { loadGameStateFromFile } from "common/utils"; // Game state loading utility
 import { BOARD_SIZE } from "globalConstants"; // Board dimensions
@@ -246,6 +247,9 @@ class LudoBare extends React.PureComponent<IProps, IState> {
 
         {/* Development-only context menu */}
         {process.env.NODE_ENV === "development" ? <ContextMenu /> : null}
+
+        {/* Action Selection UI - shows available actions after dice roll */}
+        <ActionSelection />
       </div>
     );
   }
@@ -313,9 +317,12 @@ class LudoBare extends React.PureComponent<IProps, IState> {
       (restoredState, metadata) => {
         // Restore the game state with proper type casting
         // currentTurn should be a BaseID enum value
+        // availableActions and availableActionsDieValue should be null when loading a saved game
         this.props.getInitialGameDataSuccess({
           ...restoredState,
           currentTurn: restoredState.currentTurn as BaseID,
+          availableActions: null,
+          availableActionsDieValue: null,
         });
 
         // Hide the configuration screen since we're loading an existing game

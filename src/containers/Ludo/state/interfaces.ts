@@ -141,6 +141,24 @@ export interface IState {
   coins: { [coinID: string]: ICoin };
   /** ID of the base whose turn it currently is */
   currentTurn: BaseID;
+  /** Available actions for the player to choose from (null when no action selection needed) */
+  availableActions: IAvailableAction[] | null;
+  /** Current die roll value associated with available actions */
+  availableActionsDieValue: number | null;
+}
+
+/**
+ * Available action option for player selection UI
+ */
+export interface IAvailableAction {
+  /** Type of action: 'spawn' or 'move' */
+  type: 'spawn' | 'move';
+  /** ID of the coin this action applies to */
+  coinID: ICoin['coinID'];
+  /** Human-readable label for this action */
+  label: string;
+  /** Optional description/details about this action */
+  description?: string;
 }
 
 /**

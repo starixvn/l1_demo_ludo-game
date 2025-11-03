@@ -41,6 +41,10 @@ export enum ActionTypes {
   // Player Setup Actions
   SET_PLAYERS = 'ludo/SET_PLAYERS',                             // Set number of players in game
   ENABLE_BASE = 'ludo/ENABLE_BASE',                             // Enable a specific player's base for gameplay
+
+  // Action Selection UI Actions
+  SET_AVAILABLE_ACTIONS = 'ludo/SET_AVAILABLE_ACTIONS',         // Set available actions for player to choose from
+  CLEAR_AVAILABLE_ACTIONS = 'ludo/CLEAR_AVAILABLE_ACTIONS',     // Clear available actions UI
 }
 
 /**
@@ -217,6 +221,40 @@ export const enableBase = (baseID: BaseID): IReduxAction<ActionTypes.ENABLE_BASE
 });
 
 /**
+ * Available action option for player selection UI
+ */
+export interface IAvailableAction {
+  /** Type of action: 'spawn' or 'move' */
+  type: 'spawn' | 'move';
+  /** ID of the coin this action applies to */
+  coinID: ICoin['coinID'];
+  /** Human-readable label for this action */
+  label: string;
+  /** Optional description/details about this action */
+  description?: string;
+}
+
+/**
+ * Sets available actions that the player can choose from after rolling dice
+ * @param actions - Array of available action options
+ * @param dieValue - The die roll value that triggered these actions
+ */
+export const setAvailableActions = (
+  actions: IAvailableAction[],
+  dieValue: Rolls
+): IReduxAction<ActionTypes.SET_AVAILABLE_ACTIONS, { actions: IAvailableAction[]; dieValue: Rolls }> => ({
+  data: { actions, dieValue },
+  type: ActionTypes.SET_AVAILABLE_ACTIONS,
+});
+
+/**
+ * Clears the available actions UI (hides the action selection panel)
+ */
+export const clearAvailableActions = (): IReduxAction<ActionTypes.CLEAR_AVAILABLE_ACTIONS, void> => ({
+  type: ActionTypes.CLEAR_AVAILABLE_ACTIONS,
+});
+
+/**
  * Union type of all possible Ludo game actions
  * This type is used by the reducer to ensure type safety when handling actions
  * Each action type in this union corresponds to one of the action creators above
@@ -237,4 +275,6 @@ export type Actions =
   | ReturnType<typeof setPlayers>
   | ReturnType<typeof enableBase>
   | ReturnType<typeof markWinner>
+  | ReturnType<typeof setAvailableActions>
+  | ReturnType<typeof clearAvailableActions>
   ;

@@ -40,3 +40,13 @@ export const currentTurnSelector = createSelector(
   [ludoStateSelector],
   (state) => state.currentTurn,
 );
+
+export const availableActionsSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.availableActions,
+);
+
+export const availableActionsDieValueSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.availableActionsDieValue,
+);

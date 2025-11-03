@@ -23,6 +23,8 @@ const initialState: IState = {
   links: {},        // Will contain cell connectivity information
   relationships: [], // Will contain relationships between board entities
   walkways: {},     // Will contain all walkway segments
+  availableActions: null, // No actions available initially
+  availableActionsDieValue: null, // No die value initially
 };
 
 /**
@@ -278,6 +280,30 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         },
       };
     }
+
+    /**
+     * Set available actions for player to choose from
+     */
+    case ActionTypes.SET_AVAILABLE_ACTIONS: {
+      const { actions, dieValue } = action.data!;
+      return {
+        ...state,
+        availableActions: actions, // Store available actions
+        availableActionsDieValue: dieValue, // Store associated die value
+      };
+    }
+
+    /**
+     * Clear available actions UI
+     */
+    case ActionTypes.CLEAR_AVAILABLE_ACTIONS: {
+      return {
+        ...state,
+        availableActions: null, // Clear available actions
+        availableActionsDieValue: null, // Clear die value
+      };
+    }
+
     default:
       return state;
   }

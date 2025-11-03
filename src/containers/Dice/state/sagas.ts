@@ -21,6 +21,9 @@ import {
   moveCoin,
   nextTurn,
   spawnCoin,
+  setAvailableActions,
+  clearAvailableActions,
+  IAvailableAction,
   ActionTypes as LudoActionTypes,
 } from 'containers/Ludo/state/actions';
 import { rollDie } from './actions';
@@ -437,8 +440,70 @@ function * handleRollSixImmediateSpawn(
   currentTurnBase: IBase,
   spawnableCoins: ICoin['coinID'][]
 ): Generator<any, void, any> {
-  yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
-  yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
+
+  if (autoActionsEnabled) {
+    // Auto-actions enabled - immediately spawn
+    yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+  } else {
+    // Auto-actions disabled - show action selection UI
+    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, [], currentDieRoll, currentTurnBase);
+    yield put(setAvailableActions(actions, currentDieRoll));
+    yield put(markCurrentBase(true));
+    
+    // Wait for user to select an action
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    yield put(clearAvailableActions());
+    yield put(markCurrentBase(false));
+  }
+}
+
+/**
+ * Builds available actions list from spawnable and movable coins
+ */
+function * buildAvailableActions(
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  dieValue: Rolls,
+  currentTurnBase: IBase
+): Generator<any, IAvailableAction[], any> {
+  const actions: IAvailableAction[] = [];
+
+  // Add spawn actions
+  for (const coinID of spawnableCoins) {
+    actions.push({
+      type: 'spawn',
+      coinID,
+      label: `Spawn Coin ${coinID.split('_')[1]}`,
+      description: 'Bring a new coin onto the board',
+    });
+  }
+
+  // Add move actions with priority information
+  for (const coinID of movableCoins) {
+    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
+    let label = `Move Coin ${coinID.split('_')[1]}`;
+    let description = `Move ${dieValue} spaces`;
+
+    if (result === 'HOME') {
+      label = `Move Coin ${coinID.split('_')[1]} (Can Reach Home!)`;
+      description = `Move ${dieValue} spaces - This coin can reach HOME!`;
+    } else if (result === 'HOMEPATH') {
+      label = `Move Coin ${coinID.split('_')[1]} (Can Enter Home Path)`;
+      description = `Move ${dieValue} spaces - This coin can enter the home path`;
+    }
+
+    actions.push({
+      type: 'move',
+      coinID,
+      label,
+      description,
+    });
+  }
+
+  return actions;
 }
 
 /**
@@ -449,9 +514,26 @@ function * handleRollSixWithChoice(
   movableCoins: ICoin['coinID'][],
   currentTurnBase: IBase
 ): Generator<any, void, any> {
-  yield put(markCurrentBase(true));
-  yield call(waitForUserOrAutoAction, spawnableCoins, movableCoins, currentTurnBase);
-  yield put(markCurrentBase(false));
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
+
+  if (autoActionsEnabled) {
+    // Auto-actions enabled - use existing logic
+    yield put(markCurrentBase(true));
+    yield call(waitForUserOrAutoAction, spawnableCoins, movableCoins, currentTurnBase);
+    yield put(markCurrentBase(false));
+  } else {
+    // Auto-actions disabled - show action selection UI
+    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, movableCoins, currentDieRoll, currentTurnBase);
+    yield put(setAvailableActions(actions, currentDieRoll));
+    yield put(markCurrentBase(true));
+    
+    // Wait for user to select an action
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    
+    yield put(clearAvailableActions());
+    yield put(markCurrentBase(false));
+  }
 }
 
 /**
@@ -579,11 +661,17 @@ function * handleMultipleCoinsMove(
       }
     }
   } else {
-    // Auto-actions disabled - wait for user input or auto-actions being re-enabled
+    // Auto-actions disabled - show action selection UI
     const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
     const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
     const currentTurnBase = bases[currentTurn];
-    yield call(waitForUserOrAutoActionReenable, [], movableCoins, currentTurnBase, [LudoActionTypes.MOVE_COIN_SUCCESS]);
+    
+    const actions: IAvailableAction[] = yield call(buildAvailableActions, [], movableCoins, dieValue, currentTurnBase);
+    yield put(setAvailableActions(actions, dieValue));
+    
+    // Wait for user to select an action
+    yield take(LudoActionTypes.MOVE_COIN_SUCCESS);
+    yield put(clearAvailableActions());
   }
 }
 
@@ -596,14 +684,32 @@ function * handleNonSixRoll(
   dieValue: Rolls,
   coins: { [key: string]: ICoin }
 ): Generator<any, void, any> {
-  // Auto-move if only one coin option
-  if (spawnedCoinIDs.length === 1) {
-    yield call(handleSingleCoinMove, spawnedCoinIDs[0], coins);
-  } else if (movableCoins.length === 1) {
-    yield call(handleSingleCoinMove, movableCoins[0], coins);
-  } else if (movableCoins.length > 1) {
-    // Multiple options - requires choice
-    yield call(handleMultipleCoinsMove, movableCoins, dieValue, coins);
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+
+  if (autoActionsEnabled) {
+    // Auto-actions enabled - auto-move if only one coin option
+    if (spawnedCoinIDs.length === 1) {
+      yield call(handleSingleCoinMove, spawnedCoinIDs[0], coins);
+    } else if (movableCoins.length === 1) {
+      yield call(handleSingleCoinMove, movableCoins[0], coins);
+    } else if (movableCoins.length > 1) {
+      // Multiple options - requires choice
+      yield call(handleMultipleCoinsMove, movableCoins, dieValue, coins);
+    }
+  } else {
+    // Auto-actions disabled - show action selection UI even for single options
+    if (movableCoins.length > 0) {
+      const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+      const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+      const currentTurnBase = bases[currentTurn];
+      
+      const actions: IAvailableAction[] = yield call(buildAvailableActions, [], movableCoins, dieValue, currentTurnBase);
+      yield put(setAvailableActions(actions, dieValue));
+      
+      // Wait for user to select an action
+      yield take(LudoActionTypes.MOVE_COIN_SUCCESS);
+      yield put(clearAvailableActions());
+    }
   }
 }
 

@@ -91,6 +91,8 @@ function * getInitialGameDataSaga() {
     bases,                              // Player bases with spawnable state
     cells: data.cells,                  // All board cells with positions and types
     coins: mapByProperty(coins, 'coinID'), // All game coins mapped by ID
+    availableActions: null,             // No action selection initially
+    availableActionsDieValue: null,     // No die value for actions initially
     currentTurn: BaseID.BASE_3,         // Start with red player (arbitrary choice)
     links: data.links,                  // Movement connectivity between cells
     relationships: data.relationships,  // Component relationships for rendering

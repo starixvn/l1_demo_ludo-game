@@ -1,0 +1,149 @@
+.Sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 350px;
+  background: white;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  animation: slideInLeft 0.3s ease-out;
+  overflow-y: auto;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.Container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+}
+
+.Header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.Title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.DieValue {
+  font-size: 14px;
+  color: #666;
+}
+
+.DieNumber {
+  font-size: 20px;
+  font-weight: bold;
+  color: #1976d2;
+  margin-left: 8px;
+}
+
+.ActionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ActionButton {
+  padding: 14px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: left;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+.ActionButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.ActionButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.SpawnButton {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+}
+
+.SpawnButton:hover {
+  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+}
+
+.MoveButton {
+  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  color: white;
+}
+
+.MoveButton:hover {
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+}
+
+.ActionLabel {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.ActionDescription {
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: normal;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+.ActionDetails {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.DetailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.DetailRow:last-child {
+  margin-bottom: 0;
+}
+
+.DetailLabel {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.DetailValue {
+  font-weight: bold;
+  opacity: 1;
+  font-family: monospace;
+}
