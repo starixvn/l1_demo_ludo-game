@@ -21,6 +21,7 @@ export enum BaseColors {
   GREEN = 'GREEN',  // Player 2
   BLUE = 'BLUE',    // Player 3
   YELLOW = 'YELLOW', // Player 4
+  DEFAULT = 'WHITE'
 }
 
 /**

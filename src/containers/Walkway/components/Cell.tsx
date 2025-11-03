@@ -11,7 +11,7 @@ import React from "react";
 
 import { CellType, ICell } from "containers/Ludo/state/interfaces"; // Cell type definitions
 import { getStyleObject } from "containers/utils"; // Style utility
-import { CELL_SIZE } from "globalConstants"; // Size constants
+import { CELL_SIZE, WALKWAY_LENGTH } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Color and position types
 
 import { IContextMenuOptions } from "../interfaces"; // Context menu options type
@@ -65,6 +65,22 @@ export class Cell extends React.PureComponent<ICellProps> {
     // Generate the cell ID for display
     const cellID = generateCellID(walkwayPosition, row, column);
 
+    // Determine the index for homepath cells based on walkway position
+    // NORTH/SOUTH are vertical, so use row; EAST/WEST are horizontal, so use column
+    // SOUTH indices are reversed to match logical progression (opposite of NORTH)
+    // EAST indices are reversed to match logical progression (opposite of WEST)
+    const homePathIndex =
+      cellType === CellType.HOMEPATH
+        ? walkwayPosition === WalkwayPosition.NORTH ||
+          walkwayPosition === WalkwayPosition.SOUTH
+          ? walkwayPosition === WalkwayPosition.SOUTH
+            ? WALKWAY_LENGTH - 1 - row
+            : row
+          : walkwayPosition === WalkwayPosition.EAST
+          ? WALKWAY_LENGTH - 1 - column
+          : column
+        : undefined;
+
     // Get child components (usually coins)
     const children = React.Children.map(this.props.children, (child) => child);
     // Apply special styling when multiple coins are present
@@ -98,6 +114,10 @@ export class Cell extends React.PureComponent<ICellProps> {
               </div>
             )}
           </div>
+        )}
+        {/* Display index for homepath cells */}
+        {cellType === CellType.HOMEPATH && homePathIndex !== undefined && (
+          <div className={styles.HomePathIndex}>{homePathIndex}</div>
         )}
         {
           children // Render child components (coins)

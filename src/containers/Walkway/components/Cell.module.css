@@ -69,3 +69,17 @@
   word-break: break-all;       /* Break long cell IDs to fit */
   line-height: 1.1;           /* Tight line spacing */
 }
+
+/* Homepath cell index display */
+.HomePathIndex {
+  position: absolute;           /* Position relative to cell container */
+  top: 50%;                     /* Center vertically */
+  left: 50%;                    /* Center horizontally */
+  transform: translate(-50%, -50%); /* Perfect centering */
+  font-size: 16px;             /* Larger font for visibility */
+  font-weight: bold;            /* Bold for emphasis */
+  color: #fff;                  /* White text color */
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* Text shadow for readability */
+  pointer-events: none;        /* Don't interfere with click events */
+  z-index: 5;                  /* Above coins but below debug info */
+}

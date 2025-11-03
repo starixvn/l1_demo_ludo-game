@@ -6,15 +6,15 @@
  * Can conditionally show or hide the actual coin inside.
  */
 
-import React from 'react';
+import React from "react";
 
-import { getStyleObject } from 'containers/utils';           // Utility for creating style objects
-import { COIN_PLACEHOLDER_SIZE, COIN_SIZE } from 'globalConstants'; // Size constants
-import { BaseColors } from 'state/interfaces';              // Available player colors
+import { getStyleObject } from "containers/utils"; // Utility for creating style objects
+import { COIN_PLACEHOLDER_SIZE, COIN_SIZE } from "globalConstants"; // Size constants
+import { BaseColors } from "state/interfaces"; // Available player colors
 
-import { Coin } from './Coin';                               // The actual coin component
+import { Coin } from "./Coin"; // The actual coin component
 
-import styles from './CoinPlaceholder.module.css';          // CSS module for styling
+import styles from "./CoinPlaceholder.module.css"; // CSS module for styling
 
 /**
  * Props for the CoinPlaceholder component
@@ -38,23 +38,19 @@ export class CoinPlaceholder extends React.PureComponent<ICoinPlaceholderProps> 
 
     return (
       <div
-        className={styles.Container}                                       // Container with centering
+        className={styles.Container} // Container with centering
         style={getStyleObject(COIN_PLACEHOLDER_SIZE, COIN_PLACEHOLDER_SIZE)} // Placeholder size
       >
         <div
-          className={styles.Circle}                                       // Colored circle background
-          style={getStyleObject(COIN_SIZE, COIN_SIZE, baseColor)}        // Circle size and color
+          className={styles.Circle} // Colored circle background
+          style={getStyleObject(COIN_SIZE, COIN_SIZE, BaseColors.DEFAULT)} // Circle size and color
         >
-          {
-            isCoinHidden
-            ? null                                                        // Hide coin if specified
-            : (
-              <Coin
-                baseColor={baseColor}                                    // Pass color to coin
-                onCoinClicked={() => this.props.onCoinClicked()}        // Pass click handler
-              />
-            )
-          }
+          {isCoinHidden ? null : ( // Hide coin if specified
+            <Coin
+              baseColor={baseColor} // Pass color to coin
+              onCoinClicked={() => this.props.onCoinClicked()} // Pass click handler
+            />
+          )}
         </div>
       </div>
     );
