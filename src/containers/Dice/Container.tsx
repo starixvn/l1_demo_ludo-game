@@ -5,7 +5,7 @@ import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
 import { getStyleObject } from "containers/utils";
-import { DICE_SIZE } from "globalConstants";
+import { DICE_SIZE, DICE_AUTO_ROLL_TIMEOUT } from "globalConstants";
 import { BaseColors } from "state/interfaces";
 
 import { rollDie } from "./state/actions";
@@ -67,8 +67,12 @@ class DiceBare extends React.PureComponent<IProps> {
     this.clearAutoRollTimer(); // Clear any existing timer
     if (this.props.isDieRollAllowed) {
       this.autoRollTimeout = setTimeout(() => {
-        this.props.rollDie();
-      }, 200); // 0.2 second delay
+        // Double-check: props may have changed during the timeout period
+        // This is especially important with longer timeouts
+        if (this.props.isDieRollAllowed && this.autoRollTimeout !== null) {
+          this.props.rollDie();
+        }
+      }, DICE_AUTO_ROLL_TIMEOUT);
     }
   };
 

@@ -17,10 +17,11 @@ import {
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
 import { enableDie, invalidateDieRoll } from 'containers/Dice/state/actions';
-import { addLogEntry } from 'containers/StepLogs/state/actions';
+import { addLogEntry, setAutoActionsEnabled } from 'containers/StepLogs/state/actions';
+import { autoActionsEnabledSelector } from 'containers/StepLogs/state/selectors';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRollSelector } from 'containers/Dice/state/selectors';
-import { WINNING_MOVES } from 'globalConstants';
+import { WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
 import {
@@ -395,7 +396,7 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
     }
 
     // Animation delay for smooth movement
-    yield delay(100);
+    yield delay(LUDO_MOVE_ANIMATION_DELAY);
 
     // Update position for next iteration
     cellID = nextCell.cellID;
@@ -577,6 +578,12 @@ function * watchForSetPlayers() {
 function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
   const { playerCount } = action.data!;
 
+  // Explicitly disable auto-actions when starting a new game
+  yield put(setAutoActionsEnabled(false));
+  
+  // Small delay to ensure state is updated before proceeding
+  yield delay(LUDO_STATE_UPDATE_DELAY);
+
   switch (playerCount) {
     case 2:
       // 2-player game: Blue and Red players
@@ -599,6 +606,28 @@ function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
     default:
       // Invalid player count - do nothing
       return;
+  }
+
+  // After enabling bases, find the first enabled base and set it as current turn
+  // Get updated bases after enabling them
+  const updatedBases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  
+  // Find the first enabled base
+  const firstEnabledBase = Object.values(updatedBases).find((base) => base.enabled);
+  
+  if (firstEnabledBase) {
+    // Double-check that auto-actions are disabled before setting turn
+    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+    
+    if (autoActionsEnabled) {
+      // Force disable again if somehow still enabled
+      yield put(setAutoActionsEnabled(false));
+      yield delay(LUDO_STATE_UPDATE_DELAY);
+    }
+    
+    // Set the first enabled player's turn directly (this will trigger passTurnToSaga)
+    // Auto-actions are explicitly disabled above, so it won't auto-roll
+    yield put(passTurnTo(firstEnabledBase.ID));
   }
 }
 

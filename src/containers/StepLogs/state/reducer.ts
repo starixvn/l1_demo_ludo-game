@@ -5,6 +5,8 @@
  * Handles adding log entries, clearing logs, and configuring auto-play behavior.
  */
 
+import { AUTO_ACTION_TIMEOUT } from 'globalConstants';
+
 import { Actions, ActionTypes } from './actions';
 import { ILogEntry, IState } from './interfaces';
 
@@ -16,7 +18,7 @@ const initialState: IState = {
   logs: [],                      // Start with empty log history
   maxLogs: 1000,                // Store up to 1000 log entries (increased for export)
   autoActionsEnabled: true,     // Enable automatic actions by default
-  autoActionTimeout: 200,       // Default 200ms timeout for auto-actions
+  autoActionTimeout: AUTO_ACTION_TIMEOUT,       // Default timeout for auto-actions from globalConstants
 };
 
 /**

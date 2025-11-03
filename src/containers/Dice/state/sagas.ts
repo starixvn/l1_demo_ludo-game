@@ -29,6 +29,7 @@ import { getMovableCoins } from 'containers/Ludo/state/sagas';
 import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
+import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY } from 'globalConstants';
 
 import { currentDieRollSelector } from './selectors';
 
@@ -434,7 +435,7 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
     const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
     if (autoActionsEnabled) {
       // Small delay before auto-rolling for the bonus turn
-      yield delay(500);
+      yield delay(DICE_BONUS_TURN_DELAY);
       // Automatically roll the die for the bonus turn
       yield put(rollDie());
     }
@@ -619,10 +620,13 @@ function * watchForPassTurnTo() {
 function * passTurnToSaga() {
   yield put(enableDie());
   
+  // Small delay to ensure any state updates are processed
+  yield delay(DICE_STATE_UPDATE_DELAY);
+  
   // In auto-play mode, automatically roll for the new player
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   if (autoActionsEnabled) {
-    yield delay(500);
+    yield delay(DICE_BONUS_TURN_DELAY);
     yield put(rollDie());
   }
 }
@@ -639,7 +643,7 @@ function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boo
     const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
     if (autoActionsEnabled) {
       // Small delay before auto-rolling for the bonus turn
-      yield delay(500);
+      yield delay(DICE_BONUS_TURN_DELAY);
       // Automatically roll the die for the bonus turn
       yield put(rollDie());
     }

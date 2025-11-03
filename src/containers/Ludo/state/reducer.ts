@@ -45,6 +45,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         relationships,
         walkways,
         links,
+        currentTurn,
       } = action.data!.gameData;
       return {
         ...state,
@@ -54,6 +55,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         links,        // Set up cell connectivity for movement validation
         relationships, // Define relationships between board entities
         walkways,     // Initialize walkway segments
+        currentTurn: currentTurn || state.currentTurn, // Reset current turn or keep existing
       };
     }
 

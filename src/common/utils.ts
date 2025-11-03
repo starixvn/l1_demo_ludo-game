@@ -50,3 +50,126 @@ export const shuffleArray = <T>(array: T[]): T[] => {
 
   return array;
 };
+
+/**
+ * Game state loading utility interfaces
+ */
+export interface IGameStateFile {
+  gameState: {
+    currentTurn: any; // BaseID type (will be validated by caller)
+    bases: any[];
+    coins: any[];
+    cells: any;
+    walkways: any[];
+    relationships: any[];
+    links: any;
+  };
+  exportedAt?: string;
+  statistics?: {
+    totalLogs: number;
+  };
+  logs?: any[];
+}
+
+export interface IRestoredGameState {
+  currentTurn: any; // BaseID type (will be validated by caller)
+  bases: { [key: string]: any };
+  coins: { [key: string]: any };
+  cells: any;
+  walkways: { [key: string]: any };
+  relationships: any[];
+  links: any;
+}
+
+/**
+ * Loads a game state from a JSON file
+ * Opens a file picker, reads the file, validates and transforms the data
+ * @param onSuccess - Callback function called with the restored game state on success
+ * @param onError - Callback function called with error message on failure
+ */
+export const loadGameStateFromFile = (
+  onSuccess: (state: IRestoredGameState, metadata: { exportedAt?: string; totalLogs?: number }) => void,
+  onError: (message: string) => void
+): void => {
+  // Create a hidden file input element
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.style.display = "none";
+
+  input.onchange = (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) {
+      document.body.removeChild(input);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const fileContent = e.target?.result as string;
+        const importedData: IGameStateFile = JSON.parse(fileContent);
+
+        // Check if the file has the expected structure
+        if (!importedData.gameState) {
+          document.body.removeChild(input);
+          onError("Invalid game state file. Missing 'gameState' property.");
+          return;
+        }
+
+        const { gameState } = importedData;
+
+        // Convert arrays back to dictionaries (since export uses Object.values)
+        const restoredState: IRestoredGameState = {
+          currentTurn: gameState.currentTurn,
+          bases: gameState.bases.reduce((acc: any, base: any) => {
+            acc[base.ID] = base;
+            return acc;
+          }, {}),
+          coins: gameState.coins.reduce((acc: any, coin: any) => {
+            acc[coin.coinID] = coin;
+            return acc;
+          }, {}),
+          cells: gameState.cells, // Already in correct format
+          walkways: gameState.walkways.reduce((acc: any, walkway: any) => {
+            acc[walkway.ID] = walkway;
+            return acc;
+          }, {}),
+          relationships: gameState.relationships, // Already an array
+          links: gameState.links, // Already in correct format
+        };
+
+        const metadata = {
+          exportedAt: importedData.exportedAt,
+          totalLogs: importedData.statistics?.totalLogs || importedData.logs?.length || 0,
+        };
+
+        document.body.removeChild(input);
+        onSuccess(restoredState, metadata);
+      } catch (error) {
+        console.error("Error loading game state:", error);
+        document.body.removeChild(input);
+        onError(
+          "Failed to load game state. The file may be corrupted or in an invalid format."
+        );
+      }
+    };
+
+    reader.onerror = () => {
+      document.body.removeChild(input);
+      onError("Failed to read the file.");
+    };
+
+    reader.readAsText(file);
+  };
+
+  input.oncancel = () => {
+    if (document.body.contains(input)) {
+      document.body.removeChild(input);
+    }
+  };
+
+  document.body.appendChild(input);
+  input.click();
+};
