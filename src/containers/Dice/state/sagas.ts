@@ -356,6 +356,267 @@ function * watchForRollDieComplete() {
 }
 
 /**
+ * Waits for user action or auto-action timeout, then triggers auto-action if timeout occurs
+ * @param spawnableCoins - Coins that can be spawned
+ * @param movableCoins - Coins that can be moved
+ * @param currentTurnBase - Current player's base
+ * @param actionTypes - Action types to wait for (for spawn/move choice or just move)
+ */
+function * waitForUserOrAutoAction(
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  currentTurnBase: IBase,
+  actionTypes: string[] = [LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]
+): Generator<any, void, any> {
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+
+  if (autoActionsEnabled) {
+    // Race between user input and configurable timeout
+    const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
+    const { timeout } = yield race({
+      userAction: take(actionTypes),
+      timeout: delay(timeoutDuration),
+    });
+
+    if (timeout) {
+      // Timeout won - auto choose an action
+      yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
+      yield take(actionTypes);
+    }
+  } else {
+    // Auto-actions disabled - wait for user input or auto-actions being re-enabled
+    yield call(waitForUserOrAutoActionReenable, spawnableCoins, movableCoins, currentTurnBase, actionTypes);
+  }
+}
+
+/**
+ * Waits for user action when auto-actions are disabled, but can trigger if re-enabled
+ */
+function * waitForUserOrAutoActionReenable(
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  currentTurnBase: IBase,
+  actionTypes: string[]
+): Generator<any, void, any> {
+  while (true) {
+    const action: any = yield take([
+      ...actionTypes,
+      StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED,
+    ]);
+
+    if (action.type === StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED) {
+      // Check if auto-actions are now enabled
+      const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+      if (newAutoActionsEnabled) {
+        // Auto-actions were re-enabled - start the timeout
+        const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
+        const { timeout } = yield race({
+          userAction: take(actionTypes),
+          timeout: delay(timeoutDuration),
+        });
+
+        if (timeout) {
+          // Timeout won - auto choose an action
+          yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
+          yield take(actionTypes);
+        }
+        break; // Exit the loop
+      }
+      // If still disabled, continue waiting
+    } else {
+      // User performed an action - exit the loop
+      break;
+    }
+  }
+}
+
+/**
+ * Handles when a 6 is rolled with immediate spawn condition (no coins spawned or no moves available)
+ */
+function * handleRollSixImmediateSpawn(
+  currentTurnBase: IBase,
+  spawnableCoins: ICoin['coinID'][]
+): Generator<any, void, any> {
+  yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
+  yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+}
+
+/**
+ * Handles when a 6 is rolled and player needs to choose between spawn and move
+ */
+function * handleRollSixWithChoice(
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  currentTurnBase: IBase
+): Generator<any, void, any> {
+  yield put(markCurrentBase(true));
+  yield call(waitForUserOrAutoAction, spawnableCoins, movableCoins, currentTurnBase);
+  yield put(markCurrentBase(false));
+}
+
+/**
+ * Handles bonus turn after rolling a 6
+ */
+function * handleBonusTurnAfterSix(): Generator<any, void, any> {
+  yield put(enableDie());
+  
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  if (autoActionsEnabled) {
+    // Small delay before auto-rolling for the bonus turn
+    yield delay(DICE_BONUS_TURN_DELAY);
+    // Automatically roll the die for the bonus turn
+    yield put(rollDie());
+  }
+}
+
+/**
+ * Handles when a 6 is rolled
+ */
+function * handleRollSix(
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  spawnedCoinIDs: ICoin['coinID'][],
+  currentTurnBase: IBase
+): Generator<any, void, any> {
+  // Immediate spawn if no coins spawned or no moves available
+  if ((spawnedCoinIDs.length === 0 || movableCoins.length === 0) && spawnableCoins.length > 0) {
+    yield call(handleRollSixImmediateSpawn, currentTurnBase, spawnableCoins);
+  } else {
+    // Player needs to choose
+    yield call(handleRollSixWithChoice, spawnableCoins, movableCoins, currentTurnBase);
+  }
+  
+  // Handle bonus turn
+  yield call(handleBonusTurnAfterSix);
+}
+
+/**
+ * Automatically moves a single coin (only one option available)
+ */
+function * handleSingleCoinMove(coinID: ICoin['coinID'], coins: { [key: string]: ICoin }): Generator<any, void, any> {
+  const coin = coins[coinID];
+  yield put(moveCoin(coinID, coin.position, coin.cellID));
+}
+
+/**
+ * Selects and moves a coin with priority (HOME > HOMEPATH > random)
+ */
+function * selectAndMoveCoinWithPriority(
+  movableCoins: ICoin['coinID'][],
+  dieValue: Rolls,
+  coins: { [key: string]: ICoin },
+  playerColor: string
+): Generator<any, void, any> {
+  const mt = MersenneTwister19937.autoSeed();
+
+  // Prioritize coins that can reach HOME or HOMEPATH
+  const coinsThatCanReachHome: ICoin['coinID'][] = [];
+  const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
+
+  for (const coinID of movableCoins) {
+    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
+    if (result === 'HOME') {
+      coinsThatCanReachHome.push(coinID);
+    } else if (result === 'HOMEPATH') {
+      coinsThatCanReachHomePath.push(coinID);
+    }
+  }
+
+  // Priority 1: Choose coin that can reach HOME
+  let chosenCoinID: ICoin['coinID'];
+  if (coinsThatCanReachHome.length > 0) {
+    chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
+  } else if (coinsThatCanReachHomePath.length > 0) {
+    // Priority 2: Choose coin that can reach HOMEPATH
+    chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
+  } else {
+    // Priority 3: Random selection
+    chosenCoinID = movableCoins[integer(0, movableCoins.length - 1)(mt)];
+  }
+
+  const coin = coins[chosenCoinID];
+  const details = coinsThatCanReachHome.length > 0
+    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${dieValue} spaces (can reach HOME)`
+    : coinsThatCanReachHomePath.length > 0
+    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${dieValue} spaces (can reach HOMEPATH)`
+    : `Automatically moved coin ${chosenCoinID.split('_')[1]} ${dieValue} spaces`;
+
+  yield put(addLogEntry({
+    player: playerColor,
+    action: 'Auto-moved coin',
+    details,
+  }));
+
+  yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+}
+
+/**
+ * Handles when multiple coins can be moved (requires user choice or auto-action)
+ */
+function * handleMultipleCoinsMove(
+  movableCoins: ICoin['coinID'][],
+  dieValue: Rolls,
+  coins: { [key: string]: ICoin }
+): Generator<any, void, any> {
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+
+  if (autoActionsEnabled) {
+    // Multiple movable coins - wait for user input with timeout
+    const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
+    const { timeout } = yield race({
+      userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
+      timeout: delay(timeoutDuration),
+    });
+
+    if (timeout) {
+      // Timeout won - auto select a movable coin (prioritizing HOME/HOMEPATH)
+      const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, dieValue);
+      if (currentMovableCoins.length > 0) {
+        const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+        const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+        const playerColor = bases[currentTurn].color;
+        yield call(selectAndMoveCoinWithPriority, currentMovableCoins, dieValue, coins, playerColor);
+      }
+    }
+  } else {
+    // Auto-actions disabled - wait for user input or auto-actions being re-enabled
+    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+    const currentTurnBase = bases[currentTurn];
+    yield call(waitForUserOrAutoActionReenable, [], movableCoins, currentTurnBase, [LudoActionTypes.MOVE_COIN_SUCCESS]);
+  }
+}
+
+/**
+ * Handles non-6 roll with spawned coins available
+ */
+function * handleNonSixRoll(
+  spawnedCoinIDs: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  dieValue: Rolls,
+  coins: { [key: string]: ICoin }
+): Generator<any, void, any> {
+  // Auto-move if only one coin option
+  if (spawnedCoinIDs.length === 1) {
+    yield call(handleSingleCoinMove, spawnedCoinIDs[0], coins);
+  } else if (movableCoins.length === 1) {
+    yield call(handleSingleCoinMove, movableCoins[0], coins);
+  } else if (movableCoins.length > 1) {
+    // Multiple options - requires choice
+    yield call(handleMultipleCoinsMove, movableCoins, dieValue, coins);
+  }
+}
+
+/**
+ * Handles when no valid moves are available
+ */
+function * handleNoValidMoves(): Generator<any, void, any> {
+  yield put(invalidateDieRoll());
+  yield put(nextTurn());
+  // Note: enableDie() and auto-roll will be handled by passTurnToSaga
+}
+
+/**
  * Main saga that handles what happens after a die roll is complete
  * Implements the core Ludo game logic for turn progression and auto-actions
  * @param action - The roll die complete action with the rolled value
@@ -369,232 +630,13 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
   const spawnedCoinIDs = currentTurnBase.coinIDs.filter((coinID) => coins[coinID].isSpawned && !coins[coinID].isRetired);
   const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
   const spawnableCoins = bases[currentTurn].coinIDs.filter((coinID) => !coins[coinID].isSpawned && !coins[coinID].isRetired);
+
   if (value === Rolls.SIX && (spawnableCoins.length > 0 || movableCoins.length > 0)) {
-    if ((spawnedCoinIDs.length === 0 || movableCoins.length === 0) && spawnableCoins.length > 0) {
-      yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
-      yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-    } else {
-      yield put(markCurrentBase(true));
-
-      // Check if auto-actions are enabled
-      const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-
-      if (autoActionsEnabled) {
-        // Race between user input and configurable timeout
-        const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-        const { timeout } = yield race({
-          userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
-          timeout: delay(timeoutDuration),
-        });
-
-        if (timeout) {
-          // Timeout won - auto choose an action
-          yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
-          yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-        }
-      } else {
-        // Auto-actions disabled - wait for user input or auto-actions being re-enabled
-        while (true) {
-          const action: any = yield take([
-            LudoActionTypes.SPAWN_COIN_SUCCESS,
-            LudoActionTypes.MOVE_COIN_SUCCESS,
-            StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED
-          ]);
-
-          if (action.type === StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED) {
-            // Check if auto-actions are now enabled
-            const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-            if (newAutoActionsEnabled) {
-              // Auto-actions were re-enabled - start the timeout
-              const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-              const { timeout } = yield race({
-                userAction: take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]),
-                timeout: delay(timeoutDuration),
-              });
-
-              if (timeout) {
-                // Timeout won - auto choose an action
-                yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
-                yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-              }
-              break; // Exit the loop
-            }
-            // If still disabled, continue waiting
-          } else {
-            // User performed an action - exit the loop
-            break;
-          }
-        }
-      }
-
-      yield put(markCurrentBase(false));
-    }
-    yield put(enableDie());
-    
-    // After rolling a 6, player gets a bonus turn - automatically roll again in auto-play mode
-    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-    if (autoActionsEnabled) {
-      // Small delay before auto-rolling for the bonus turn
-      yield delay(DICE_BONUS_TURN_DELAY);
-      // Automatically roll the die for the bonus turn
-      yield put(rollDie());
-    }
+    yield call(handleRollSix, spawnableCoins, movableCoins, spawnedCoinIDs, currentTurnBase);
   } else if (spawnedCoinIDs.length > 0) {
-    // Automove if only one coin is spawned
-    if (spawnedCoinIDs.length === 1) {
-      const coinID = spawnedCoinIDs[0];
-      const coin = coins[coinID];
-      yield put(moveCoin(coinID, coin.position, coin.cellID));
-    } else if (movableCoins.length === 1) {
-      const coinID = movableCoins[0];
-      const coin = coins[coinID];
-      yield put(moveCoin(coinID, coin.position, coin.cellID));
-    } else if (movableCoins.length > 1) {
-      // Check if auto-actions are enabled
-      const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-
-      if (autoActionsEnabled) {
-        // Multiple movable coins - wait for user input with timeout
-        const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-        const { timeout } = yield race({
-          userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
-          timeout: delay(timeoutDuration),
-        });
-
-        if (timeout) {
-          // Timeout won - auto select a movable coin (prioritizing HOME/HOMEPATH)
-          const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
-          if (currentMovableCoins.length > 0) {
-            const mt = MersenneTwister19937.autoSeed();
-            const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-            const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-            const playerColor = bases[currentTurn].color;
-
-            // Prioritize coins that can reach HOME or HOMEPATH
-            const coinsThatCanReachHome: ICoin['coinID'][] = [];
-            const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
-
-            for (const coinID of currentMovableCoins) {
-              const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, value);
-              if (result === 'HOME') {
-                coinsThatCanReachHome.push(coinID);
-              } else if (result === 'HOMEPATH') {
-                coinsThatCanReachHomePath.push(coinID);
-              }
-            }
-
-            // Priority 1: Choose coin that can reach HOME
-            let chosenCoinID: ICoin['coinID'];
-            if (coinsThatCanReachHome.length > 0) {
-              chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
-            } else if (coinsThatCanReachHomePath.length > 0) {
-              // Priority 2: Choose coin that can reach HOMEPATH
-              chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
-            } else {
-              // Priority 3: Random selection
-              chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-            }
-
-            const coin = coins[chosenCoinID];
-            const details = coinsThatCanReachHome.length > 0
-              ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOME)`
-              : coinsThatCanReachHomePath.length > 0
-              ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOMEPATH)`
-              : `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces`;
-
-            yield put(addLogEntry({
-              player: playerColor,
-              action: 'Auto-moved coin',
-              details,
-            }));
-
-            yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
-          }
-        }
-      } else {
-        // Auto-actions disabled - wait for user input or auto-actions being re-enabled
-        while (true) {
-          const action: any = yield take([
-            LudoActionTypes.MOVE_COIN_SUCCESS,
-            StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED
-          ]);
-
-          if (action.type === StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED) {
-            // Check if auto-actions are now enabled
-            const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-            if (newAutoActionsEnabled) {
-              // Auto-actions were re-enabled - start the timeout
-              const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-              const { timeout } = yield race({
-                userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
-                timeout: delay(timeoutDuration),
-              });
-
-              if (timeout) {
-                // Timeout won - auto select a movable coin (prioritizing HOME/HOMEPATH)
-                const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
-                if (currentMovableCoins.length > 0) {
-                  const mt = MersenneTwister19937.autoSeed();
-                  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-                  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-                  const playerColor = bases[currentTurn].color;
-
-                  // Prioritize coins that can reach HOME or HOMEPATH
-                  const coinsThatCanReachHome: ICoin['coinID'][] = [];
-                  const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
-
-                  for (const coinID of currentMovableCoins) {
-                    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, value);
-                    if (result === 'HOME') {
-                      coinsThatCanReachHome.push(coinID);
-                    } else if (result === 'HOMEPATH') {
-                      coinsThatCanReachHomePath.push(coinID);
-                    }
-                  }
-
-                  // Priority 1: Choose coin that can reach HOME
-                  let chosenCoinID: ICoin['coinID'];
-                  if (coinsThatCanReachHome.length > 0) {
-                    chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
-                  } else if (coinsThatCanReachHomePath.length > 0) {
-                    // Priority 2: Choose coin that can reach HOMEPATH
-                    chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
-                  } else {
-                    // Priority 3: Random selection
-                    chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-                  }
-
-                  const coin = coins[chosenCoinID];
-                  const details = coinsThatCanReachHome.length > 0
-                    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOME)`
-                    : coinsThatCanReachHomePath.length > 0
-                    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces (can reach HOMEPATH)`
-                    : `Automatically moved coin ${chosenCoinID.split('_')[1]} ${value} spaces`;
-
-                  yield put(addLogEntry({
-                    player: playerColor,
-                    action: 'Auto-moved coin',
-                    details,
-                  }));
-
-                  yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
-                }
-              }
-              break; // Exit the loop
-            }
-            // If still disabled, continue waiting
-          } else {
-            // User performed an action - exit the loop
-            break;
-          }
-        }
-      }
-    }
+    yield call(handleNonSixRoll, spawnedCoinIDs, movableCoins, value, coins);
   } else {
-    // No valid moves available - invalidate roll and pass to next player
-    yield put(invalidateDieRoll());
-    yield put(nextTurn());
-    // Note: enableDie() and auto-roll will be handled by passTurnToSaga
+    yield call(handleNoValidMoves);
   }
 }
 
