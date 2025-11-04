@@ -1,0 +1,7 @@
+include:
+  - project: ci/core-cicd
+    ref: main
+    file: luminet.gitlab-ci.yml
+
+variables:
+  NODEJS_IMAGE: $DOCKER_REG_LOCAL_URL/docker-hub/library/node:22-alpine

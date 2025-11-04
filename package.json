@@ -85,7 +85,8 @@
     "start": "http-server build -p $PORT",
     "dev": "set NODE_OPTIONS=--openssl-legacy-provider && node --es-module-specifier-resolution=node scripts/start.js",
     "build": "set NODE_OPTIONS=--openssl-legacy-provider && node --es-module-specifier-resolution=node scripts/build.js",
-    "test": "node scripts/test.js"
+    "test": "node scripts/test.js",
+    "test-coverage": "jest --coverage"
   },
   "eslintConfig": {
     "extends": "react-app"
