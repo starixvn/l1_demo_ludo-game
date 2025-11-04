@@ -20,7 +20,7 @@ import { mapByProperty } from 'common/utils';
 import { enableDie, invalidateDieRoll, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
-import { currentDieRollSelector } from 'containers/Dice/state/selectors';
+import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from 'containers/Dice/state/selectors';
 import { WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
@@ -227,7 +227,7 @@ export function * getMovableCoins(stepsToTake: Rolls) {
 function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   let { cellID, walkwayPosition } = { ...action.data! };
   const { coinID } = action.data!;
-  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
+  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
 
   // Validate that this move is possible
   const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
@@ -409,10 +409,14 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
     walkwayPosition = nextCell.position;
   }
 
+  // Get dice values to check for bonus turn
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  
   // Determine if player gets a bonus turn
   const bonusChance = bonusChanceForHomeCoin                          // Reached home
   || (yield call(performDisqualificationCheck, action.data!.coinID, walkwayPosition, cellID)) // Captured opponent
-  || (currentDieRoll === Rolls.SIX);                                  // Rolled a 6
+  || ((roll1 === Rolls.ONE && roll2 === Rolls.SIX) || (roll1 === Rolls.SIX && roll2 === Rolls.ONE) || roll1 === roll2); // Rolled spawnable combination
 
   // Log the successful move
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
@@ -482,7 +486,7 @@ function * performDisqualificationCheck(activeCoinID: ICoin['coinID'], walkwayPo
 
 /**
  * Calculates all reachable cells for the current player's coins
- * Returns a Set of cell IDs that can be reached with any valid die roll (1-6)
+ * Returns a Set of cell IDs that can be reached with any valid dice roll (sum of 2-12)
  */
 export function * calculateReachableCells(): Generator<any, Set<string>, any> {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
@@ -524,12 +528,12 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
         }
       }
     } else {
-      // Spawned coin - calculate cells reachable with 1-6 steps
+      // Spawned coin - calculate cells reachable with 2-12 steps (sum of two dice)
       const startCellID = coin.cellID;
       if (!startCellID) continue;
 
-      // Calculate all cells reachable with 1-6 steps
-      for (let steps = 1; steps <= 6; steps++) {
+      // Calculate all cells reachable with 2-12 steps (two dice: min 1+1=2, max 6+6=12)
+      for (let steps = 2; steps <= 12; steps++) {
         // Check if this move would overshoot home
         if (coin.steps + steps > WINNING_MOVES) {
           continue; // Skip moves that overshoot

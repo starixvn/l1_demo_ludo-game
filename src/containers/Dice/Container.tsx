@@ -11,8 +11,10 @@ import { BaseColors } from "state/interfaces";
 import { rollDie } from "./state/actions";
 import { CONFIGURATIONS } from "./state/constants";
 import {
-  currentDieRollSelector,
+  currentDieRoll1Selector,
+  currentDieRoll2Selector,
   isDieRollAllowedSelector,
+  isDieRollValidSelector,
 } from "./state/selectors";
 import {
   autoActionsEnabledSelector,
@@ -22,8 +24,10 @@ import {
 import styles from "./Container.module.css";
 
 interface IStateProps {
-  currentDieRoll: ReturnType<typeof currentDieRollSelector>;
+  currentDieRoll1: ReturnType<typeof currentDieRoll1Selector>;
+  currentDieRoll2: ReturnType<typeof currentDieRoll2Selector>;
   isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
+  isDieRollValid: ReturnType<typeof isDieRollValidSelector>;
   autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
   autoActionTimeout: ReturnType<typeof autoActionTimeoutSelector>;
 }
@@ -39,8 +43,10 @@ interface IPublicProps {
 interface IProps extends IStateProps, IDispatchProps, IPublicProps {}
 
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  currentDieRoll: currentDieRollSelector,
+  currentDieRoll1: currentDieRoll1Selector,
+  currentDieRoll2: currentDieRoll2Selector,
   isDieRollAllowed: isDieRollAllowedSelector,
+  isDieRollValid: isDieRollValidSelector,
   autoActionsEnabled: autoActionsEnabledSelector,
   autoActionTimeout: autoActionTimeoutSelector,
 });
@@ -109,13 +115,15 @@ class DiceBare extends React.PureComponent<IProps> {
   };
 
   render() {
-    const { baseColor, isDieRollAllowed, autoActionsEnabled } = this.props;
+    const { baseColor, isDieRollAllowed, autoActionsEnabled, isDieRollValid } =
+      this.props;
     const shouldHighlight = isDieRollAllowed && !autoActionsEnabled;
     const dieClassNames = isDieRollAllowed
       ? shouldHighlight
         ? [styles.Die, styles.Highlighted]
         : styles.Die
       : [styles.Die, styles.Disabled];
+
     return (
       <div className={styles.Container}>
         <div
@@ -123,16 +131,26 @@ class DiceBare extends React.PureComponent<IProps> {
           style={getStyleObject(DICE_SIZE, DICE_SIZE, baseColor)}
           onClick={this.handleDieClick}
         >
-          {this.renderDots()}
+          {this.renderDots(this.props.currentDieRoll1, isDieRollValid)}
+        </div>
+        <div
+          className={classnames(dieClassNames)}
+          style={getStyleObject(DICE_SIZE, DICE_SIZE, baseColor)}
+          onClick={this.handleDieClick}
+        >
+          {this.renderDots(this.props.currentDieRoll2, isDieRollValid)}
         </div>
       </div>
     );
   }
 
-  private renderDots = () => {
+  private renderDots = (rollValue: number, isValid: boolean) => {
     const elements: any[] = [];
-    const configurationForCurrentRoll =
-      CONFIGURATIONS[this.props.currentDieRoll];
+    const configurationForCurrentRoll = CONFIGURATIONS[rollValue];
+
+    if (!configurationForCurrentRoll) {
+      return null;
+    }
 
     for (let i = 0; i < configurationForCurrentRoll.length; i++) {
       const isVisible = Boolean(configurationForCurrentRoll[i]);

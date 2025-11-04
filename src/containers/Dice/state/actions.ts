@@ -33,11 +33,12 @@ export const rollDie = (): IReduxAction<ActionTypes.ROLL_DIE, void> => ({
 });
 
 /**
- * Action dispatched when the die roll is complete
- * @param value - The final value shown on the die (1-6)
+ * Action dispatched when the dice roll is complete
+ * @param roll1 - The final value shown on the first die (1-6)
+ * @param roll2 - The final value shown on the second die (1-6)
  */
-export const rollDieComplete = (value: Rolls): IReduxAction<ActionTypes.ROLL_DIE_COMPLETE, { value: Rolls }> => ({
-  data: { value },
+export const rollDieComplete = (roll1: Rolls, roll2: Rolls): IReduxAction<ActionTypes.ROLL_DIE_COMPLETE, { roll1: Rolls; roll2: Rolls }> => ({
+  data: { roll1, roll2 },
   type: ActionTypes.ROLL_DIE_COMPLETE,
 });
 

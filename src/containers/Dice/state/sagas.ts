@@ -35,7 +35,7 @@ import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
 import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY } from 'globalConstants';
 
-import { currentDieRollSelector } from './selectors';
+import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
 import { enableDie, invalidateDieRoll, rollDieComplete, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
@@ -50,27 +50,28 @@ function * watchForRollDie() {
 
 /**
  * Saga that handles the dice rolling process
- * Generates a random die roll and logs the action
+ * Generates two random die rolls and logs the action
  */
 function * rollDieSaga() {
-  // Generate random die roll using Mersenne Twister for better randomness
+  // Generate random die rolls using Mersenne Twister for better randomness
   const mt = MersenneTwister19937.autoSeed();
-  const dieRoll: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
+  const dieRoll1: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
+  const dieRoll2: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
 
   // Get current player info for logging
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const playerColor = bases[currentTurn].color;
 
-  // Log the die roll action
+  // Log the dice roll action
   yield put(addLogEntry({
     player: playerColor,
-    action: `Rolled ${dieRoll}`,
-    details: `Dice roll: ${dieRoll}`,
+    action: `Rolled ${dieRoll1}-${dieRoll2}`,
+    details: `Dice roll: ${dieRoll1}-${dieRoll2} (sum: ${dieRoll1 + dieRoll2})`,
   }));
 
   // Dispatch the roll completion action
-  yield put(rollDieComplete(dieRoll));
+  yield put(rollDieComplete(dieRoll1, dieRoll2));
 }
 
 /**
@@ -240,7 +241,7 @@ function * canReachHomeFromCell(cellID: string, baseID: BaseID, remainingSteps: 
  */
 function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICoin['coinID'][], currentTurnBase: IBase) {
   const mt = MersenneTwister19937.autoSeed();
-  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
+  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
 
   // Priority 1: Check if any movable coins can reach HOME
   const coinsThatCanReachHome: ICoin['coinID'][] = [];
@@ -442,7 +443,7 @@ function * handleRollSixImmediateSpawn(
   spawnableCoins: ICoin['coinID'][]
 ): Generator<any, void, any> {
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
+  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
 
   if (autoActionsEnabled) {
     // Auto-actions enabled - immediately spawn
@@ -508,6 +509,90 @@ function * buildAvailableActions(
 }
 
 /**
+ * Handles when a spawnable roll is rolled with immediate spawn condition (no coins spawned or no moves available)
+ */
+function * handleRollSpawnableImmediateSpawn(
+  roll1: Rolls,
+  roll2: Rolls,
+  currentTurnBase: IBase,
+  spawnableCoins: ICoin['coinID'][]
+): Generator<any, void, any> {
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  const dieSum: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
+
+  if (autoActionsEnabled) {
+    // Auto-actions enabled - immediately spawn
+    yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+  } else {
+    // Auto-actions disabled - show action selection UI
+    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, [], dieSum as Rolls, currentTurnBase);
+    yield put(setAvailableActions(actions, dieSum as Rolls));
+    yield put(markCurrentBase(true));
+    
+    // Wait for user to select an action
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    yield put(clearAvailableActions());
+    yield put(markCurrentBase(false));
+  }
+}
+
+/**
+ * Handles when a spawnable roll is rolled with choice between spawn and move
+ */
+function * handleRollSpawnableWithChoice(
+  roll1: Rolls,
+  roll2: Rolls,
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  currentTurnBase: IBase
+): Generator<any, void, any> {
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  const dieSum: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
+
+  if (autoActionsEnabled) {
+    // Auto-actions enabled - choose action automatically
+    yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
+    
+    // Wait for action to complete
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+  } else {
+    // Auto-actions disabled - show action selection UI
+    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, movableCoins, dieSum as Rolls, currentTurnBase);
+    yield put(setAvailableActions(actions, dieSum as Rolls));
+    yield put(markCurrentBase(true));
+    
+    // Wait for user to select an action
+    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    yield put(clearAvailableActions());
+    yield put(markCurrentBase(false));
+  }
+}
+
+/**
+ * Handles when a spawnable roll is rolled (1-6, 6-1, or doubles)
+ */
+function * handleRollSpawnable(
+  roll1: Rolls,
+  roll2: Rolls,
+  spawnableCoins: ICoin['coinID'][],
+  movableCoins: ICoin['coinID'][],
+  spawnedCoinIDs: ICoin['coinID'][],
+  currentTurnBase: IBase
+): Generator<any, void, any> {
+  // Mark base as spawnable
+  yield put(markCurrentBase(true));
+
+  if (spawnedCoinIDs.length === 0 && movableCoins.length === 0) {
+    // No coins spawned yet - must spawn
+    yield call(handleRollSpawnableImmediateSpawn, roll1, roll2, currentTurnBase, spawnableCoins);
+  } else {
+    // Has spawned coins - can choose between spawn or move
+    yield call(handleRollSpawnableWithChoice, roll1, roll2, spawnableCoins, movableCoins, currentTurnBase);
+  }
+}
+
+/**
  * Handles when a 6 is rolled and player needs to choose between spawn and move
  */
 function * handleRollSixWithChoice(
@@ -516,7 +601,7 @@ function * handleRollSixWithChoice(
   currentTurnBase: IBase
 ): Generator<any, void, any> {
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-  const currentDieRoll: ReturnType<typeof currentDieRollSelector> = yield select(currentDieRollSelector);
+  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
 
   if (autoActionsEnabled) {
     // Auto-actions enabled - use existing logic
@@ -538,9 +623,9 @@ function * handleRollSixWithChoice(
 }
 
 /**
- * Handles bonus turn after rolling a 6
+ * Handles bonus turn after rolling a spawnable combination (1-6, 6-1, or doubles)
  */
-function * handleBonusTurnAfterSix(): Generator<any, void, any> {
+function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
   yield put(enableDie());
   
   // Recalculate and highlight reachable cells for the bonus turn
@@ -555,7 +640,7 @@ function * handleBonusTurnAfterSix(): Generator<any, void, any> {
   if (autoActionsEnabled) {
     // Small delay before auto-rolling for the bonus turn
     yield delay(DICE_BONUS_TURN_DELAY);
-    // Automatically roll the die for the bonus turn
+    // Automatically roll the dice for the bonus turn
     yield put(rollDie());
   }
 }
@@ -577,8 +662,8 @@ function * handleRollSix(
     yield call(handleRollSixWithChoice, spawnableCoins, movableCoins, currentTurnBase);
   }
   
-  // Handle bonus turn
-  yield call(handleBonusTurnAfterSix);
+  // Handle bonus turn after spawnable roll
+  yield call(handleBonusTurnAfterSpawnable);
 }
 
 /**
@@ -685,9 +770,9 @@ function * handleMultipleCoinsMove(
 }
 
 /**
- * Handles non-6 roll with spawned coins available
+ * Handles non-spawnable roll with spawned coins available
  */
-function * handleNonSixRoll(
+function * handleNonSpawnableRoll(
   spawnedCoinIDs: ICoin['coinID'][],
   movableCoins: ICoin['coinID'][],
   dieValue: Rolls,
@@ -732,27 +817,95 @@ function * handleNoValidMoves(): Generator<any, void, any> {
 }
 
 /**
- * Main saga that handles what happens after a die roll is complete
+ * Helper function to check if dice roll allows spawning
+ * Spawn conditions: (1,6), (6,1), or doubles (1-1, 2-2, 3-3, 4-4, 5-5, 6-6)
+ */
+function canSpawn(roll1: Rolls, roll2: Rolls): boolean {
+  // Check for (1,6) or (6,1)
+  if ((roll1 === Rolls.ONE && roll2 === Rolls.SIX) || (roll1 === Rolls.SIX && roll2 === Rolls.ONE)) {
+    return true;
+  }
+  // Check for doubles
+  if (roll1 === roll2) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Main saga that handles what happens after a dice roll is complete
  * Implements the core Ludo game logic for turn progression and auto-actions
- * @param action - The roll die complete action with the rolled value
+ * @param action - The roll die complete action with both dice values
  */
 function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Generator<any, void, any> {
-  const { value } = action.data!;
+  const { roll1, roll2 } = action.data!;
+  const dieSum = roll1 + roll2;
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const currentTurnBase = bases[currentTurn];
   const spawnedCoinIDs = currentTurnBase.coinIDs.filter((coinID) => coins[coinID].isSpawned && !coins[coinID].isRetired);
-  const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, value);
+  const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, dieSum as Rolls);
   const spawnableCoins = bases[currentTurn].coinIDs.filter((coinID) => !coins[coinID].isSpawned && !coins[coinID].isRetired);
 
-  if (value === Rolls.SIX && (spawnableCoins.length > 0 || movableCoins.length > 0)) {
-    yield call(handleRollSix, spawnableCoins, movableCoins, spawnedCoinIDs, currentTurnBase);
+  if (canSpawn(roll1, roll2)) {
+    // Rolled a spawnable combination - can spawn and will get bonus turn
+    if (spawnableCoins.length > 0 || movableCoins.length > 0) {
+      yield call(handleRollSpawnable, roll1, roll2, spawnableCoins, movableCoins, spawnedCoinIDs, currentTurnBase);
+      // Bonus turn will be handled after action completes (in moveCoinSuccessSaga or spawnCoinSaga)
+    } else {
+      // Rolled spawnable combination but no valid actions - still get bonus turn
+      yield put(invalidateDieRoll());
+      yield call(handleBonusTurnAfterSpawnable);
+    }
   } else if (spawnedCoinIDs.length > 0) {
-    yield call(handleNonSixRoll, spawnedCoinIDs, movableCoins, value, coins);
+    yield call(handleNonSpawnableRoll, spawnedCoinIDs, movableCoins, dieSum as Rolls, coins);
   } else {
     yield call(handleNoValidMoves);
   }
+}
+
+/**
+ * Saga that handles bonus turns after spawning a coin
+ * If the player rolled a spawnable combination, grant a bonus turn
+ */
+function * spawnCoinSuccessSaga() {
+  // Get the dice values that were used for spawning
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  
+  // Check if this was a spawnable combination that grants a bonus turn
+  if (canSpawn(roll1, roll2)) {
+    // Player gets a bonus turn - recalculate highlighting and enable die
+    yield put(enableDie());
+    
+    // Recalculate and highlight reachable cells for the bonus turn
+    yield put(clearHighlightedCells());
+    const reachableCells: Set<string> = yield call(calculateReachableCells);
+    if (reachableCells.size > 0) {
+      yield put(setHighlightedCells(reachableCells));
+    }
+    
+    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+    if (autoActionsEnabled) {
+      // Small delay before auto-rolling for the bonus turn
+      yield delay(DICE_BONUS_TURN_DELAY);
+      // Automatically roll the dice for the bonus turn
+      yield put(rollDie());
+    }
+  } else {
+    // Not a spawnable combination - pass turn to next player
+    yield put(nextTurn());
+    yield put(enableDie());
+  }
+}
+
+/**
+ * Watcher saga that listens for SPAWN_COIN_SUCCESS actions
+ * Handles bonus turns after spawning
+ */
+function * watchForSpawnCoinSuccess() {
+  yield takeLatest(LudoActionTypes.SPAWN_COIN_SUCCESS, spawnCoinSuccessSaga);
 }
 
 /**
@@ -790,18 +943,28 @@ function * passTurnToSaga() {
 
 /**
  * Saga that handles bonus turns after a successful coin move
- * If the player got a bonus turn (rolled 6, reached home, or captured), automatically roll again in auto-play mode
+ * If the player got a bonus turn (rolled spawnable combination, reached home, or captured), grant bonus turn
  */
 function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boolean; coinID: string; currentDieRoll: Rolls } }) {
   const { bonusChance } = action.data!;
   
   if (bonusChance) {
-    // Player got a bonus turn - check if we should auto-roll
+    // Player got a bonus turn - enable die and recalculate highlighting
+    yield put(enableDie());
+    
+    // Recalculate and highlight reachable cells for the bonus turn
+    yield put(clearHighlightedCells());
+    const reachableCells: Set<string> = yield call(calculateReachableCells);
+    if (reachableCells.size > 0) {
+      yield put(setHighlightedCells(reachableCells));
+    }
+    
+    // Check if we should auto-roll in auto-play mode
     const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
     if (autoActionsEnabled) {
       // Small delay before auto-rolling for the bonus turn
       yield delay(DICE_BONUS_TURN_DELAY);
-      // Automatically roll the die for the bonus turn
+      // Automatically roll the dice for the bonus turn
       yield put(rollDie());
     }
   }
@@ -814,6 +977,7 @@ function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boo
 export const sagas = [
   watchForRollDie,          // Watches for die roll requests
   watchForRollDieComplete,  // Watches for die roll completions and handles game logic
+  watchForSpawnCoinSuccess, // Watches for successful spawns and handles bonus turns
   watchForMoveCoinSuccess,  // Watches for successful moves and handles bonus turns
   watchForPassTurnTo,       // Watches for turn changes and auto-rolls in auto-play mode
 ];

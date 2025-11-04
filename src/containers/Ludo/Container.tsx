@@ -23,6 +23,7 @@ import { BOARD_SIZE } from "globalConstants"; // Board dimensions
 import { ContextMenu } from "services/contextMenu/Container"; // Right-click menu
 
 import {
+  clearAvailableActions,
   clearHighlightedCells,
   getInitialGameData,
   getInitialGameDataSuccess,
@@ -48,6 +49,7 @@ import styles from "./Container.module.css"; // Component styles
  * Props dispatched to Redux actions
  */
 interface IDispatchProps {
+  clearAvailableActions: typeof clearAvailableActions; // Clear available actions UI
   clearHighlightedCells: typeof clearHighlightedCells; // Clear highlighted cells
   getInitialGameData: typeof getInitialGameData; // Initialize game data
   getInitialGameDataSuccess: typeof getInitialGameDataSuccess; // Load saved game state
@@ -97,6 +99,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
  * Maps Redux dispatch actions to component props
  */
 const mapDispatchToProps = {
+  clearAvailableActions, // Action to clear available actions UI
   clearHighlightedCells, // Action to clear highlighted cells
   setPlayers, // Action to set number of players
   getInitialGameData, // Action to load initial game data
@@ -368,6 +371,9 @@ class LudoBare extends React.PureComponent<IProps, IState> {
 
     // Clear highlighted cells
     this.props.clearHighlightedCells();
+
+    // Clear available actions panel
+    this.props.clearAvailableActions();
 
     // Disable and invalidate die
     this.props.disableDie();

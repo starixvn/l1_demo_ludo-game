@@ -10,12 +10,13 @@ import { IState, Rolls } from './interfaces';
 
 /**
  * Initial state for the dice container
- * Die starts enabled but with no valid roll
+ * Dice start enabled but with no valid roll
  */
 const initialState: IState = {
-  isDieRollAllowed: true,  // Die can be rolled initially
+  isDieRollAllowed: true,  // Dice can be rolled initially
   isDieRollValid: false,   // No roll has been made yet
-  roll: Rolls.ONE,         // Default roll value
+  roll1: Rolls.ONE,        // Default first die value
+  roll2: Rolls.ONE,        // Default second die value
 };
 
 /**
@@ -27,7 +28,7 @@ const initialState: IState = {
 export const reducer = (state: IState = initialState, action: Actions): IState => {
   switch (action.type) {
     /**
-     * Die roll has completed - update the roll value and mark it as valid
+     * Dice roll has completed - update the roll values and mark them as valid
      * Disable further rolling until the current roll is used or turn passes
      */
     case ActionTypes.ROLL_DIE_COMPLETE: {
@@ -35,7 +36,8 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         ...state,
         isDieRollAllowed: false, // Can't roll again until turn advances
         isDieRollValid: true,    // This roll can be used for moves
-        roll: action.data!.value, // Set the rolled value
+        roll1: action.data!.roll1, // Set the first die value
+        roll2: action.data!.roll2, // Set the second die value
       };
     }
 
