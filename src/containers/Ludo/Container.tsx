@@ -22,6 +22,7 @@ import { BOARD_SIZE } from "globalConstants"; // Board dimensions
 import { ContextMenu } from "services/contextMenu/Container"; // Right-click menu
 
 import {
+  clearHighlightedCells,
   getInitialGameData,
   getInitialGameDataSuccess,
   setPlayers,
@@ -46,6 +47,7 @@ import styles from "./Container.module.css"; // Component styles
  * Props dispatched to Redux actions
  */
 interface IDispatchProps {
+  clearHighlightedCells: typeof clearHighlightedCells; // Clear highlighted cells
   getInitialGameData: typeof getInitialGameData; // Initialize game data
   getInitialGameDataSuccess: typeof getInitialGameDataSuccess; // Load saved game state
   setPlayers: typeof setPlayers; // Configure number of players
@@ -94,6 +96,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
  * Maps Redux dispatch actions to component props
  */
 const mapDispatchToProps = {
+  clearHighlightedCells, // Action to clear highlighted cells
   setPlayers, // Action to set number of players
   getInitialGameData, // Action to load initial game data
   getInitialGameDataSuccess, // Action to load saved game state
@@ -317,12 +320,13 @@ class LudoBare extends React.PureComponent<IProps, IState> {
       (restoredState, metadata) => {
         // Restore the game state with proper type casting
         // currentTurn should be a BaseID enum value
-        // availableActions and availableActionsDieValue should be null when loading a saved game
+        // availableActions, availableActionsDieValue, and highlightedCells should be null when loading a saved game
         this.props.getInitialGameDataSuccess({
           ...restoredState,
           currentTurn: restoredState.currentTurn as BaseID,
           availableActions: null,
           availableActionsDieValue: null,
+          highlightedCells: null,
         });
 
         // Hide the configuration screen since we're loading an existing game
@@ -358,6 +362,9 @@ class LudoBare extends React.PureComponent<IProps, IState> {
 
     // Clear all game logs
     this.props.clearLogs();
+
+    // Clear highlighted cells
+    this.props.clearHighlightedCells();
 
     // Disable and invalidate die
     this.props.disableDie();

@@ -28,6 +28,7 @@ import {
   cellsSelector,
   coinsSelector,
   currentTurnSelector,
+  highlightedCellsSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
@@ -61,6 +62,7 @@ interface IStateProps {
   links: ReturnType<typeof linksSelector>; // Cell connectivity links
   isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether die roll can be used
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
+  highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
 }
 
 /**
@@ -95,6 +97,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentTurn: currentTurnSelector, // Get current player turn
   isDieRollValid: isDieRollValidSelector, // Get die roll validity
   links: linksSelector, // Get cell connectivity links
+  highlightedCells: highlightedCellsSelector, // Get highlighted cells
 });
 
 /**
@@ -173,6 +176,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
       const cellLinks = links[cellID] || [];
       const nextLinkCellIDs = cellLinks.map((link) => link.cellID);
 
+      // Check if this cell should be highlighted
+      const isHighlighted = this.props.highlightedCells?.has(cellID) || false;
+
       // Create Cell component at the correct grid position
       cellComponents[cellConfiguration.row][cellConfiguration.column] = (
         <Cell
@@ -192,6 +198,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
           cellType={cellType}
           nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
           showDebugText={this.props.showDebugText} // Whether to show debug text
+          isHighlighted={isHighlighted} // Whether this cell is highlighted
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
         >
           {

@@ -50,3 +50,8 @@ export const availableActionsDieValueSelector = createSelector(
   [ludoStateSelector],
   (state) => state.availableActionsDieValue,
 );
+
+export const highlightedCellsSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.highlightedCells,
+);

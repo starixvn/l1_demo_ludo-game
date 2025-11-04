@@ -11,12 +11,13 @@ import {
   delay,
   put,
   select,
+  takeEvery,
   takeLatest,
 } from 'redux-saga/effects';
 
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
-import { enableDie, invalidateDieRoll } from 'containers/Dice/state/actions';
+import { enableDie, invalidateDieRoll, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRollSelector } from 'containers/Dice/state/selectors';
@@ -24,6 +25,7 @@ import { WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } fro
 import { WalkwayPosition } from 'state/interfaces';
 
 import {
+  clearHighlightedCells,
   disqualifyCoin,
   enableBase,
   getInitialGameDataSuccess,
@@ -36,6 +38,7 @@ import {
   nextTurn,
   passTurnTo,
   placeCoin,
+  setHighlightedCells,
   setPlayers,
   spawnCoin,
   spawnCoinSuccess,
@@ -48,6 +51,7 @@ import {
   ICoin,
   IServerGameData,
   IState,
+  IWalkway,
 } from './interfaces';
 import {
   basesSelector,
@@ -93,6 +97,7 @@ function * getInitialGameDataSaga() {
     coins: mapByProperty(coins, 'coinID'), // All game coins mapped by ID
     availableActions: null,             // No action selection initially
     availableActionsDieValue: null,     // No die value for actions initially
+    highlightedCells: null,             // No cells highlighted initially
     currentTurn: BaseID.BASE_3,         // Start with red player (arbitrary choice)
     links: data.links,                  // Movement connectivity between cells
     relationships: data.relationships,  // Component relationships for rendering
@@ -476,11 +481,153 @@ function * performDisqualificationCheck(activeCoinID: ICoin['coinID'], walkwayPo
 }
 
 /**
+ * Calculates all reachable cells for the current player's coins
+ * Returns a Set of cell IDs that can be reached with any valid die roll (1-6)
+ */
+export function * calculateReachableCells(): Generator<any, Set<string>, any> {
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+
+  const reachableCells = new Set<string>();
+  const currentBase = bases[currentTurn];
+
+  if (!currentBase) {
+    return reachableCells;
+  }
+
+  // Get all coins for the current player
+  const playerCoins = currentBase.coinIDs.map((coinID) => coins[coinID]);
+
+  // For each coin, calculate reachable cells
+  for (const coin of playerCoins) {
+    if (coin.isRetired) {
+      continue; // Skip retired coins
+    }
+
+    if (!coin.isSpawned) {
+      // Unspawned coin - can spawn to spawn cell
+      // Find the spawn cell for this base
+      const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
+      const walkway = Object.values(walkways).find(
+        (w: IWalkway) => w.baseID === currentBase.ID
+      );
+      if (walkway) {
+        const walkwayCells = cells[walkway.position];
+        const spawnCell = Object.values(walkwayCells).find(
+          (cell) => cell.cellType === CellType.SPAWN && cell.baseID === currentBase.ID
+        );
+        if (spawnCell) {
+          reachableCells.add(spawnCell.cellID);
+        }
+      }
+    } else {
+      // Spawned coin - calculate cells reachable with 1-6 steps
+      const startCellID = coin.cellID;
+      if (!startCellID) continue;
+
+      // Calculate all cells reachable with 1-6 steps
+      for (let steps = 1; steps <= 6; steps++) {
+        // Check if this move would overshoot home
+        if (coin.steps + steps > WINNING_MOVES) {
+          continue; // Skip moves that overshoot
+        }
+
+        // Use BFS to find all cells reachable in exactly 'steps' moves
+        const visited = new Set<string>();
+        const queue: Array<{ cellID: string; stepsRemaining: number }> = [
+          { cellID: startCellID, stepsRemaining: steps },
+        ];
+
+        while (queue.length > 0) {
+          const { cellID, stepsRemaining } = queue.shift()!;
+
+          if (stepsRemaining === 0) {
+            // We've reached this cell in exactly the right number of steps
+            reachableCells.add(cellID);
+            continue;
+          }
+
+          if (visited.has(cellID)) {
+            continue;
+          }
+          visited.add(cellID);
+
+          const nextCells = links[cellID];
+          if (!nextCells || nextCells.length === 0) {
+            continue;
+          }
+
+          // Add all next cells to queue
+          for (const nextCell of nextCells) {
+            // Skip HOME cells in intermediate steps (we'll add it at the end if reachable)
+            if (nextCell.cellID === 'HOME' && stepsRemaining > 1) {
+              continue;
+            }
+
+            // For homepath cells, only allow if they match the coin's base
+            if (nextCell.cellID !== 'HOME') {
+              const cellData = cells[nextCell.position]?.[nextCell.cellID];
+              if (cellData && cellData.cellType === CellType.HOMEPATH) {
+                if (cellData.baseID !== coin.baseID) {
+                  continue; // Skip other players' homepaths
+                }
+              }
+            }
+
+            queue.push({ cellID: nextCell.cellID, stepsRemaining: stepsRemaining - 1 });
+          }
+        }
+      }
+    }
+  }
+
+  return reachableCells;
+}
+
+/**
  * Watcher saga for turn progression
  * Advances to the next player's turn when current turn ends
  */
 function * watchForNextTurn() {
   yield takeLatest(ActionTypes.NEXT_TURN, nextTurnSaga);
+}
+
+/**
+ * Watcher saga for pass turn to action
+ * Calculates and highlights reachable cells when a player's turn starts
+ */
+function * watchForPassTurnTo() {
+  yield takeLatest(ActionTypes.PASS_TURN_TO, passTurnToSaga);
+}
+
+/**
+ * Watcher saga for dice roll complete
+ * Clears highlighting when dice is rolled
+ */
+function * watchForRollDieComplete() {
+  yield takeEvery(DiceActionTypes.ROLL_DIE_COMPLETE, function * () {
+    yield put(clearHighlightedCells());
+  });
+}
+
+/**
+ * Handles when turn is passed to a player
+ * Calculates and highlights all reachable cells for that player's coins
+ */
+function * passTurnToSaga() {
+  // Clear any existing highlighting
+  yield put(clearHighlightedCells());
+
+  // Calculate reachable cells for current player
+  const reachableCells: Set<string> = yield call(calculateReachableCells);
+
+  // Set highlighted cells
+  if (reachableCells.size > 0) {
+    yield put(setHighlightedCells(reachableCells));
+  }
 }
 
 /**
@@ -718,6 +865,8 @@ export const sagas = [
   watchForMoveCoin,           // Coin movement along board
   watchForDisqualifyCoin,     // Coin captures (logging only)
   watchForNextTurn,           // Turn progression
+  watchForPassTurnTo,         // Calculate reachable cells when turn starts
+  watchForRollDieComplete,    // Clear highlighting when dice is rolled
   watchForSetPlayers,         // Player count configuration
   watchForHomeCoin,           // Victory detection
 ];

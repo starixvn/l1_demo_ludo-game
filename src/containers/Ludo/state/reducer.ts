@@ -25,6 +25,7 @@ const initialState: IState = {
   walkways: {},     // Will contain all walkway segments
   availableActions: null, // No actions available initially
   availableActionsDieValue: null, // No die value initially
+  highlightedCells: null, // No cells highlighted initially
 };
 
 /**
@@ -301,6 +302,27 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         ...state,
         availableActions: null, // Clear available actions
         availableActionsDieValue: null, // Clear die value
+      };
+    }
+
+    /**
+     * Set highlighted cells for showing reachable destinations
+     */
+    case ActionTypes.SET_HIGHLIGHTED_CELLS: {
+      const { cellIDs } = action.data!;
+      return {
+        ...state,
+        highlightedCells: cellIDs, // Store set of highlighted cell IDs
+      };
+    }
+
+    /**
+     * Clear cell highlighting
+     */
+    case ActionTypes.CLEAR_HIGHLIGHTED_CELLS: {
+      return {
+        ...state,
+        highlightedCells: null, // Clear highlighted cells
       };
     }
 

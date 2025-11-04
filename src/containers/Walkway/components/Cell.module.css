@@ -116,3 +116,18 @@
   pointer-events: none;        /* Don't interfere with click events */
   z-index: 3;                  /* Above background but below coins */
 }
+
+/* Highlighted cell styling - shows reachable destinations */
+.Highlighted {
+  box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.8), inset 0 0 10px 2px rgba(255, 215, 0, 0.4) !important;
+  animation: highlightPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.8), inset 0 0 10px 2px rgba(255, 215, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(255, 215, 0, 1), inset 0 0 15px 3px rgba(255, 215, 0, 0.6);
+  }
+}

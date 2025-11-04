@@ -145,6 +145,8 @@ export interface IState {
   availableActions: IAvailableAction[] | null;
   /** Current die roll value associated with available actions */
   availableActionsDieValue: number | null;
+  /** Set of cell IDs that should be highlighted as reachable for current player */
+  highlightedCells: Set<string> | null;
 }
 
 /**

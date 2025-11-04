@@ -28,7 +28,8 @@ import {
 } from 'containers/Ludo/state/actions';
 import { rollDie } from './actions';
 import { BaseID, CellType, IBase, ICoin } from 'containers/Ludo/state/interfaces';
-import { getMovableCoins } from 'containers/Ludo/state/sagas';
+import { getMovableCoins, calculateReachableCells } from 'containers/Ludo/state/sagas';
+import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/state/actions';
 import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
@@ -541,6 +542,14 @@ function * handleRollSixWithChoice(
  */
 function * handleBonusTurnAfterSix(): Generator<any, void, any> {
   yield put(enableDie());
+  
+  // Recalculate and highlight reachable cells for the bonus turn
+  // Since the player's turn continues (no PASS_TURN_TO action), we need to recalculate highlighting
+  yield put(clearHighlightedCells());
+  const reachableCells: Set<string> = yield call(calculateReachableCells);
+  if (reachableCells.size > 0) {
+    yield put(setHighlightedCells(reachableCells));
+  }
   
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   if (autoActionsEnabled) {

@@ -45,6 +45,10 @@ export enum ActionTypes {
   // Action Selection UI Actions
   SET_AVAILABLE_ACTIONS = 'ludo/SET_AVAILABLE_ACTIONS',         // Set available actions for player to choose from
   CLEAR_AVAILABLE_ACTIONS = 'ludo/CLEAR_AVAILABLE_ACTIONS',     // Clear available actions UI
+
+  // Cell Highlighting Actions
+  SET_HIGHLIGHTED_CELLS = 'ludo/SET_HIGHLIGHTED_CELLS',         // Set cells to highlight as reachable
+  CLEAR_HIGHLIGHTED_CELLS = 'ludo/CLEAR_HIGHLIGHTED_CELLS',     // Clear cell highlighting
 }
 
 /**
@@ -255,6 +259,24 @@ export const clearAvailableActions = (): IReduxAction<ActionTypes.CLEAR_AVAILABL
 });
 
 /**
+ * Sets which cells should be highlighted as reachable for the current player
+ * @param cellIDs - Set of cell IDs to highlight
+ */
+export const setHighlightedCells = (
+  cellIDs: Set<string>
+): IReduxAction<ActionTypes.SET_HIGHLIGHTED_CELLS, { cellIDs: Set<string> }> => ({
+  data: { cellIDs },
+  type: ActionTypes.SET_HIGHLIGHTED_CELLS,
+});
+
+/**
+ * Clears all cell highlighting
+ */
+export const clearHighlightedCells = (): IReduxAction<ActionTypes.CLEAR_HIGHLIGHTED_CELLS, void> => ({
+  type: ActionTypes.CLEAR_HIGHLIGHTED_CELLS,
+});
+
+/**
  * Union type of all possible Ludo game actions
  * This type is used by the reducer to ensure type safety when handling actions
  * Each action type in this union corresponds to one of the action creators above
@@ -277,4 +299,6 @@ export type Actions =
   | ReturnType<typeof markWinner>
   | ReturnType<typeof setAvailableActions>
   | ReturnType<typeof clearAvailableActions>
+  | ReturnType<typeof setHighlightedCells>
+  | ReturnType<typeof clearHighlightedCells>
   ;

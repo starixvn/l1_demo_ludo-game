@@ -39,6 +39,8 @@ interface ICellProps {
   nextLinkCellIDs?: string[];
   /** Whether to show debug text (cell ID, base ID, etc.) */
   showDebugText?: boolean;
+  /** Whether this cell is highlighted as reachable */
+  isHighlighted?: boolean;
 
   /** Callback when right-click context menu is opened */
   onContextMenuOpened: (options: IContextMenuOptions) => void;
@@ -114,7 +116,11 @@ export class Cell extends React.PureComponent<ICellProps> {
 
     return (
       <div
-        className={classnames(styles.Container, mutipleCoinClassName)} // Base styles + multiple coin handling
+        className={classnames(
+          styles.Container,
+          mutipleCoinClassName,
+          this.props.isHighlighted && styles.Highlighted
+        )} // Base styles + multiple coin handling + highlighting
         style={cellStyle}
         // Data attributes for event handling and identification
         data-id={cellID} // Unique cell identifier
