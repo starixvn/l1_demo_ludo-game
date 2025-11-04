@@ -37,9 +37,10 @@ class HomeBare extends React.PureComponent<IProps> {
           return (
             <div
               key={index}
+              data-index={index}
               className={styles.HomeContainer}
               style={this.getCSS(HOME_SIZE, base.color, index)}
-            />
+            ></div>
           );
         })}
       </div>
@@ -51,8 +52,8 @@ class HomeBare extends React.PureComponent<IProps> {
     baseColor: BaseColors,
     index: number
   ): React.CSSProperties => {
-    const size = cellSize * CELL_DIMENSION;
     const colorHex = getBaseHexColor(baseColor!);
+    const size = cellSize * CELL_DIMENSION;
 
     const cssProperties = {
       borderColor: `${colorHex} transparent transparent transparent`,
@@ -62,7 +63,7 @@ class HomeBare extends React.PureComponent<IProps> {
     switch (index) {
       case 0:
         return cssProperties;
-      case 1:
+      case 3:
         return {
           ...cssProperties,
           left: `${size / 4}px`,
@@ -75,7 +76,7 @@ class HomeBare extends React.PureComponent<IProps> {
           top: `${size / 2}px`,
           transform: "rotate(180deg)",
         };
-      case 3:
+      case 1:
         return {
           ...cssProperties,
           right: `${size / 4}px`,
