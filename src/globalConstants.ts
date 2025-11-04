@@ -34,9 +34,9 @@ export const BASE_COLORS: { [key: string]: string } = {
 }
 
 // Timeout and delay constants (in milliseconds)
-export const DICE_AUTO_ROLL_TIMEOUT = 20000;          // Auto-roll timer delay when die becomes rollable (200ms)
+export const DICE_AUTO_ROLL_TIMEOUT = 200;          // Auto-roll timer delay when die becomes rollable (200ms)
 export const DICE_BONUS_TURN_DELAY = 500;           // Delay before auto-rolling for bonus turns (500ms)
 export const DICE_STATE_UPDATE_DELAY = 50;          // Small delay for state updates in dice sagas (50ms)
 export const LUDO_MOVE_ANIMATION_DELAY = 100;       // Delay between coin movement steps for animation (100ms)
 export const LUDO_STATE_UPDATE_DELAY = 10;          // Small delay for state updates in ludo sagas (10ms)
-export const AUTO_ACTION_TIMEOUT = 20000;             // Default timeout for auto-actions (200ms)
+export const AUTO_ACTION_TIMEOUT = 200;             // Default timeout for auto-actions (200ms)

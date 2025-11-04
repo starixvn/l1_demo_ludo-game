@@ -18,6 +18,7 @@ import {
   coinsSelector,
   currentTurnSelector,
 } from 'containers/Ludo/state/selectors';
+import { getBaseHexColor } from 'containers/utils';
 
 import styles from './Container.module.css';
 
@@ -133,6 +134,8 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
             {availableActions.map((action, index) => {
               const coin = this.props.coins[action.coinID];
               const coinBase = coin ? this.props.bases[coin.baseID] : null;
+              // Get the base color for the current turn (the base performing the action)
+              const baseColor = currentBase.color ? getBaseHexColor(currentBase.color) : null;
               
               return (
                 <button
@@ -142,7 +145,12 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
                   }`}
                   onClick={() => this.handleActionClick(action)}
                 >
-                  <div className={styles.ActionLabel}>{action.label}</div>
+                  <div 
+                    className={styles.ActionLabel}
+                    style={baseColor ? { color: baseColor } : undefined}
+                  >
+                    {action.label}
+                  </div>
                   <div className={styles.ActionDetails}>
                     <div className={styles.DetailRow}>
                       <span className={styles.DetailLabel}>Coin ID:</span>

@@ -14,12 +14,14 @@ import {
   currentDieRollSelector,
   isDieRollAllowedSelector,
 } from "./state/selectors";
+import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors";
 
 import styles from "./Container.module.css";
 
 interface IStateProps {
   currentDieRoll: ReturnType<typeof currentDieRollSelector>;
   isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
+  autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
 }
 
 interface IDispatchProps {
@@ -35,6 +37,7 @@ interface IProps extends IStateProps, IDispatchProps, IPublicProps {}
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentDieRoll: currentDieRollSelector,
   isDieRollAllowed: isDieRollAllowedSelector,
+  autoActionsEnabled: autoActionsEnabledSelector,
 });
 
 const mapDispatchToProps = {
@@ -49,12 +52,15 @@ class DiceBare extends React.PureComponent<IProps> {
   }
 
   componentDidUpdate(prevProps: IProps) {
-    // Start timer when die becomes rollable again
+    // Start timer when die becomes rollable again (only if auto-actions are enabled)
     if (!prevProps.isDieRollAllowed && this.props.isDieRollAllowed) {
       this.startAutoRollTimer();
     }
-    // Clear timer when die is no longer rollable
-    if (prevProps.isDieRollAllowed && !this.props.isDieRollAllowed) {
+    // Clear timer when die is no longer rollable or when auto-actions are disabled
+    if (
+      (prevProps.isDieRollAllowed && !this.props.isDieRollAllowed) ||
+      (prevProps.autoActionsEnabled && !this.props.autoActionsEnabled)
+    ) {
       this.clearAutoRollTimer();
     }
   }
@@ -65,11 +71,16 @@ class DiceBare extends React.PureComponent<IProps> {
 
   private startAutoRollTimer = () => {
     this.clearAutoRollTimer(); // Clear any existing timer
-    if (this.props.isDieRollAllowed) {
+    // Only start auto-roll timer if die is rollable AND auto-actions are enabled
+    if (this.props.isDieRollAllowed && this.props.autoActionsEnabled) {
       this.autoRollTimeout = setTimeout(() => {
         // Double-check: props may have changed during the timeout period
         // This is especially important with longer timeouts
-        if (this.props.isDieRollAllowed && this.autoRollTimeout !== null) {
+        if (
+          this.props.isDieRollAllowed &&
+          this.props.autoActionsEnabled &&
+          this.autoRollTimeout !== null
+        ) {
           this.props.rollDie();
         }
       }, DICE_AUTO_ROLL_TIMEOUT);
