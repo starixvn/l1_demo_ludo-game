@@ -146,7 +146,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
    */
   private renderCells = () => {
     const {
-      walkway: { position, baseID }, // Walkway configuration
+      walkway: { position }, // Walkway configuration
       cells: cellConfigurations, // All cell configurations
       bases, // Player base data
       coins, // All coin data
@@ -160,7 +160,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
     const cellConfigurationsForWalkway = Object.values(
       cellConfigurations[position]
     );
-    const base = bases[baseID]; // Base data for this walkway
 
     // Process each cell configuration and create Cell components
     cellConfigurationsForWalkway.forEach((cellConfiguration, index) => {
@@ -179,6 +178,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
       // Check if this cell should be highlighted
       const isHighlighted = this.props.highlightedCells?.has(cellID) || false;
 
+      // Get the base that this cell belongs to (use cell's baseID, not walkway's baseID)
+      const cellBase = bases[cellConfiguration.baseID];
+
       // Create Cell component at the correct grid position
       cellComponents[cellConfiguration.row][cellConfiguration.column] = (
         <Cell
@@ -187,12 +189,12 @@ class WalkwayBare extends React.PureComponent<IProps> {
           row={row}
           walkwayPosition={position}
           baseID={cellConfiguration.baseID} // Base ID this cell belongs to
-          // Color special cells (spawn/homepath/normal) with base color
+          // Color special cells (spawn/homepath/normal) with base color of the cell's base
           color={
             [CellType.HOMEPATH, CellType.SPAWN, CellType.NORMAL].includes(
               cellType
-            )
-              ? base.color
+            ) && cellBase
+              ? cellBase.color
               : undefined
           }
           cellType={cellType}
