@@ -9,7 +9,7 @@
 import classnames from "classnames"; // Utility for conditional CSS classes
 import React from "react";
 
-import { CellType, ICell } from "containers/Ludo/state/interfaces"; // Cell type definitions
+import { CellType } from "containers/Ludo/state/interfaces"; // Cell type definitions
 import { getBaseHexColor, getStyleObject } from "containers/utils"; // Style utility
 import { CELL_SIZE, WALKWAY_LENGTH } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Color and position types
@@ -42,8 +42,6 @@ interface ICellProps {
 
   /** Callback when right-click context menu is opened */
   onContextMenuOpened: (options: IContextMenuOptions) => void;
-  /** Callback to highlight valid next moves when hovering */
-  onHighlightNextCells: (cellID: ICell["cellID"]) => void;
 }
 
 /**
@@ -126,7 +124,6 @@ export class Cell extends React.PureComponent<ICellProps> {
         data-position={walkwayPosition}
         data-cell-type={cellType}
         onContextMenu={(event) => this.handleContextMenu(event)} // Right-click menu
-        onMouseEnter={(event) => this.highlightNextCells(event)} // Hover highlighting
       >
         {/* Display cell information for debugging/development */}
         {this.props.showDebugText !== false && (
@@ -187,18 +184,4 @@ export class Cell extends React.PureComponent<ICellProps> {
     });
   };
 
-  /**
-   * Handles mouse enter events to highlight valid next moves
-   * Called when user hovers over a cell to show possible moves
-   */
-  private highlightNextCells = (
-    event: React.MouseEvent<HTMLDivElement, MouseEvent>
-  ) => {
-    const target = event.target as HTMLDivElement;
-    const cellID = target.getAttribute("data-id");
-
-    if (cellID) {
-      this.props.onHighlightNextCells(cellID); // Trigger highlighting of valid moves
-    }
-  };
 }

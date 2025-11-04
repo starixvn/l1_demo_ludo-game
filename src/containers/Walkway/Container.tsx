@@ -183,7 +183,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
           baseID={cellConfiguration.baseID} // Base ID this cell belongs to
           // Color special cells (spawn/homepath/normal) with base color
           color={
-            [CellType.HOMEPATH, CellType.SPAWN, CellType.NORMAL].includes(cellType)
+            [CellType.HOMEPATH, CellType.SPAWN, CellType.NORMAL].includes(
+              cellType
+            )
               ? base.color
               : undefined
           }
@@ -191,7 +193,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
           nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
           showDebugText={this.props.showDebugText} // Whether to show debug text
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
-          onHighlightNextCells={this.onHighlightNextCells} // Hover highlighting
         >
           {
             // Render coins that are currently on this cell
@@ -276,17 +277,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
         },
       ]
     );
-  };
-
-  /**
-   * Highlights connected cells when hovering (development tool)
-   * Shows which cells are linked for valid movement paths
-   */
-  private onHighlightNextCells = (cellID: ICell["cellID"]) => {
-    const { links } = this.props;
-    // Get all cells that this cell can move to
-    const linkedCellIDs = links[cellID].map((cell) => cell.cellID);
-    console.log(`${cellID} -> ${linkedCellIDs}`); // Debug output
   };
 
   /**

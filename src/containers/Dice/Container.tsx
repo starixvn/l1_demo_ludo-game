@@ -5,7 +5,7 @@ import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
 import { getStyleObject } from "containers/utils";
-import { DICE_SIZE, DICE_AUTO_ROLL_TIMEOUT } from "globalConstants";
+import { DICE_SIZE } from "globalConstants";
 import { BaseColors } from "state/interfaces";
 
 import { rollDie } from "./state/actions";
@@ -14,7 +14,10 @@ import {
   currentDieRollSelector,
   isDieRollAllowedSelector,
 } from "./state/selectors";
-import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors";
+import {
+  autoActionsEnabledSelector,
+  autoActionTimeoutSelector,
+} from "containers/StepLogs/state/selectors";
 
 import styles from "./Container.module.css";
 
@@ -22,6 +25,7 @@ interface IStateProps {
   currentDieRoll: ReturnType<typeof currentDieRollSelector>;
   isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
   autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
+  autoActionTimeout: ReturnType<typeof autoActionTimeoutSelector>;
 }
 
 interface IDispatchProps {
@@ -38,6 +42,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentDieRoll: currentDieRollSelector,
   isDieRollAllowed: isDieRollAllowedSelector,
   autoActionsEnabled: autoActionsEnabledSelector,
+  autoActionTimeout: autoActionTimeoutSelector,
 });
 
 const mapDispatchToProps = {
@@ -73,6 +78,10 @@ class DiceBare extends React.PureComponent<IProps> {
     this.clearAutoRollTimer(); // Clear any existing timer
     // Only start auto-roll timer if die is rollable AND auto-actions are enabled
     if (this.props.isDieRollAllowed && this.props.autoActionsEnabled) {
+      console.log(
+        "Starting auto-roll timer with timeout:",
+        this.props.autoActionTimeout
+      );
       this.autoRollTimeout = setTimeout(() => {
         // Double-check: props may have changed during the timeout period
         // This is especially important with longer timeouts
@@ -83,7 +92,7 @@ class DiceBare extends React.PureComponent<IProps> {
         ) {
           this.props.rollDie();
         }
-      }, DICE_AUTO_ROLL_TIMEOUT);
+      }, this.props.autoActionTimeout);
     }
   };
 
