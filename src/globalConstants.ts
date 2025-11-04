@@ -40,3 +40,4 @@ export const DICE_STATE_UPDATE_DELAY = 50;          // Small delay for state upd
 export const LUDO_MOVE_ANIMATION_DELAY = 100;       // Delay between coin movement steps for animation (100ms)
 export const LUDO_STATE_UPDATE_DELAY = 10;          // Small delay for state updates in ludo sagas (10ms)
 export const AUTO_ACTION_TIMEOUT = 200;             // Default timeout for auto-actions (200ms)
+export const DICE_COUNTDOWN_TIMEOUT = 30;           // Countdown timer duration in seconds when player needs to roll dice (30s)

@@ -17,6 +17,7 @@
   border: 1px solid #CCCCCC;
   display: flex;
   flex-wrap: wrap;
+  position: relative; /* Allow absolute positioning of countdown timer */
 }
 
 .PlayerContainer {
