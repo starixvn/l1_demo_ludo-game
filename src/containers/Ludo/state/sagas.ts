@@ -210,6 +210,82 @@ export function * getMovableCoins(stepsToTake: Rolls) {
 }
 
 /**
+ * Finds blocking coins along a coin's movement path
+ * Returns information about the first blocking coin encountered
+ * @param coinID - The coin that wants to move
+ * @param stepsToTake - Number of steps to move
+ * @returns Object with blockingCoinID, blockingCellID, and stepsBeforeBlocking, or null if no blocking
+ */
+export function * findBlockingCoin(
+  coinID: ICoin['coinID'],
+  stepsToTake: Rolls
+): Generator<any, { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null, any> {
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+  const currentCoin = coins[coinID];
+
+  if (!currentCoin.isSpawned || currentCoin.isRetired) {
+    return null; // Coin not on board or already home
+  }
+
+  let currentCellID = currentCoin.cellID;
+
+  // Traverse the path step by step
+  for (let step = 0; step < stepsToTake; step++) {
+    const nextCells = links[currentCellID];
+    
+    if (!nextCells || nextCells.length === 0) {
+      break; // End of path
+    }
+
+    // Find the next cell (prioritize HOME, then home path, then first available)
+    let nextCell;
+    const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
+    if (homeCell) {
+      nextCell = homeCell;
+    } else {
+      // Find matching home path or use first available
+      const matchingHomePath = nextCells.find((cell) => {
+        if (cell.cellID === 'HOME') return false;
+        const cellData = cells[cell.position]?.[cell.cellID];
+        return cellData?.cellType === CellType.HOMEPATH && cellData.baseID === currentCoin.baseID;
+      });
+      nextCell = matchingHomePath || nextCells[0];
+    }
+
+    if (!nextCell) {
+      break;
+    }
+
+    // Check if next cell has any coins (blocking) BEFORE moving to it
+    if (nextCell.cellID !== 'HOME') {
+      const cellData = cells[nextCell.position]?.[nextCell.cellID];
+      if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
+        // Found a blocking coin - check if it's the same base (can't block own coins)
+        const blockingCoinID = cellData.coinIDs[0]; // Get first coin on the cell
+        const blockingCoin = coins[blockingCoinID];
+        
+        // Only block if it's a different base (opponent's coin)
+        if (blockingCoin && blockingCoin.baseID !== currentCoin.baseID) {
+          // Blocking coin found at this step - can move up to 'step' steps before it
+          return {
+            blockingCoinID,
+            blockingCellID: nextCell.cellID,
+            stepsBeforeBlocking: step, // Number of steps we can take before hitting the blocker
+          };
+        }
+      }
+    }
+
+    // Move to next cell for next iteration
+    currentCellID = nextCell.cellID;
+  }
+
+  return null; // No blocking coin found
+}
+
+/**
  * Main saga for handling coin movement along the board
  *
  * This is the most complex saga in the game. It handles:
@@ -227,6 +303,22 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   let { cellID, walkwayPosition } = { ...action.data! };
   const { coinID } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
+  
+  // Check for blocking coins BEFORE allowing movement
+  const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null = 
+    yield call(findBlockingCoin, coinID, currentDieRoll);
+  
+  // If blocking coin is detected, cannot move at all - fail the move and pass turn
+  if (blockingInfo) {
+    console.warn(`Coin ${coinID} cannot move - blocked by ${blockingInfo.blockingCoinID}`);
+    yield put(moveCoinFailure());
+    yield put(nextTurn());
+    yield put(enableDie());
+    return;
+  }
+  
+  // Determine how many steps to move (always use full die roll - no partial moves allowed)
+  const stepsToMove = currentDieRoll;
 
   // Validate that this move is possible
   const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
@@ -250,8 +342,8 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   // Track if coin reached home during movement
   let bonusChanceForHomeCoin = false;
 
-  // Move the coin step-by-step based on die roll value
-  for (let i = 0; i < currentDieRoll; i++) {
+  // Move the coin step-by-step based on steps to move
+  for (let i = 0; i < stepsToMove; i++) {
     // Get fresh state for each step (state may change during movement)
     const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
     const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
@@ -387,6 +479,26 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
       }
     }
 
+    // Check for blocking coin on next cell - if found, cannot move over
+    if (nextCell.cellID !== 'HOME') {
+      const nextCellData = cells[nextCell.position]?.[nextCell.cellID];
+      if (nextCellData && nextCellData.coinIDs && nextCellData.coinIDs.length > 0) {
+        // Found a coin on the next cell
+        const coinOnNextCell = coins[nextCellData.coinIDs[0]];
+        const currentCoin = coins[coinID];
+        
+        // Check if it's a blocking coin (different base) - cannot move over
+        if (coinOnNextCell && coinOnNextCell.baseID !== currentCoin.baseID) {
+          // Blocking coin encountered - cannot move over
+          console.warn(`Coin ${coinID} cannot move to ${nextCell.cellID} - blocked by ${nextCellData.coinIDs[0]}`);
+          yield put(moveCoinFailure());
+          yield put(nextTurn());
+          yield put(enableDie());
+          return; // Stop movement and pass turn
+        }
+      }
+    }
+
     // Animate: lift coin from current cell
     yield put(liftCoin(cellID, coinID, walkwayPosition));
 
@@ -421,14 +533,15 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const playerColor = bases[coins[coinID].baseID].color;
 
+  // Log the move action
   yield put(addLogEntry({
     player: playerColor,
     action: 'Moved coin',
-    details: `Moved coin ${coinID.split('_')[1]} ${currentDieRoll} spaces`,
+    details: `Moved coin ${coinID.split('_')[1]} ${stepsToMove} spaces`,
   }));
 
   // Complete the move and handle turn progression
-  yield put(moveCoinSuccess(bonusChance, coinID, currentDieRoll));
+  yield put(moveCoinSuccess(bonusChance, coinID, stepsToMove as Rolls));
 
   // Advance to next turn unless player gets bonus
   // Note: Roll invalidation and die enabling are handled in moveCoinSuccessSaga

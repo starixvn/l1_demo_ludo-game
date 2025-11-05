@@ -107,8 +107,14 @@ export const spawnCoinSuccess = (
  * @param walkwayPosition - Target position on the walkway
  * @param cellID - ID of the target cell
  */
-export const moveCoin = (coinID: ICoin['coinID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']): IReduxAction<ActionTypes.MOVE_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; }> => ({
-  data: { cellID, coinID, walkwayPosition },
+export const moveCoin = (
+  coinID: ICoin['coinID'], 
+  walkwayPosition: WalkwayPosition, 
+  cellID: ICell['cellID'],
+  blockingCoinID?: ICoin['coinID'],
+  stepsBeforeBlocking?: number
+): IReduxAction<ActionTypes.MOVE_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; blockingCoinID?: ICoin['coinID']; stepsBeforeBlocking?: number }> => ({
+  data: { cellID, coinID, walkwayPosition, blockingCoinID, stepsBeforeBlocking },
   type: ActionTypes.MOVE_COIN,
 });
 
@@ -228,14 +234,18 @@ export const enableBase = (baseID: BaseID): IReduxAction<ActionTypes.ENABLE_BASE
  * Available action option for player selection UI
  */
 export interface IAvailableAction {
-  /** Type of action: 'spawn' or 'move' */
-  type: 'spawn' | 'move';
+  /** Type of action: 'spawn', 'move', 'kick', or 'move_before' */
+  type: 'spawn' | 'move' | 'kick' | 'move_before';
   /** ID of the coin this action applies to */
   coinID: ICoin['coinID'];
   /** Human-readable label for this action */
   label: string;
   /** Optional description/details about this action */
   description?: string;
+  /** For 'kick' and 'move_before' actions: ID of the blocking coin */
+  blockingCoinID?: ICoin['coinID'];
+  /** For 'move_before' action: number of steps to move before blocking coin */
+  stepsBeforeBlocking?: number;
 }
 
 /**

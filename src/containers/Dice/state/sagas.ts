@@ -28,7 +28,7 @@ import {
 } from 'containers/Ludo/state/actions';
 import { rollDie } from './actions';
 import { BaseID, CellType, IBase, ICoin } from 'containers/Ludo/state/interfaces';
-import { getMovableCoins, calculateReachableCells } from 'containers/Ludo/state/sagas';
+import { getMovableCoins, calculateReachableCells, findBlockingCoin } from 'containers/Ludo/state/sagas';
 import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/state/actions';
 import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
@@ -387,26 +387,36 @@ function * buildAvailableActions(
     });
   }
 
-  // Add move actions with priority information
+  // Add move actions with priority information and blocking detection
   for (const coinID of movableCoins) {
-    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
-    let label = `Move Coin ${coinID.split('_')[1]}`;
-    let description = `Move ${dieValue} spaces`;
+    // Check for blocking coins
+    const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null = 
+      yield call(findBlockingCoin, coinID, dieValue);
 
-    if (result === 'HOME') {
-      label = `Move Coin ${coinID.split('_')[1]} (Can Reach Home!)`;
-      description = `Move ${dieValue} spaces - This coin can reach HOME!`;
-    } else if (result === 'HOMEPATH') {
-      label = `Move Coin ${coinID.split('_')[1]} (Can Enter Home Path)`;
-      description = `Move ${dieValue} spaces - This coin can enter the home path`;
+    if (blockingInfo) {
+      // Blocking coin found - cannot move at all, pass turn to next base
+      // No actions are added when a blocking coin is detected
+    } else {
+      // No blocking - normal move action
+      const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
+      let label = `Move Coin ${coinID.split('_')[1]}`;
+      let description = `Move ${dieValue} spaces`;
+
+      if (result === 'HOME') {
+        label = `Move Coin ${coinID.split('_')[1]} (Can Reach Home!)`;
+        description = `Move ${dieValue} spaces - This coin can reach HOME!`;
+      } else if (result === 'HOMEPATH') {
+        label = `Move Coin ${coinID.split('_')[1]} (Can Enter Home Path)`;
+        description = `Move ${dieValue} spaces - This coin can enter the home path`;
+      }
+
+      actions.push({
+        type: 'move',
+        coinID,
+        label,
+        description,
+      });
     }
-
-    actions.push({
-      type: 'move',
-      coinID,
-      label,
-      description,
-    });
   }
 
   return actions;
@@ -463,13 +473,21 @@ function * handleRollSpawnableWithChoice(
   } else {
     // Auto-actions disabled - show action selection UI
     const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, movableCoins, dieSum as Rolls, currentTurnBase);
-    yield put(setAvailableActions(actions, dieSum as Rolls));
-    yield put(markCurrentBase(true));
     
-    // Wait for user to select an action
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-    yield put(clearAvailableActions());
-    yield put(markCurrentBase(false));
+    // Check if any actions are available after blocking detection
+    if (actions.length === 0) {
+      // All coins are blocked - pass turn automatically
+      yield put(markCurrentBase(false));
+      yield call(handleNoValidMoves);
+    } else {
+      yield put(setAvailableActions(actions, dieSum as Rolls));
+      yield put(markCurrentBase(true));
+      
+      // Wait for user to select an action
+      yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+      yield put(clearAvailableActions());
+      yield put(markCurrentBase(false));
+    }
   }
 }
 
@@ -614,11 +632,18 @@ function * handleMultipleCoinsMove(
     const currentTurnBase = bases[currentTurn];
     
     const actions: IAvailableAction[] = yield call(buildAvailableActions, [], movableCoins, dieValue, currentTurnBase);
-    yield put(setAvailableActions(actions, dieValue));
     
-    // Wait for user to select an action
-    yield take(LudoActionTypes.MOVE_COIN_SUCCESS);
-    yield put(clearAvailableActions());
+    // Check if any actions are available after blocking detection
+    if (actions.length === 0) {
+      // All coins are blocked - pass turn automatically
+      yield call(handleNoValidMoves);
+    } else {
+      yield put(setAvailableActions(actions, dieValue));
+      
+      // Wait for user to select an action
+      yield take(LudoActionTypes.MOVE_COIN_SUCCESS);
+      yield put(clearAvailableActions());
+    }
   }
 }
 
@@ -651,11 +676,21 @@ function * handleNonSpawnableRoll(
       const currentTurnBase = bases[currentTurn];
       
       const actions: IAvailableAction[] = yield call(buildAvailableActions, [], movableCoins, dieValue, currentTurnBase);
-      yield put(setAvailableActions(actions, dieValue));
       
-      // Wait for user to select an action
-      yield take(LudoActionTypes.MOVE_COIN_SUCCESS);
-      yield put(clearAvailableActions());
+      // Check if any actions are available after blocking detection
+      if (actions.length === 0) {
+        // All coins are blocked - pass turn automatically
+        yield call(handleNoValidMoves);
+      } else {
+        yield put(setAvailableActions(actions, dieValue));
+        
+        // Wait for user to select an action
+        yield take(LudoActionTypes.MOVE_COIN_SUCCESS);
+        yield put(clearAvailableActions());
+      }
+    } else {
+      // No movable coins at all - pass turn
+      yield call(handleNoValidMoves);
     }
   }
 }

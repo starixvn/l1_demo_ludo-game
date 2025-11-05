@@ -88,6 +88,14 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
       // Move the coin
       const coin = coins[action.coinID];
       this.props.moveCoin(action.coinID, coin.position, coin.cellID);
+    } else if (action.type === 'kick') {
+      // Kick action: move coin and disqualify blocking coin
+      const coin = coins[action.coinID];
+      this.props.moveCoin(action.coinID, coin.position, coin.cellID, action.blockingCoinID);
+    } else if (action.type === 'move_before') {
+      // Move before blocking: move only specified steps
+      const coin = coins[action.coinID];
+      this.props.moveCoin(action.coinID, coin.position, coin.cellID, undefined, action.stepsBeforeBlocking);
     }
   };
 
