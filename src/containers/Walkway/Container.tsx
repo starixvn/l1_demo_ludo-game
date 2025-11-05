@@ -201,6 +201,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
           nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
           showDebugText={this.props.showDebugText} // Whether to show debug text
           isHighlighted={isHighlighted} // Whether this cell is highlighted
+          index={cellConfiguration.index} // Index value for debugging
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
         >
           {

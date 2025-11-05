@@ -52,7 +52,20 @@
   border-radius: 2px;          /* Rounded corners */
   font-family: monospace;      /* Monospace font for consistent spacing */
   display: block;              /* Ensure block display */
-  margin-bottom: 1px;          /* Space between base ID and next links */
+  margin-bottom: 1px;          /* Space between base ID and index */
+}
+
+/* Index display for NORMAL cells */
+.Index {
+  font-size: 6px;              /* Small text for index */
+  font-weight: normal;         /* Normal weight */
+  color: #990000;              /* Red color to distinguish index */
+  background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
+  padding: 1px 2px;            /* Small padding around text */
+  border-radius: 2px;          /* Rounded corners */
+  font-family: monospace;      /* Monospace font for consistent spacing */
+  display: block;              /* Ensure block display */
+  margin-bottom: 1px;          /* Space between index and next links */
 }
 
 /* Next link cell IDs display */

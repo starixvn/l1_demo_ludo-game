@@ -41,6 +41,8 @@ interface ICellProps {
   showDebugText?: boolean;
   /** Whether this cell is highlighted as reachable */
   isHighlighted?: boolean;
+  /** Index value for NORMAL cells (for debugging) */
+  index?: number;
 
   /** Callback when right-click context menu is opened */
   onContextMenuOpened: (options: IContextMenuOptions) => void;
@@ -136,6 +138,9 @@ export class Cell extends React.PureComponent<ICellProps> {
           <div className={styles.CellInfo}>
             <div className={styles.CellID}>{cellID}</div>
             <div className={styles.BaseID}>{baseID}</div>
+            {this.props.index !== undefined && (
+              <div className={styles.Index}>Index: {this.props.index}</div>
+            )}
             {nextLinkCellIDs && nextLinkCellIDs.length > 0 && (
               <div className={styles.NextLinks}>
                 → {nextLinkCellIDs.join(", ")}

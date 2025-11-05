@@ -108,6 +108,8 @@ export interface ICell {
   baseID: IBase['ID'];
   /** Array of coin IDs currently occupying this cell */
   coinIDs: ICoin['coinID'][];
+  /** Index value for NORMAL cells (for debugging) */
+  index?: number;
 }
 
 /**
