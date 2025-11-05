@@ -12,7 +12,6 @@ import { COIN_SIZE } from "globalConstants";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
-import { moveCoin } from "containers/Ludo/state/actions";
 import { Coin } from "containers/Base/components/Coin";
 import { Cell } from "containers/Walkway/components/Cell";
 import { WalkwayPosition } from "state/interfaces";
@@ -33,7 +32,7 @@ interface IPublicProps {
 }
 
 interface IDispatchProps {
-  moveCoin: typeof moveCoin;
+  // No dispatch props needed - coins are not clickable, actions must be chosen from action panel
 }
 
 interface IProps extends IStateProps, IPublicProps, IDispatchProps {}
@@ -45,9 +44,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   links: linksSelector,
 });
 
-const mapDispatchToProps = {
-  moveCoin,
-};
+const mapDispatchToProps = {};
 
 class HomeBare extends React.PureComponent<IProps> {
   /**

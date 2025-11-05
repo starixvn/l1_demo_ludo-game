@@ -4,8 +4,7 @@ import React from "react";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
-import { getStyleObject, getBaseHexColor } from "containers/utils";
-import { DICE_SIZE } from "globalConstants";
+import { getBaseHexColor } from "containers/utils";
 import { BaseColors } from "state/interfaces";
 
 import { rollDie } from "./state/actions";

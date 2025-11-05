@@ -110,6 +110,8 @@ export interface ICell {
   coinIDs: ICoin['coinID'][];
   /** Index value for NORMAL cells (for debugging) */
   index?: number;
+  /** Whether this cell should not be rendered in the walkway (rendered in Home instead) */
+  notRenderInWalkway?: boolean;
 }
 
 /**

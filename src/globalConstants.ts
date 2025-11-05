@@ -45,4 +45,4 @@ export const LUDO_STATE_UPDATE_DELAY = 10;          // Small delay for state upd
 export const AUTO_ACTION_TIMEOUT = 200;             // Default timeout for auto-actions (200ms)
 export const DICE_COUNTDOWN_TIMEOUT = 15;           // Countdown timer duration in seconds when player needs to roll dice (30s)
 export const DICE_COUNTDOWN_WARNING_THRESHOLD = 5; // Show warning color when time remaining is <= this value (in seconds)
-export const DICE_ROLLING_ANIMATION_DURATION = 1200; // Dice rolling animation duration in milliseconds (1.2 seconds)
+export const DICE_ROLLING_ANIMATION_DURATION = 800; // Dice rolling animation duration in milliseconds (1.2 seconds)

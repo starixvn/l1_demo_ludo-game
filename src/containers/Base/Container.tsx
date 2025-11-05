@@ -11,9 +11,7 @@ import React from 'react';
 import { connect } from 'react-redux';                    // Redux connection
 import { createStructuredSelector } from 'reselect';      // Optimized state selection
 
-import { isDieRollValidSelector } from 'containers/Dice/state/selectors'; // Die roll validation
-import { spawnCoin } from 'containers/Ludo/state/actions'; // Spawn coin action
-import { IBase, ICoin } from 'containers/Ludo/state/interfaces'; // Game data types
+import { IBase } from 'containers/Ludo/state/interfaces'; // Game data types
 import { basesSelector, coinsSelector } from 'containers/Ludo/state/selectors'; // State selectors
 import { getStyleObject } from 'containers/utils';        // Styling utilities
 import { BASE_SIZE, INNER_BASE_SIZE } from 'globalConstants'; // Size constants
@@ -42,14 +40,13 @@ interface IPublicProps {
 interface IStateProps {
   bases: ReturnType<typeof basesSelector>;           // All player bases
   coins: ReturnType<typeof coinsSelector>;           // All coins in the game
-  isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether die roll can be used
 }
 
 /**
  * Props for Redux dispatch actions
  */
 interface IDispatchProps {
-  spawnCoin: typeof spawnCoin; // Action to spawn a coin from base
+  // No dispatch props needed - coins are not clickable, actions must be chosen from action panel
 }
 
 /** Combined component props */
@@ -58,9 +55,7 @@ interface IProps extends IPublicProps, IDispatchProps, IStateProps {}
 /**
  * Maps Redux dispatch actions to component props
  */
-const mapDispatchToProps = {
-  spawnCoin, // Spawn coin action
-};
+const mapDispatchToProps = {};
 
 /**
  * Maps Redux state to component props using reselect
@@ -68,7 +63,6 @@ const mapDispatchToProps = {
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   bases: basesSelector,                     // Get all player bases
   coins: coinsSelector,                     // Get all coins
-  isDieRollValid: isDieRollValidSelector,   // Get die roll validity
 });
 
 /**

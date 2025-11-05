@@ -14,12 +14,9 @@ import { createStructuredSelector } from "reselect"; // Optimized state selectio
 
 import { flatArray } from "common/utils"; // Array flattening utility
 import { Coin } from "containers/Base/components/Coin"; // Coin component for rendering
-import { isDieRollValidSelector } from "containers/Dice/state/selectors"; // Die roll validation
-import { moveCoin } from "containers/Ludo/state/actions"; // Move coin action
 import {
   CellType,
   ICell,
-  ICoin,
   IServerGameData,
   IWalkway,
 } from "containers/Ludo/state/interfaces"; // Game data types
@@ -60,7 +57,6 @@ interface IStateProps {
   cells: ReturnType<typeof cellsSelector>; // All game board cells
   coins: ReturnType<typeof coinsSelector>; // All coins in the game
   links: ReturnType<typeof linksSelector>; // Cell connectivity links
-  isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether die roll can be used
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
   highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
 }
@@ -69,7 +65,7 @@ interface IStateProps {
  * Props for Redux dispatch actions
  */
 interface IDispatchProps {
-  moveCoin: typeof moveCoin; // Action to move a coin
+  // No dispatch props needed - coins are not clickable, actions must be chosen from action panel
 }
 
 /** Combined component props */
@@ -95,7 +91,6 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   cells: cellsSelector, // Get all board cells
   coins: coinsSelector, // Get all coins
   currentTurn: currentTurnSelector, // Get current player turn
-  isDieRollValid: isDieRollValidSelector, // Get die roll validity
   links: linksSelector, // Get cell connectivity links
   highlightedCells: highlightedCellsSelector, // Get highlighted cells
 });
@@ -103,9 +98,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
 /**
  * Maps Redux dispatch actions to component props
  */
-const mapDispatchToProps = {
-  moveCoin, // Coin movement action
-};
+const mapDispatchToProps = {};
 
 /**
  * Walkway container component class

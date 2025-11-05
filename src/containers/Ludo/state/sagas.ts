@@ -17,7 +17,7 @@ import {
 
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
-import { enableDie, invalidateDieRoll, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
+import { enableDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from 'containers/Dice/state/selectors';

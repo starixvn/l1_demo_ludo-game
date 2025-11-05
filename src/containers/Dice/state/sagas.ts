@@ -39,7 +39,6 @@ import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSele
 
 import { enableDie, invalidateDieRoll, rollDieComplete, startRolling, stopRolling, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
-import { ActionTypes as StepLogsActionTypes } from 'containers/StepLogs/state/actions';
 
 /**
  * Watcher saga that listens for ROLL_DIE actions and triggers the roll die saga
@@ -368,108 +367,6 @@ function * watchForRollDieComplete() {
 }
 
 /**
- * Waits for user action or auto-action timeout, then triggers auto-action if timeout occurs
- * @param spawnableCoins - Coins that can be spawned
- * @param movableCoins - Coins that can be moved
- * @param currentTurnBase - Current player's base
- * @param actionTypes - Action types to wait for (for spawn/move choice or just move)
- */
-function * waitForUserOrAutoAction(
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
-  currentTurnBase: IBase,
-  actionTypes: string[] = [LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]
-): Generator<any, void, any> {
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-
-  if (autoActionsEnabled) {
-    // Race between user input and configurable timeout
-    const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-    const { timeout } = yield race({
-      userAction: take(actionTypes),
-      timeout: delay(timeoutDuration),
-    });
-
-    if (timeout) {
-      // Timeout won - auto choose an action
-      yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
-      yield take(actionTypes);
-    }
-  } else {
-    // Auto-actions disabled - wait for user input or auto-actions being re-enabled
-    yield call(waitForUserOrAutoActionReenable, spawnableCoins, movableCoins, currentTurnBase, actionTypes);
-  }
-}
-
-/**
- * Waits for user action when auto-actions are disabled, but can trigger if re-enabled
- */
-function * waitForUserOrAutoActionReenable(
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
-  currentTurnBase: IBase,
-  actionTypes: string[]
-): Generator<any, void, any> {
-  while (true) {
-    const action: any = yield take([
-      ...actionTypes,
-      StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED,
-    ]);
-
-    if (action.type === StepLogsActionTypes.SET_AUTO_ACTIONS_ENABLED) {
-      // Check if auto-actions are now enabled
-      const newAutoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-      if (newAutoActionsEnabled) {
-        // Auto-actions were re-enabled - start the timeout
-        const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-        const { timeout } = yield race({
-          userAction: take(actionTypes),
-          timeout: delay(timeoutDuration),
-        });
-
-        if (timeout) {
-          // Timeout won - auto choose an action
-          yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
-          yield take(actionTypes);
-        }
-        break; // Exit the loop
-      }
-      // If still disabled, continue waiting
-    } else {
-      // User performed an action - exit the loop
-      break;
-    }
-  }
-}
-
-/**
- * Handles when a 6 is rolled with immediate spawn condition (no coins spawned or no moves available)
- */
-function * handleRollSixImmediateSpawn(
-  currentTurnBase: IBase,
-  spawnableCoins: ICoin['coinID'][]
-): Generator<any, void, any> {
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
-
-  if (autoActionsEnabled) {
-    // Auto-actions enabled - immediately spawn
-    yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-  } else {
-    // Auto-actions disabled - show action selection UI
-    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, [], currentDieRoll, currentTurnBase);
-    yield put(setAvailableActions(actions, currentDieRoll));
-    yield put(markCurrentBase(true));
-    
-    // Wait for user to select an action
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-    yield put(clearAvailableActions());
-    yield put(markCurrentBase(false));
-  }
-}
-
-/**
  * Builds available actions list from spawnable and movable coins
  */
 function * buildAvailableActions(
@@ -600,36 +497,6 @@ function * handleRollSpawnable(
 }
 
 /**
- * Handles when a 6 is rolled and player needs to choose between spawn and move
- */
-function * handleRollSixWithChoice(
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
-  currentTurnBase: IBase
-): Generator<any, void, any> {
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
-
-  if (autoActionsEnabled) {
-    // Auto-actions enabled - use existing logic
-    yield put(markCurrentBase(true));
-    yield call(waitForUserOrAutoAction, spawnableCoins, movableCoins, currentTurnBase);
-    yield put(markCurrentBase(false));
-  } else {
-    // Auto-actions disabled - show action selection UI
-    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, movableCoins, currentDieRoll, currentTurnBase);
-    yield put(setAvailableActions(actions, currentDieRoll));
-    yield put(markCurrentBase(true));
-    
-    // Wait for user to select an action
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
-    
-    yield put(clearAvailableActions());
-    yield put(markCurrentBase(false));
-  }
-}
-
-/**
  * Handles bonus turn after rolling a spawnable combination (1-6, 6-1, or doubles)
  */
 function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
@@ -650,27 +517,6 @@ function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
     // Automatically roll the dice for the bonus turn
     yield put(rollDie());
   }
-}
-
-/**
- * Handles when a 6 is rolled
- */
-function * handleRollSix(
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
-  spawnedCoinIDs: ICoin['coinID'][],
-  currentTurnBase: IBase
-): Generator<any, void, any> {
-  // Immediate spawn if no coins spawned or no moves available
-  if ((spawnedCoinIDs.length === 0 || movableCoins.length === 0) && spawnableCoins.length > 0) {
-    yield call(handleRollSixImmediateSpawn, currentTurnBase, spawnableCoins);
-  } else {
-    // Player needs to choose
-    yield call(handleRollSixWithChoice, spawnableCoins, movableCoins, currentTurnBase);
-  }
-  
-  // Handle bonus turn after spawnable roll
-  yield call(handleBonusTurnAfterSpawnable);
 }
 
 /**
