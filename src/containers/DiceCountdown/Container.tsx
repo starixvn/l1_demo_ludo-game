@@ -9,7 +9,11 @@ import React from "react";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
-import { CELL_DIMENSION, DICE_COUNTDOWN_TIMEOUT } from "globalConstants";
+import {
+  CELL_DIMENSION,
+  DICE_COUNTDOWN_TIMEOUT,
+  DICE_COUNTDOWN_WARNING_THRESHOLD,
+} from "globalConstants";
 import { rollDie } from "containers/Dice/state/actions";
 import { isDieRollAllowedSelector } from "containers/Dice/state/selectors";
 import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors";
@@ -154,7 +158,7 @@ class DiceCountdownBare extends React.PureComponent<IProps, ILocalState> {
     }
 
     const { timeRemaining } = this.state;
-    const isWarning = timeRemaining <= 10; // Show warning color when <= 10 seconds
+    const isWarning = timeRemaining <= DICE_COUNTDOWN_WARNING_THRESHOLD;
 
     return (
       <div className={styles.Container}>
