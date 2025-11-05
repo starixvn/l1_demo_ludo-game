@@ -650,17 +650,56 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
           continue; // Skip moves that overshoot
         }
 
-        // Use BFS to find all cells reachable in exactly 'steps' moves
+        // Check for blocking coins for this specific step count
+        const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null = 
+          yield call(findBlockingCoin, coin.coinID, steps as Rolls);
+        
+        let maxStepsToExplore = steps;
+        let shouldHighlightBlockingCell = false;
+        
+        if (blockingInfo) {
+          // Blocking coin detected at step (stepsBeforeBlocking + 1)
+          const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
+          
+          if (steps < blockingStep) {
+            // Die roll is less than blocking step - can only move steps before blocker
+            maxStepsToExplore = blockingInfo.stepsBeforeBlocking;
+          } else if (steps > blockingStep) {
+            // Die roll is greater than blocking step - can kick the blocking coin
+            // Highlight the blocking cell itself
+            shouldHighlightBlockingCell = true;
+            maxStepsToExplore = steps; // Can move full distance and kick
+          } else {
+            // Die roll equals blocking step - cannot move (would land exactly on blocker)
+            continue; // Skip this step count - no highlighting
+          }
+        }
+
+        // Use BFS to find all cells reachable in exactly 'maxStepsToExplore' moves
         const visited = new Set<string>();
-        const queue: Array<{ cellID: string; stepsRemaining: number }> = [
-          { cellID: startCellID, stepsRemaining: steps },
+        const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
+          { cellID: startCellID, position: coin.position, stepsRemaining: maxStepsToExplore },
         ];
 
         while (queue.length > 0) {
-          const { cellID, stepsRemaining } = queue.shift()!;
+          const { cellID, position, stepsRemaining } = queue.shift()!;
 
           if (stepsRemaining === 0) {
             // We've reached this cell in exactly the right number of steps
+            if (cellID !== 'HOME') {
+              const cellData = cells[position]?.[cellID];
+              if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
+                const coinOnCell = coins[cellData.coinIDs[0]];
+                // If it's a blocking coin and we can kick it, highlight it
+                if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
+                  if (shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID) {
+                    // This is the blocking cell and we can kick it - highlight it
+                    reachableCells.add(cellID);
+                  }
+                  continue; // Otherwise, blocked - don't highlight
+                }
+              }
+            }
             reachableCells.add(cellID);
             continue;
           }
@@ -690,9 +729,23 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
                   continue; // Skip other players' homepaths
                 }
               }
+              
+              // Check if next cell has a blocking coin
+              if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
+                const coinOnCell = coins[cellData.coinIDs[0]];
+                // If it's an opponent's coin
+                if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
+                  // If we can kick it (die roll > blocking step), allow exploring this path to reach the blocking cell
+                  // Otherwise, this path is blocked - skip it
+                  if (!shouldHighlightBlockingCell || nextCell.cellID !== blockingInfo?.blockingCellID) {
+                    continue; // Blocked by opponent coin - don't explore this path
+                  }
+                  // If we can kick and this is the blocking cell, continue exploring to reach it
+                }
+              }
             }
 
-            queue.push({ cellID: nextCell.cellID, stepsRemaining: stepsRemaining - 1 });
+            queue.push({ cellID: nextCell.cellID, position: nextCell.position, stepsRemaining: stepsRemaining - 1 });
           }
         }
       }
