@@ -24,8 +24,8 @@ interface ICoinPlaceholderProps {
   baseColor: BaseColors;
   /** Whether to hide the coin inside the placeholder */
   isCoinHidden: boolean;
-  /** Callback function when the coin/placeholder is clicked */
-  onCoinClicked: () => void;
+  /** Callback function when the coin/placeholder is clicked (disabled - actions must be chosen from action panel) */
+  onCoinClicked?: () => void;
 }
 
 /**
@@ -48,7 +48,7 @@ export class CoinPlaceholder extends React.PureComponent<ICoinPlaceholderProps> 
           {isCoinHidden ? null : ( // Hide coin if specified
             <Coin
               baseColor={baseColor} // Pass color to coin
-              onCoinClicked={() => this.props.onCoinClicked()} // Pass click handler
+              // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
             />
           )}
         </div>

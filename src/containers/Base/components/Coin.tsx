@@ -22,8 +22,8 @@ interface IProps {
   baseColor: BaseColors;
   /** Optional custom size for the coin (defaults to COIN_SIZE) */
   coinSize?: number;
-  /** Callback function when the coin is clicked */
-  onCoinClicked: () => void;
+  /** Callback function when the coin is clicked (disabled - actions must be chosen from action panel) */
+  onCoinClicked?: () => void;
 }
 
 /**
@@ -47,7 +47,7 @@ export class Coin extends React.PureComponent<IProps> {
       <div
         className={styles.Container}                                       // CSS module class for styling
         style={finalStyle}                                                 // Dynamic size and color
-        onClick={() => this.props.onCoinClicked()}                       // Handle click events
+        // onClick removed - coins are not clickable, actions must be chosen from action panel
       >
         &#9822;
       </div>

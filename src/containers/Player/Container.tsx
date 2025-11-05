@@ -90,7 +90,7 @@ class PlayerBare extends React.PureComponent<IProps> {
           .map((coin, index) => (
             <Coin
               baseColor={base.color}        // Use player's color
-              onCoinClicked={() => null}   // Retired coins are not clickable
+              // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
               key={index}
             />
           ))

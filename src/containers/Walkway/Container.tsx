@@ -220,9 +220,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
                     ? COIN_SIZE / 2
                     : COIN_SIZE
                 }
-                onCoinClicked={() =>
-                  this.onCoinClicked(coinID, position, cellID)
-                }
+                // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
                 key={index}
               />
             ))
@@ -342,21 +340,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
 
   /**
    * Handles coin click events during gameplay
-   * Validates that it's the player's turn and die roll is valid before moving
+   * DISABLED - Actions must be chosen from action panel
    */
-  private onCoinClicked = (
-    coinID: ICoin["coinID"],
-    position: WalkwayPosition,
-    cellID: ICell["cellID"]
-  ) => {
-    const { coins, currentTurn } = this.props;
-    const coin = coins[coinID];
-
-    // Only allow move if die roll is valid and it's the coin's player's turn
-    if (this.props.isDieRollValid && coin.baseID === currentTurn) {
-      this.props.moveCoin(coinID, position, cellID); // Dispatch move action
-    }
-  };
+  // private onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
 }
 
 /**

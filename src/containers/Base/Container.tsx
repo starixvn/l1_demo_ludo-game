@@ -135,7 +135,7 @@ class BaseBare extends React.PureComponent<IProps> {
                   baseColor={base.color} // Coin color matches base color
                   // Hide coin if base is disabled OR coin is already spawned/retired
                   isCoinHidden={!this.props.enabled || (coin.isSpawned || coin.isRetired)}
-                  onCoinClicked={() => this.onCoinClicked(base, coin)}
+                  // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
                 />
               );
             })
@@ -147,14 +147,9 @@ class BaseBare extends React.PureComponent<IProps> {
 
   /**
    * Handles coin click events for spawning
-   * Only allows spawning if base is spawnable and die roll is valid
+   * DISABLED - Actions must be chosen from action panel
    */
-  private onCoinClicked = (base: IBase, coin: ICoin) => {
-    // Check if player can spawn (rolled 6) and die roll is still valid
-    if (base.spawnable && this.props.isDieRollValid) {
-      this.props.spawnCoin(base.ID, coin.coinID); // Dispatch spawn action
-    }
-  }
+  // private onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
 }
 
 /**

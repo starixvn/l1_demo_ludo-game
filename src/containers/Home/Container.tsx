@@ -52,24 +52,9 @@ const mapDispatchToProps = {
 class HomeBare extends React.PureComponent<IProps> {
   /**
    * Handles coin click events during gameplay
+   * DISABLED - Actions must be chosen from action panel
    */
-  private onCoinClicked = (
-    coinID: string,
-    position: WalkwayPosition,
-    cellID: string
-  ) => {
-    const { bases } = this.props;
-
-    // Find the current player's base
-    const currentTurnBase = Object.values(bases).find((base) =>
-      base.coinIDs.includes(coinID)
-    );
-
-    // Only allow move if it's the coin's player's turn
-    if (currentTurnBase && currentTurnBase.enabled) {
-      this.props.moveCoin(coinID, position, cellID);
-    }
-  };
+  // private onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
 
   render() {
     const { cells, links, bases, coins } = this.props;
@@ -128,15 +113,7 @@ class HomeBare extends React.PureComponent<IProps> {
                       coinSize={
                         cell.coinIDs.length > 1 ? COIN_SIZE / 2 : COIN_SIZE
                       }
-                      onCoinClicked={() =>
-                        this.onCoinClicked(
-                          coinID,
-                          cell.cellID === "NORTH_6_1"
-                            ? WalkwayPosition.NORTH
-                            : WalkwayPosition.SOUTH,
-                          cell.cellID
-                        )
-                      }
+                      // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
                     />
                   ))
                 }
