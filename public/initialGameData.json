@@ -224,19 +224,23 @@
   "relationships": [
     {
       "ID": "BASE_1",
-      "type": "BASE"
+      "type": "BASE",
+      "column": 0
     },
     {
       "ID": "WALKWAY_1",
-      "type": "WALKWAY"
+      "type": "WALKWAY",
+      "column": 1
     },
     {
       "ID": "BASE_2",
-      "type": "BASE"
+      "type": "BASE",
+      "column": 2
     },
     {
       "ID": "WALKWAY_3",
-      "type": "WALKWAY"
+      "type": "WALKWAY",
+      "column": 0
     },
     {
       "ID": "HOME",
@@ -246,23 +250,28 @@
         "BASE_3",
         "BASE_4",
         "BASE_2"
-      ]
+      ],
+      "column": 1
     },
     {
       "ID": "WALKWAY_2",
-      "type": "WALKWAY"
+      "type": "WALKWAY",
+      "column": 2
     },
     {
       "ID": "BASE_3",
-      "type": "BASE"
+      "type": "BASE",
+      "column": 0
     },
     {
       "ID": "WALKWAY_4",
-      "type": "WALKWAY"
+      "type": "WALKWAY",
+      "column": 1
     },
     {
       "ID": "BASE_4",
-      "type": "BASE"
+      "type": "BASE",
+      "column": 2
     }
   ],
   "cells": {

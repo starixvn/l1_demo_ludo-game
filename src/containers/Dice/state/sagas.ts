@@ -858,6 +858,9 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
       yield put(invalidateDieRoll());
       yield call(handleBonusTurnAfterSpawnable);
     }
+  } else if (roll1 === Rolls.SIX || roll2 === Rolls.SIX) {
+    // Rolled a single 6 - can spawn or move, and gets bonus turn
+    yield call(handleRollSix, spawnableCoins, movableCoins, spawnedCoinIDs, currentTurnBase);
   } else if (spawnedCoinIDs.length > 0) {
     yield call(handleNonSpawnableRoll, spawnedCoinIDs, movableCoins, dieSum as Rolls, coins);
   } else {

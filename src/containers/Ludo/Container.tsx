@@ -118,7 +118,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   /** Initial state shows player configuration screen */
   state: IState = {
     showPlayerConfiguration: true,
-    showDebugText: false, // Hide debug text by default
+    showDebugText: true, // Show debug text by default
     showGameLog: true, // Show game log by default
   };
 
