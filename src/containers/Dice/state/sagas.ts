@@ -33,11 +33,11 @@ import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/stat
 import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
-import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY } from 'globalConstants';
+import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION } from 'globalConstants';
 
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
-import { enableDie, invalidateDieRoll, rollDieComplete, ActionTypes } from './actions';
+import { enableDie, invalidateDieRoll, rollDieComplete, startRolling, stopRolling, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
 import { ActionTypes as StepLogsActionTypes } from 'containers/StepLogs/state/actions';
 
@@ -53,6 +53,12 @@ function * watchForRollDie() {
  * Generates two random die rolls and logs the action
  */
 function * rollDieSaga() {
+  // Start the rolling animation
+  yield put(startRolling());
+
+  // Wait for animation to complete (1.2 seconds)
+  yield delay(DICE_ROLLING_ANIMATION_DURATION);
+
   // Generate random die rolls using Mersenne Twister for better randomness
   const mt = MersenneTwister19937.autoSeed();
   const dieRoll1: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
@@ -70,8 +76,9 @@ function * rollDieSaga() {
     details: `Dice roll: ${dieRoll1}-${dieRoll2} (sum: ${dieRoll1 + dieRoll2})`,
   }));
 
-  // Dispatch the roll completion action
+  // Dispatch the roll completion action and stop rolling animation
   yield put(rollDieComplete(dieRoll1, dieRoll2));
+  yield put(stopRolling());
 }
 
 /**

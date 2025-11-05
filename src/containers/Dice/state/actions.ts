@@ -19,6 +19,8 @@ export enum ActionTypes {
   ENABLE_DIE = 'die/ENABLE_DIE',                 // Enable die for rolling (player's turn)
   DISABLE_DIE = 'die/DISABLE_DIE',               // Disable die (not player's turn)
   INVALIDATE_DIE_ROLL = 'die/INVALIDATE_DIE_ROLL', // Mark current roll as invalid/used
+  START_ROLLING = 'die/START_ROLLING',           // Start dice rolling animation
+  STOP_ROLLING = 'die/STOP_ROLLING',             // Stop dice rolling animation
 }
 
 /**
@@ -64,6 +66,20 @@ export const invalidateDieRoll = (): IReduxAction<ActionTypes.INVALIDATE_DIE_ROL
 });
 
 /**
+ * Start the dice rolling animation
+ */
+export const startRolling = (): IReduxAction<ActionTypes.START_ROLLING, void> => ({
+  type: ActionTypes.START_ROLLING,
+});
+
+/**
+ * Stop the dice rolling animation
+ */
+export const stopRolling = (): IReduxAction<ActionTypes.STOP_ROLLING, void> => ({
+  type: ActionTypes.STOP_ROLLING,
+});
+
+/**
  * Union type of all possible dice actions
  * Used by the reducer to ensure type safety when handling dice-related actions
  */
@@ -73,4 +89,6 @@ export type Actions =
   | ReturnType<typeof enableDie>
   | ReturnType<typeof disableDie>
   | ReturnType<typeof invalidateDieRoll>
+  | ReturnType<typeof startRolling>
+  | ReturnType<typeof stopRolling>
   ;

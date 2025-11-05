@@ -7,26 +7,159 @@
   margin: 20px 0;
 }
 
-.Die {
-  border-radius: 20%;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-around;
-  padding: 7%;
-  box-shadow: 0 0 5px;
+/* Dice Container - 3D perspective */
+.DiceContainer {
+  width: 40px;
+  height: 40px;
+  position: relative;
+  perspective: 1000px;
   cursor: pointer;
 }
 
+/* 3D Dice */
+.Die {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.1s;
+}
+
+/* Dice Face - Base styling for all 6 faces */
+.DiceFace {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 10%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 2px;
+  padding: 8px;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+}
+
+/* Position each face in 3D space */
+.DiceFace[data-face="1"] {
+  transform: translateZ(20px);
+}
+
+.DiceFace[data-face="6"] {
+  transform: rotateY(90deg) translateZ(20px);
+}
+
+.DiceFace[data-face="3"] {
+  transform: rotateY(-90deg) translateZ(20px);
+}
+
+.DiceFace[data-face="4"] {
+  transform: rotateX(90deg) translateZ(20px);
+}
+
+.DiceFace[data-face="5"] {
+  transform: rotateX(-90deg) translateZ(20px);
+}
+
+.DiceFace[data-face="2"] {
+  transform: rotateY(-180deg) translateZ(20px);
+}
+
+/* Dot styling */
+.Dot {
+  border-radius: 50%;
+  background-color: #000;
+  box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.DotInvisible {
+  visibility: hidden;
+}
+
+/* Rolling animation - Different animations for each dice */
+.Die.Rolling {
+  animation: roll1 1.2s ease-in-out infinite;
+}
+
+.Die.Rolling.Rolling2 {
+  animation: roll2 1.2s ease-in-out infinite;
+}
+
+@keyframes roll1 {
+  0% {
+    transform: rotateX(0deg) rotateZ(0deg);
+  }
+  25% {
+    transform: rotateX(90deg) rotateZ(90deg);
+  }
+  50% {
+    transform: rotateX(180deg) rotateZ(180deg);
+  }
+  75% {
+    transform: rotateX(360deg) rotateZ(360deg);
+  }
+  100% {
+    transform: rotateX(180deg) rotateZ(180deg);
+  }
+}
+
+@keyframes roll2 {
+  0% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  25% {
+    transform: rotateX(270deg) rotateY(90deg) rotateZ(180deg);
+  }
+  50% {
+    transform: rotateX(180deg) rotateY(180deg) rotateZ(360deg);
+  }
+  75% {
+    transform: rotateX(90deg) rotateY(270deg) rotateZ(540deg);
+  }
+  100% {
+    transform: rotateX(0deg) rotateY(360deg) rotateZ(720deg);
+  }
+}
+
+/* Dice face positions after roll completes */
+.Die[data-face="1"] {
+  transform: rotateX(0deg) rotateZ(0deg);
+}
+
+.Die[data-face="2"] {
+  transform: rotateX(180deg) rotateZ(0deg);
+}
+
+.Die[data-face="3"] {
+  transform: rotateY(90deg) rotateZ(0deg);
+}
+
+.Die[data-face="4"] {
+  transform: rotateX(270deg) rotateZ(0deg);
+}
+
+.Die[data-face="5"] {
+  transform: rotateX(90deg) rotateZ(0deg);
+}
+
+.Die[data-face="6"] {
+  transform: rotateY(270deg) rotateZ(0deg);
+}
+
+/* Disabled state */
 .Disabled {
   opacity: 0.5;
   pointer-events: none;
 }
 
-.Highlighted {
+.Disabled .DiceContainer {
+  cursor: not-allowed;
+}
+
+/* Highlighted state - when dice is clickable */
+.Highlighted .DiceContainer {
   box-shadow: 0 0 15px 5px rgba(255, 215, 0, 0.9), 0 0 5px;
   animation: diceHighlightPulse 1.5s ease-in-out infinite;
-  cursor: pointer;
 }
 
 @keyframes diceHighlightPulse {
@@ -40,9 +173,11 @@
   }
 }
 
-.Rolled {
+/* Rolled state - after dice is rolled */
+.Rolled .DiceContainer {
   box-shadow: 0 0 15px 5px #9b59b6, 0 0 5px;
   border: 3px solid #9b59b6;
+  border-radius: 10%;
   animation: diceRolledPulse 1.5s ease-in-out infinite;
 }
 
@@ -56,15 +191,3 @@
     border-color: #8e44ad;
   }
 }
-.Dot {
-  width: 30%;
-  height: 30%;
-  background-color: inherit;
-  box-shadow: inset 0 0 5px;
-  border-radius: 50%;
-}
-
-.Invisible {
-  box-shadow: none;
-}
-

@@ -49,3 +49,9 @@ export const isDieRollValidSelector = createSelector(
   [diceStateSelector],
   (state) => state.isDieRollValid,
 );
+
+/** Selector for whether the dice are currently rolling (animating) */
+export const isRollingSelector = createSelector(
+  [diceStateSelector],
+  (state) => state.isRolling,
+);

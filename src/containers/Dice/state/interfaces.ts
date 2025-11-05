@@ -30,4 +30,6 @@ export interface IState {
   isDieRollAllowed: boolean;
   /** Whether the current die roll is still valid for making moves */
   isDieRollValid: boolean;
+  /** Whether the dice is currently rolling (animating) */
+  isRolling: boolean;
 }

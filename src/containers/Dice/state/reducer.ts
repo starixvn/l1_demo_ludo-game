@@ -15,6 +15,7 @@ import { IState, Rolls } from './interfaces';
 const initialState: IState = {
   isDieRollAllowed: true,  // Dice can be rolled initially
   isDieRollValid: false,   // No roll has been made yet
+  isRolling: false,        // Not rolling initially
   roll1: Rolls.ONE,        // Default first die value
   roll2: Rolls.ONE,        // Default second die value
 };
@@ -71,6 +72,27 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         isDieRollValid: false, // Roll has been used
       };
     }
+
+    /**
+     * Start the dice rolling animation
+     */
+    case ActionTypes.START_ROLLING: {
+      return {
+        ...state,
+        isRolling: true, // Show rolling animation
+      };
+    }
+
+    /**
+     * Stop the dice rolling animation
+     */
+    case ActionTypes.STOP_ROLLING: {
+      return {
+        ...state,
+        isRolling: false, // Hide rolling animation
+      };
+    }
+
     default:
       return state;
   }

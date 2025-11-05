@@ -4,7 +4,7 @@ import React from "react";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
-import { getStyleObject } from "containers/utils";
+import { getStyleObject, getBaseHexColor } from "containers/utils";
 import { DICE_SIZE } from "globalConstants";
 import { BaseColors } from "state/interfaces";
 
@@ -15,6 +15,7 @@ import {
   currentDieRoll2Selector,
   isDieRollAllowedSelector,
   isDieRollValidSelector,
+  isRollingSelector,
 } from "./state/selectors";
 import {
   autoActionsEnabledSelector,
@@ -28,6 +29,7 @@ interface IStateProps {
   currentDieRoll2: ReturnType<typeof currentDieRoll2Selector>;
   isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
   isDieRollValid: ReturnType<typeof isDieRollValidSelector>;
+  isRolling: ReturnType<typeof isRollingSelector>;
   autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
   autoActionTimeout: ReturnType<typeof autoActionTimeoutSelector>;
 }
@@ -47,6 +49,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentDieRoll2: currentDieRoll2Selector,
   isDieRollAllowed: isDieRollAllowedSelector,
   isDieRollValid: isDieRollValidSelector,
+  isRolling: isRollingSelector,
   autoActionsEnabled: autoActionsEnabledSelector,
   autoActionTimeout: autoActionTimeoutSelector,
 });
@@ -115,59 +118,95 @@ class DiceBare extends React.PureComponent<IProps> {
   };
 
   render() {
-    const { baseColor, isDieRollAllowed, autoActionsEnabled, isDieRollValid } =
+    const { baseColor, isDieRollAllowed, autoActionsEnabled, isDieRollValid, isRolling } =
       this.props;
     const shouldHighlight = isDieRollAllowed && !autoActionsEnabled;
     const isRolled = !isDieRollAllowed && isDieRollValid;
     
-    let dieClassNames;
+    let containerClassNames;
     if (isDieRollAllowed) {
-      dieClassNames = shouldHighlight
-        ? [styles.Die, styles.Highlighted]
-        : styles.Die;
+      containerClassNames = shouldHighlight
+        ? [styles.Highlighted]
+        : [];
     } else if (isRolled) {
-      dieClassNames = [styles.Die, styles.Rolled];
+      containerClassNames = [styles.Rolled];
     } else {
-      dieClassNames = [styles.Die, styles.Disabled];
+      containerClassNames = [styles.Disabled];
     }
+
+    // Get the face value to show (use current roll value, animation will handle the visual)
+    const face1 = this.props.currentDieRoll1;
+    const face2 = this.props.currentDieRoll2;
 
     return (
       <div className={styles.Container}>
-        <div
-          className={classnames(dieClassNames)}
-          style={getStyleObject(DICE_SIZE, DICE_SIZE, baseColor)}
-          onClick={this.handleDieClick}
-        >
-          {this.renderDots(this.props.currentDieRoll1, isDieRollValid)}
+        <div className={classnames(containerClassNames)}>
+          <div
+            className={styles.DiceContainer}
+            onClick={this.handleDieClick}
+            style={{ backgroundColor: baseColor ? getBaseHexColor(baseColor) : undefined }}
+          >
+            <div
+              className={classnames(styles.Die, isRolling && styles.Rolling)}
+              data-face={face1}
+            >
+              {this.renderDiceFaces(baseColor)}
+            </div>
+          </div>
         </div>
-        <div
-          className={classnames(dieClassNames)}
-          style={getStyleObject(DICE_SIZE, DICE_SIZE, baseColor)}
-          onClick={this.handleDieClick}
-        >
-          {this.renderDots(this.props.currentDieRoll2, isDieRollValid)}
+        <div className={classnames(containerClassNames)}>
+          <div
+            className={styles.DiceContainer}
+            onClick={this.handleDieClick}
+            style={{ backgroundColor: baseColor ? getBaseHexColor(baseColor) : undefined }}
+          >
+            <div
+              className={classnames(
+                styles.Die,
+                isRolling && styles.Rolling,
+                isRolling && styles.Rolling2
+              )}
+              data-face={face2}
+            >
+              {this.renderDiceFaces(baseColor)}
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  private renderDots = (rollValue: number, isValid: boolean) => {
-    const elements: any[] = [];
-    const configurationForCurrentRoll = CONFIGURATIONS[rollValue];
+  private renderDiceFaces = (baseColor?: BaseColors) => {
+    const faces = [1, 2, 3, 4, 5, 6];
+    const backgroundColor = baseColor ? getBaseHexColor(baseColor) : '#fff';
+    
+    return faces.map((face) => (
+      <div
+        key={face}
+        className={styles.DiceFace}
+        data-face={face}
+        style={{ backgroundColor }}
+      >
+        {this.renderDotsForFace(face)}
+      </div>
+    ));
+  };
 
-    if (!configurationForCurrentRoll) {
-      return null;
+  private renderDotsForFace = (face: number) => {
+    const configuration = CONFIGURATIONS[face];
+    if (!configuration) return null;
+
+    const dots = [];
+    for (let i = 0; i < 9; i++) {
+      const isVisible = Boolean(configuration[i]);
+      dots.push(
+        <div
+          key={i}
+          className={classnames(styles.Dot, !isVisible && styles.DotInvisible)}
+        />
+      );
     }
-
-    for (let i = 0; i < configurationForCurrentRoll.length; i++) {
-      const isVisible = Boolean(configurationForCurrentRoll[i]);
-      const classNames = isVisible
-        ? styles.Dot
-        : [styles.Dot, styles.Invisible];
-      elements.push(<div className={classnames(classNames)} key={i} />);
-    }
-
-    return elements;
+    return dots;
   };
 }
 
