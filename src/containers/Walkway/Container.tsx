@@ -32,7 +32,7 @@ import {
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
-import { COIN_SIZE, WALKWAY_LENGTH, WALKWAY_WIDTH } from "globalConstants"; // Size constants
+import { COIN_SIZE, WALKWAY_LENGTH, WALKWAY_WIDTH, WALKWAY_VERTICAL_HEIGHT } from "globalConstants"; // Size constants
 import { hideContextMenu, showContextMenu } from "services/contextMenu/service"; // Context menu service
 import { WalkwayPosition } from "state/interfaces"; // Position enums
 
@@ -126,7 +126,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
         style={
           isHorizontal
             ? getStyleObject(WALKWAY_LENGTH, WALKWAY_WIDTH) // Horizontal walkway dimensions
-            : getStyleObject(WALKWAY_WIDTH, WALKWAY_LENGTH) // Vertical walkway dimensions
+            : getStyleObject(WALKWAY_WIDTH, WALKWAY_VERTICAL_HEIGHT) // Vertical walkway dimensions
         }
       >
         {/* Walkway ID display */}
@@ -163,6 +163,11 @@ class WalkwayBare extends React.PureComponent<IProps> {
 
     // Process each cell configuration and create Cell components
     cellConfigurationsForWalkway.forEach((cellConfiguration, index) => {
+      // Skip cells that should not be rendered in walkway
+      if (cellConfiguration.notRenderInWalkway) {
+        return;
+      }
+
       const { row, column, position } = cellConfiguration;
       const cellID = generateCellID(position, row, column);
       const cellType = cellConfigurations[position][cellID].cellType;

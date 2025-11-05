@@ -289,6 +289,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           return (
             <Home
               baseIDs={relationship.baseIDs} // Which bases this home belongs to
+              showDebugText={this.state.showDebugText} // Whether to show debug text
               key={index}
             />
           );

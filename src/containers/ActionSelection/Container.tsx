@@ -115,7 +115,8 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
 
     const currentBase = bases[currentTurn];
 
-    if (!currentBase) {
+    // Don't render if current base doesn't exist or game hasn't started (base not enabled)
+    if (!currentBase || !currentBase.enabled) {
       return null;
     }
 

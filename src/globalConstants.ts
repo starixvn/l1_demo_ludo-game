@@ -9,7 +9,7 @@ export const COIN_PLACEHOLDER_DIMENSION = 2;                  // Coin placeholde
 
 // Pixel dimensions
 export const CELL_DIMENSION = 40;                             // Pixels per cell
-export const BOARD_SIZE = 17;                                 // Cells (increased to accommodate 7 columns in both WEST and EAST walkways)
+export const BOARD_SIZE = 15;                                 // Cells (increased to accommodate 7 columns in both WEST and EAST walkways)
 export const BOARD_DIMENSION = CELL_DIMENSION * BOARD_SIZE;   // Pixels (680px × 680px)
 
 // Size constants mapped to base constants (for backward compatibility and semantic clarity)
@@ -17,9 +17,10 @@ export const CELL_SIZE = UNIT_SIZE;                           // Size of a singl
 export const COIN_SIZE = UNIT_SIZE;                           // Size of a coin (1)
 export const DICE_SIZE = UNIT_SIZE;                           // Size of a die (1)
 
-export const BASE_SIZE = WALKWAY_ROW_COUNT;                   // Base size (7) - same as walkway length
+export const BASE_SIZE = WALKWAY_ROW_COUNT - 1;                   // Base size (7) - same as walkway length
 export const WALKWAY_LENGTH = WALKWAY_ROW_COUNT;              // Walkway length (7)
 export const WALKWAY_WIDTH = WALKWAY_COLUMN_COUNT;           // Walkway width (3)
+export const WALKWAY_VERTICAL_HEIGHT = WALKWAY_ROW_COUNT - 1; // Vertical walkway height for NORTH/SOUTH (6)
 export const HOME_SIZE = WALKWAY_COLUMN_COUNT;                // Home size (3) - same as walkway width
 export const INNER_BASE_SIZE = INNER_BASE_DIMENSION;         // Inner base size (4)
 export const COIN_PLACEHOLDER_SIZE = COIN_PLACEHOLDER_DIMENSION; // Coin placeholder size (2)

@@ -451,16 +451,6 @@
         "coinIDs": [],
         "index": 47
       },
-      "SOUTH_0_0": {
-        "baseID": "BASE_3",
-        "cellID": "SOUTH_0_0",
-        "column": 0,
-        "position": "SOUTH",
-        "row": 0,
-        "cellType": "NORMAL",
-        "coinIDs": [],
-        "index": 29
-      },
       "SOUTH_0_1": {
         "baseID": "BASE_4",
         "cellID": "SOUTH_0_1",
@@ -468,17 +458,8 @@
         "position": "SOUTH",
         "row": 0,
         "cellType": "HOMEPATH",
-        "coinIDs": []
-      },
-      "SOUTH_0_2": {
-        "baseID": "BASE_4",
-        "cellID": "SOUTH_0_2",
-        "column": 2,
-        "position": "SOUTH",
-        "row": 0,
-        "cellType": "NORMAL",
         "coinIDs": [],
-        "index": 49
+        "notRenderInWalkway": true
       }
     },
     "WEST": {
@@ -863,16 +844,6 @@
         "coinIDs": [],
         "index": 72
       },
-      "NORTH_6_0": {
-        "baseID": "BASE_1",
-        "cellID": "NORTH_6_0",
-        "column": 0,
-        "position": "NORTH",
-        "row": 6,
-        "cellType": "NORMAL",
-        "coinIDs": [],
-        "index": 7
-      },
       "NORTH_6_1": {
         "baseID": "BASE_1",
         "cellID": "NORTH_6_1",
@@ -880,17 +851,8 @@
         "position": "NORTH",
         "row": 6,
         "cellType": "HOMEPATH",
-        "coinIDs": []
-      },
-      "NORTH_6_2": {
-        "baseID": "BASE_2",
-        "cellID": "NORTH_6_2",
-        "column": 2,
-        "position": "NORTH",
-        "row": 6,
-        "cellType": "NORMAL",
         "coinIDs": [],
-        "index": 71
+        "notRenderInWalkway": true
       }
     },
     "EAST": {
@@ -1137,15 +1099,9 @@
         "position": "SOUTH"
       }
     ],
-    "SOUTH_0_0": [
-      {
-        "cellID": "SOUTH_1_0",
-        "position": "SOUTH"
-      }
-    ],
     "WEST_2_6": [
       {
-        "cellID": "SOUTH_0_0",
+        "cellID": "SOUTH_1_0",
         "position": "SOUTH"
       }
     ],
@@ -1273,12 +1229,6 @@
         "position": "WEST"
       }
     ],
-    "NORTH_6_0": [
-      {
-        "cellID": "WEST_0_6",
-        "position": "WEST"
-      }
-    ],
     "NORTH_4_0": [
       {
         "cellID": "NORTH_5_0",
@@ -1385,15 +1335,9 @@
         "position": "NORTH"
       }
     ],
-    "NORTH_6_2": [
-      {
-        "cellID": "NORTH_5_2",
-        "position": "NORTH"
-      }
-    ],
     "EAST_0_0": [
       {
-        "cellID": "NORTH_6_2",
+        "cellID": "NORTH_5_2",
         "position": "NORTH"
       }
     ],
@@ -1405,8 +1349,8 @@
     ],
     "NORTH_5_0": [
       {
-        "cellID": "NORTH_6_0",
-        "position": "NORTH"
+        "cellID": "WEST_0_6",
+        "position": "WEST"
       }
     ],
     "EAST_0_1": [
@@ -1533,15 +1477,9 @@
         "position": "EAST"
       }
     ],
-    "SOUTH_0_2": [
-      {
-        "cellID": "EAST_2_0",
-        "position": "EAST"
-      }
-    ],
     "SOUTH_1_2": [
       {
-        "cellID": "SOUTH_0_2",
+        "cellID": "EAST_2_0",
         "position": "SOUTH"
       }
     ],
