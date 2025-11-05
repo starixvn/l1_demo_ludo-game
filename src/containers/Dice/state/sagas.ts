@@ -889,13 +889,16 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
  * If the player rolled a spawnable combination, grant a bonus turn
  */
 function * spawnCoinSuccessSaga() {
+  // Invalidate the die roll first (action has been chosen)
+  yield put(invalidateDieRoll());
+  
   // Get the dice values that were used for spawning
   const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
   const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
   
   // Check if this was a spawnable combination that grants a bonus turn
   if (canSpawn(roll1, roll2)) {
-    // Player gets a bonus turn - recalculate highlighting and enable die
+    // Player gets a bonus turn - enable die and recalculate highlighting
     yield put(enableDie());
     
     // Recalculate and highlight reachable cells for the bonus turn
@@ -981,8 +984,12 @@ function * passTurnToSaga() {
 function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boolean; coinID: string; currentDieRoll: Rolls } }) {
   const { bonusChance } = action.data!;
   
+  // Invalidate the die roll first (action has been chosen)
+  yield put(invalidateDieRoll());
+  
   if (bonusChance) {
     // Player got a bonus turn - enable die and recalculate highlighting
+    // Dice will be clickable now because isDieRollValid is false
     yield put(enableDie());
     
     // Recalculate and highlight reachable cells for the bonus turn
@@ -1000,6 +1007,9 @@ function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boo
       // Automatically roll the dice for the bonus turn
       yield put(rollDie());
     }
+  } else {
+    // No bonus - re-enable die for next player (already in next turn)
+    yield put(enableDie());
   }
 }
 

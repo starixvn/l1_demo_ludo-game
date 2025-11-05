@@ -120,11 +120,17 @@ class DiceBare extends React.PureComponent<IProps> {
   render() {
     const { baseColor, isDieRollAllowed, autoActionsEnabled, isDieRollValid, isRolling } =
       this.props;
-    const shouldHighlight = isDieRollAllowed && !autoActionsEnabled;
+    
+    // Dice is only clickable if:
+    // 1. Rolling is allowed (isDieRollAllowed)
+    // 2. Current roll is NOT valid (isDieRollValid === false) - meaning action has been chosen or no roll yet
+    // 3. Not currently rolling
+    const isClickable = isDieRollAllowed && !isDieRollValid && !isRolling;
+    const shouldHighlight = isClickable && !autoActionsEnabled;
     const isRolled = !isDieRollAllowed && isDieRollValid;
     
     let containerClassNames;
-    if (isDieRollAllowed) {
+    if (isClickable) {
       containerClassNames = shouldHighlight
         ? [styles.Highlighted]
         : [];
@@ -143,7 +149,7 @@ class DiceBare extends React.PureComponent<IProps> {
         <div className={classnames(containerClassNames)}>
           <div
             className={styles.DiceContainer}
-            onClick={this.handleDieClick}
+            onClick={isClickable ? this.handleDieClick : undefined}
             style={{ backgroundColor: baseColor ? getBaseHexColor(baseColor) : undefined }}
           >
             <div
@@ -157,7 +163,7 @@ class DiceBare extends React.PureComponent<IProps> {
         <div className={classnames(containerClassNames)}>
           <div
             className={styles.DiceContainer}
-            onClick={this.handleDieClick}
+            onClick={isClickable ? this.handleDieClick : undefined}
             style={{ backgroundColor: baseColor ? getBaseHexColor(baseColor) : undefined }}
           >
             <div

@@ -119,14 +119,20 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   state: IState = {
     showPlayerConfiguration: true,
     showDebugText: false, // Hide debug text by default
-    showGameLog: true, // Show game log by default
+    showGameLog: false, // Hide game log by default
   };
 
   /**
    * Load initial game data when component mounts
+   * Automatically start the game with 4 players after page loads
    */
   componentDidMount() {
     this.props.getInitialGameData();
+    // Auto-start game with 4 players after initial data is loaded
+    // Use a small delay to ensure game data is loaded first
+    setTimeout(() => {
+      this.startGame(4);
+    }, 100);
   }
 
   /**

@@ -154,8 +154,7 @@ function * spawnCoinSaga(action: ReturnType<typeof spawnCoin>) {
   // Execute the spawn - move coin from base to spawn cell
   yield put(spawnCoinSuccess(spawnCellForCoin.cellID, coinIDToSpawn, baseID, walkway.position));
 
-  // Invalidate the die roll so it can't be used again
-  yield put(invalidateDieRoll());
+  // Note: Roll invalidation is handled in spawnCoinSuccessSaga (Dice sagas)
 }
 
 /**
@@ -246,8 +245,7 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
     return;
   }
 
-  // Lock the die roll so it can't be used again
-  yield put(invalidateDieRoll());
+  // Don't invalidate roll here - wait until action completes (handled in moveCoinSuccessSaga)
 
   // Track if coin reached home during movement
   let bonusChanceForHomeCoin = false;
@@ -433,12 +431,10 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   yield put(moveCoinSuccess(bonusChance, coinID, currentDieRoll));
 
   // Advance to next turn unless player gets bonus
+  // Note: Roll invalidation and die enabling are handled in moveCoinSuccessSaga
   if (!bonusChance) {
     yield put(nextTurn());
   }
-
-  // Re-enable die for next turn
-  yield put(enableDie());
 }
 
 /**
