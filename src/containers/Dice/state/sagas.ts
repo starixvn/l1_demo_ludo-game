@@ -811,6 +811,18 @@ function * handleNonSpawnableRoll(
  * Handles when no valid moves are available
  */
 function * handleNoValidMoves(): Generator<any, void, any> {
+  // Check if base has no spawned coins - if so, delay 2 seconds to show roll result
+  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const currentTurnBase = bases[currentTurn];
+  const spawnedCoinIDs = currentTurnBase.coinIDs.filter((coinID) => coins[coinID].isSpawned && !coins[coinID].isRetired);
+  
+  // If no spawned coins, wait 2 seconds to show the roll result before passing turn
+  if (spawnedCoinIDs.length === 0) {
+    yield delay(2000); // 2 seconds delay
+  }
+  
   yield put(invalidateDieRoll());
   yield put(nextTurn());
   // Note: enableDie() and auto-roll will be handled by passTurnToSaga
@@ -858,9 +870,6 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
       yield put(invalidateDieRoll());
       yield call(handleBonusTurnAfterSpawnable);
     }
-  } else if (roll1 === Rolls.SIX || roll2 === Rolls.SIX) {
-    // Rolled a single 6 - can spawn or move, and gets bonus turn
-    yield call(handleRollSix, spawnableCoins, movableCoins, spawnedCoinIDs, currentTurnBase);
   } else if (spawnedCoinIDs.length > 0) {
     yield call(handleNonSpawnableRoll, spawnedCoinIDs, movableCoins, dieSum as Rolls, coins);
   } else {
@@ -936,11 +945,25 @@ function * passTurnToSaga() {
   // Small delay to ensure any state updates are processed
   yield delay(DICE_STATE_UPDATE_DELAY);
   
-  // In auto-play mode, automatically roll for the new player
+  // In auto-play mode, automatically roll for the new player only if they have spawned coins
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   if (autoActionsEnabled) {
-    yield delay(DICE_BONUS_TURN_DELAY);
-    yield put(rollDie());
+    // Check if current player has any spawned coins before auto-rolling
+    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+    
+    // Check if the current player has any coins that are spawned (not in base)
+    const currentTurnBase = bases[currentTurn];
+    const hasSpawnedCoins = currentTurnBase.coinIDs.some((coinID) => {
+      const coin = coins[coinID];
+      return coin.isSpawned && !coin.isRetired;
+    });
+    
+    if (hasSpawnedCoins) {
+      yield delay(DICE_BONUS_TURN_DELAY);
+      yield put(rollDie());
+    }
   }
 }
 

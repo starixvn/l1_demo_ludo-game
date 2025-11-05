@@ -10,10 +10,8 @@
 .Countdown {
   background: rgba(0, 0, 0, 0.85);
   color: #ffffff;
-  font-size: 36px;
+  font-size: 24px; /* Reduced from 36px to fit better in CELL_DIMENSION (40px) */
   font-weight: bold;
-  width: 80px;
-  height: 80px;
   border-radius: 50%; /* Make it circular */
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -22,7 +20,7 @@
   font-family: 'Arial', sans-serif;
   transition: all 0.3s ease;
   animation: pulse 1s ease-in-out infinite;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3); /* Reduced border from 3px to 2px */
 }
 
 .Countdown.Warning {

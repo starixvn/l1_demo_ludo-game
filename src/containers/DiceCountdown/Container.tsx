@@ -9,7 +9,7 @@ import React from "react";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
-import { DICE_COUNTDOWN_TIMEOUT } from "globalConstants";
+import { CELL_DIMENSION, DICE_COUNTDOWN_TIMEOUT } from "globalConstants";
 import { rollDie } from "containers/Dice/state/actions";
 import { isDieRollAllowedSelector } from "containers/Dice/state/selectors";
 import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors";
@@ -118,7 +118,7 @@ class DiceCountdownBare extends React.PureComponent<IProps, ILocalState> {
             }
             return { timeRemaining: 0, isVisible: false };
           }
-          return { timeRemaining: newTime };
+          return { timeRemaining: newTime, isVisible: prevState.isVisible };
         },
         () => {
           // After state update, check if timer reached 0
@@ -160,6 +160,10 @@ class DiceCountdownBare extends React.PureComponent<IProps, ILocalState> {
       <div className={styles.Container}>
         <div
           className={`${styles.Countdown} ${isWarning ? styles.Warning : ""}`}
+          style={{
+            width: CELL_DIMENSION,
+            height: CELL_DIMENSION,
+          }}
         >
           {timeRemaining}
         </div>

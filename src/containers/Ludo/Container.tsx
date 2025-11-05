@@ -118,7 +118,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   /** Initial state shows player configuration screen */
   state: IState = {
     showPlayerConfiguration: true,
-    showDebugText: true, // Show debug text by default
+    showDebugText: false, // Hide debug text by default
     showGameLog: true, // Show game log by default
   };
 
@@ -144,12 +144,16 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <Player
               baseID={BaseID.BASE_1} // Red player
               placement="top" // Position at top of container
-              disabled={currentTurn !== BaseID.BASE_1 || !bases[BaseID.BASE_1]?.enabled} // Disable if not their turn or base not enabled
+              disabled={
+                currentTurn !== BaseID.BASE_1 || !bases[BaseID.BASE_1]?.enabled
+              } // Disable if not their turn or base not enabled
             />
             <Player
               baseID={BaseID.BASE_3} // Yellow player
               placement="bottom" // Position at bottom of container
-              disabled={currentTurn !== BaseID.BASE_3 || !bases[BaseID.BASE_3]?.enabled} // Disable if not their turn or base not enabled
+              disabled={
+                currentTurn !== BaseID.BASE_3 || !bases[BaseID.BASE_3]?.enabled
+              } // Disable if not their turn or base not enabled
             />
           </div>
 
@@ -168,12 +172,16 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <Player
               baseID={BaseID.BASE_2} // Blue player
               placement="top"
-              disabled={currentTurn !== BaseID.BASE_2 || !bases[BaseID.BASE_2]?.enabled}
+              disabled={
+                currentTurn !== BaseID.BASE_2 || !bases[BaseID.BASE_2]?.enabled
+              }
             />
             <Player
               baseID={BaseID.BASE_4} // Green player
               placement="bottom"
-              disabled={currentTurn !== BaseID.BASE_4 || !bases[BaseID.BASE_4]?.enabled}
+              disabled={
+                currentTurn !== BaseID.BASE_4 || !bases[BaseID.BASE_4]?.enabled
+              }
             />
           </div>
         </div>

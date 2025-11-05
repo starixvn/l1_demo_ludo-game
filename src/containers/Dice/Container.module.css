@@ -40,6 +40,22 @@
   }
 }
 
+.Rolled {
+  box-shadow: 0 0 15px 5px #9b59b6, 0 0 5px;
+  border: 3px solid #9b59b6;
+  animation: diceRolledPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes diceRolledPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px 5px #9b59b6, 0 0 5px;
+    border-color: #9b59b6;
+  }
+  50% {
+    box-shadow: 0 0 20px 8px #8e44ad, 0 0 10px;
+    border-color: #8e44ad;
+  }
+}
 .Dot {
   width: 30%;
   height: 30%;
@@ -51,3 +67,4 @@
 .Invisible {
   box-shadow: none;
 }
+

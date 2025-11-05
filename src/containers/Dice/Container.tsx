@@ -118,11 +118,18 @@ class DiceBare extends React.PureComponent<IProps> {
     const { baseColor, isDieRollAllowed, autoActionsEnabled, isDieRollValid } =
       this.props;
     const shouldHighlight = isDieRollAllowed && !autoActionsEnabled;
-    const dieClassNames = isDieRollAllowed
-      ? shouldHighlight
+    const isRolled = !isDieRollAllowed && isDieRollValid;
+    
+    let dieClassNames;
+    if (isDieRollAllowed) {
+      dieClassNames = shouldHighlight
         ? [styles.Die, styles.Highlighted]
-        : styles.Die
-      : [styles.Die, styles.Disabled];
+        : styles.Die;
+    } else if (isRolled) {
+      dieClassNames = [styles.Die, styles.Rolled];
+    } else {
+      dieClassNames = [styles.Die, styles.Disabled];
+    }
 
     return (
       <div className={styles.Container}>
