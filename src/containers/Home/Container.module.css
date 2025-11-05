@@ -12,69 +12,7 @@
 
 .HomeCell {
   position: relative;
-  border: 1px solid #ddd;
   box-sizing: border-box;
-}
-
-/* Cell information display for debugging/development */
-.CellInfo {
-  position: absolute;           /* Position relative to cell container */
-  top: 2px;                    /* Small margin from top */
-  left: 2px;                   /* Small margin from left */
-  pointer-events: none;        /* Don't interfere with click events */
-  z-index: 10;                 /* Ensure it appears above other elements */
-}
-
-/* Cell ID display */
-.CellID {
-  font-size: 7px;              /* Very small text */
-  font-weight: bold;           /* Make it stand out */
-  color: #333;                 /* Dark text color */
-  background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent white background */
-  padding: 1px 2px;            /* Small padding around text */
-  border-radius: 2px;          /* Rounded corners */
-  margin-bottom: 1px;          /* Space between ID and base ID */
-  font-family: monospace;      /* Monospace font for consistent spacing */
-  display: block;              /* Ensure block display */
-}
-
-/* Base ID display */
-.BaseID {
-  font-size: 6px;              /* Even smaller text for base ID */
-  font-weight: normal;         /* Normal weight for base ID */
-  color: #666;                 /* Lighter color for base ID */
-  background-color: rgba(255, 255, 255, 0.7); /* More transparent background */
-  padding: 1px 2px;            /* Small padding around text */
-  border-radius: 2px;          /* Rounded corners */
-  font-family: monospace;      /* Monospace font for consistent spacing */
-  display: block;              /* Ensure block display */
-  margin-bottom: 1px;          /* Space between base ID and index */
-}
-
-/* Index display for cells */
-.Index {
-  font-size: 6px;              /* Small text for index */
-  font-weight: normal;         /* Normal weight */
-  color: #990000;              /* Red color to distinguish index */
-  background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
-  padding: 1px 2px;            /* Small padding around text */
-  border-radius: 2px;          /* Rounded corners */
-  font-family: monospace;      /* Monospace font for consistent spacing */
-  display: block;              /* Ensure block display */
-  margin-bottom: 1px;          /* Space between index and next links */
-}
-
-/* Next link cell IDs display */
-.NextLinks {
-  font-size: 5px;              /* Very small text for link IDs */
-  font-weight: normal;         /* Normal weight */
-  color: #0066cc;              /* Blue color to distinguish links */
-  background-color: rgba(200, 230, 255, 0.9); /* Light blue background */
-  padding: 1px 2px;            /* Small padding around text */
-  border-radius: 2px;          /* Rounded corners */
-  font-family: monospace;      /* Monospace font for consistent spacing */
-  display: block;              /* Ensure block display */
-  margin-bottom: 1px;          /* Space between links and next element */
 }
 
 .CoinCount {

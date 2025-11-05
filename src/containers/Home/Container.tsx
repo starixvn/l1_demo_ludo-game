@@ -6,9 +6,12 @@ import {
   cellsSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors";
-import { getBaseHexColor, getStyleObject } from "containers/utils";
+import { getStyleObject } from "containers/utils";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
+
+import { Cell } from "containers/Walkway/components/Cell";
+import { WalkwayPosition } from "state/interfaces";
 
 import styles from "./Container.module.css";
 
@@ -34,7 +37,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
 
 class HomeBare extends React.PureComponent<IProps> {
   render() {
-    const { cells, links } = this.props;
+    const { cells, links, bases } = this.props;
 
     // Filter cells that have notRenderInWalkway = true
     const homeCells: any[] = [];
@@ -53,31 +56,39 @@ class HomeBare extends React.PureComponent<IProps> {
           const cellLinks = links[cell.cellID] || [];
           const nextLinkCellIDs = cellLinks.map((link: any) => link.cellID);
 
+          const cellBase = bases[cell.baseID];
+          const cellColor = cellBase?.color;
+
           return (
             <div
               key={cell.cellID}
               className={styles.HomeCell}
               style={this.getCellStyle(cell)}
-              data-cell-id={cell.cellID}
             >
-              {/* Display cell information for debugging/development */}
-              {this.props.showDebugText !== false && (
-                <div className={styles.CellInfo}>
-                  <div className={styles.CellID}>{cell.cellID}</div>
-                  <div className={styles.BaseID}>{cell.baseID}</div>
-                  {cell.index !== undefined && (
-                    <div className={styles.Index}>Index: {cell.index}</div>
-                  )}
-                  {nextLinkCellIDs && nextLinkCellIDs.length > 0 && (
-                    <div className={styles.NextLinks}>
-                      → {nextLinkCellIDs.join(", ")}
-                    </div>
-                  )}
-                </div>
-              )}
-              {cell.coinIDs.length > 0 && (
-                <span className={styles.CoinCount}>{cell.coinIDs.length}</span>
-              )}
+              <Cell
+                row={cell.cellID === "NORTH_6_1" ? 6 : 0} // NORTH_6_1 should show index 6
+                column={cell.cellID === "SOUTH_0_1" ? 0 : 0} // SOUTH_0_1 should show index 6 (7-1-0=6)
+                walkwayPosition={
+                  cell.cellID === "NORTH_6_1"
+                    ? WalkwayPosition.NORTH
+                    : cell.cellID === "SOUTH_0_1"
+                    ? WalkwayPosition.SOUTH
+                    : WalkwayPosition.NORTH
+                }
+                baseID={cell.baseID}
+                cellType={cell.cellType}
+                color={cellColor}
+                nextLinkCellIDs={nextLinkCellIDs}
+                showDebugText={this.props.showDebugText}
+                index={cell.index}
+                onContextMenuOpened={() => {}} // No context menu for home cells
+              >
+                {cell.coinIDs.length > 0 && (
+                  <span className={styles.CoinCount}>
+                    {cell.coinIDs.length}
+                  </span>
+                )}
+              </Cell>
             </div>
           );
         })}
@@ -85,64 +96,32 @@ class HomeBare extends React.PureComponent<IProps> {
     );
   }
 
-  // Helper function to convert hex to rgba with opacity
-  private hexToRgba = (hex: string, opacity: number): string => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return hex; // Return original if invalid hex
-    const r = parseInt(result[1], 16);
-    const g = parseInt(result[2], 16);
-    const b = parseInt(result[3], 16);
-    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-  };
-
   private getCellStyle = (cell: any): React.CSSProperties => {
-    const { bases } = this.props;
-    const baseStyle = getStyleObject(1, 1); // 1x1 cell size
-
-    // For HOMEPATH cells, apply base color with 0.5 opacity (same as walkway homepath cells)
-    let cellStyle: React.CSSProperties;
-    if (cell.cellType === "HOMEPATH") {
-      const cellBase = bases[cell.baseID];
-      if (cellBase && cellBase.color) {
-        const hexColor = getBaseHexColor(cellBase.color);
-        cellStyle = {
-          ...baseStyle,
-          backgroundColor: this.hexToRgba(hexColor, 0.5), // Apply color with 0.5 opacity
-        };
-      } else {
-        cellStyle = baseStyle;
-      }
-    } else {
-      cellStyle = baseStyle;
-    }
-
     // Position the cells appropriately within the 1x3 home container
     // YELLOW (NORTH_6_1) at top, RED (SOUTH_0_1) at bottom
+    const basePositioning = {
+      position: "absolute" as const,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "12px",
+    };
+
     if (cell.cellID === "NORTH_6_1") {
       return {
-        ...cellStyle,
-        position: "absolute",
+        ...basePositioning,
         top: 0,
         left: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "12px",
       };
     } else if (cell.cellID === "SOUTH_0_1") {
       return {
-        ...cellStyle,
-        position: "absolute",
+        ...basePositioning,
         bottom: 0,
         left: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "12px",
       };
     }
 
-    return cellStyle;
+    return basePositioning;
   };
 }
 
