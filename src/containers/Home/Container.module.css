@@ -14,16 +14,3 @@
   position: relative;
   box-sizing: border-box;
 }
-
-.CoinCount {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  font-size: 10px;
-  font-weight: bold;
-  color: #fff;
-  background-color: rgba(0, 0, 0, 0.7);
-  padding: 1px 3px;
-  border-radius: 3px;
-  pointer-events: none;
-}

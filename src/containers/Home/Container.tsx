@@ -4,12 +4,16 @@ import { IRelationship } from "containers/Ludo/state/interfaces";
 import {
   basesSelector,
   cellsSelector,
+  coinsSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors";
 import { getStyleObject } from "containers/utils";
+import { COIN_SIZE } from "globalConstants";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
+import { moveCoin } from "containers/Ludo/state/actions";
+import { Coin } from "containers/Base/components/Coin";
 import { Cell } from "containers/Walkway/components/Cell";
 import { WalkwayPosition } from "state/interfaces";
 
@@ -18,6 +22,7 @@ import styles from "./Container.module.css";
 interface IStateProps {
   bases: ReturnType<typeof basesSelector>;
   cells: ReturnType<typeof cellsSelector>;
+  coins: ReturnType<typeof coinsSelector>;
   links: ReturnType<typeof linksSelector>;
 }
 
@@ -27,17 +32,47 @@ interface IPublicProps {
   showDebugText?: boolean;
 }
 
-interface IProps extends IStateProps, IPublicProps {}
+interface IDispatchProps {
+  moveCoin: typeof moveCoin;
+}
+
+interface IProps extends IStateProps, IPublicProps, IDispatchProps {}
 
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   bases: basesSelector,
   cells: cellsSelector,
+  coins: coinsSelector,
   links: linksSelector,
 });
 
+const mapDispatchToProps = {
+  moveCoin,
+};
+
 class HomeBare extends React.PureComponent<IProps> {
+  /**
+   * Handles coin click events during gameplay
+   */
+  private onCoinClicked = (
+    coinID: string,
+    position: WalkwayPosition,
+    cellID: string
+  ) => {
+    const { bases } = this.props;
+
+    // Find the current player's base
+    const currentTurnBase = Object.values(bases).find((base) =>
+      base.coinIDs.includes(coinID)
+    );
+
+    // Only allow move if it's the coin's player's turn
+    if (currentTurnBase && currentTurnBase.enabled) {
+      this.props.moveCoin(coinID, position, cellID);
+    }
+  };
+
   render() {
-    const { cells, links, bases } = this.props;
+    const { cells, links, bases, coins } = this.props;
 
     // Filter cells that have notRenderInWalkway = true
     const homeCells: any[] = [];
@@ -83,11 +118,28 @@ class HomeBare extends React.PureComponent<IProps> {
                 index={cell.index}
                 onContextMenuOpened={() => {}} // No context menu for home cells
               >
-                {cell.coinIDs.length > 0 && (
-                  <span className={styles.CoinCount}>
-                    {cell.coinIDs.length}
-                  </span>
-                )}
+                {
+                  // Render coins that are currently on this cell
+                  cell.coinIDs.map((coinID: string, index: number) => (
+                    <Coin
+                      key={coinID}
+                      baseColor={coins[coinID].color} // Coin color matches its base
+                      // Smaller coins if multiple coins on same cell
+                      coinSize={
+                        cell.coinIDs.length > 1 ? COIN_SIZE / 2 : COIN_SIZE
+                      }
+                      onCoinClicked={() =>
+                        this.onCoinClicked(
+                          coinID,
+                          cell.cellID === "NORTH_6_1"
+                            ? WalkwayPosition.NORTH
+                            : WalkwayPosition.SOUTH,
+                          cell.cellID
+                        )
+                      }
+                    />
+                  ))
+                }
               </Cell>
             </div>
           );
@@ -125,6 +177,7 @@ class HomeBare extends React.PureComponent<IProps> {
   };
 }
 
-export const Home = connect(mapStateToProps)(
-  HomeBare
-) as unknown as React.ComponentClass<IPublicProps>;
+export const Home = connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(HomeBare) as unknown as React.ComponentClass<IPublicProps>;
