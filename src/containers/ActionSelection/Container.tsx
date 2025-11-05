@@ -125,7 +125,7 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
         <div className={styles.Container}>
           <div className={styles.Header}>
             <h3 className={styles.Title}>
-              {currentBase.color} Player - Choose Your Action
+              {currentBase.color} Player - Choose settlement action
             </h3>
             <div className={styles.DieValue}>
               Rolled: <span className={styles.DieNumber}>{availableActionsDieValue}</span>

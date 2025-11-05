@@ -199,7 +199,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <button
               className={styles.ResetButton}
               onClick={this.handleResetGame}
-              title="Reset the game to the beginning and choose players again"
+              title="Reload the page to start fresh"
             >
               Reset Game
             </button>
@@ -372,43 +372,20 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   };
 
   /**
-   * Resets the game to the beginning
-   * Reloads initial game data, clears logs, resets dice, and shows player configuration screen
+   * Reloads the current page to start fresh
    */
   private handleResetGame = () => {
-    // Confirm with user before resetting
+    // Confirm with user before reloading
     if (
       !window.confirm(
-        "Are you sure you want to reset the game? All progress will be lost."
+        "Are you sure you want to reload the page? All progress will be lost."
       )
     ) {
       return;
     }
 
-    // Clear all game logs
-    this.props.clearLogs();
-
-    // Clear highlighted cells
-    this.props.clearHighlightedCells();
-
-    // Clear available actions panel
-    this.props.clearAvailableActions();
-
-    // Disable and invalidate die
-    this.props.disableDie();
-    this.props.invalidateDieRoll();
-
-    // Disable auto-actions (will be set when starting new game)
-    this.props.setAutoActionsEnabled(false);
-
-    // Reload initial game data from JSON file
-    this.props.getInitialGameData();
-
-    // Show player configuration screen again
-    this.setState({
-      showPlayerConfiguration: true,
-      showGameLog: true, // Reset game log visibility to default
-    });
+    // Reload the page
+    window.location.reload();
   };
 }
 
