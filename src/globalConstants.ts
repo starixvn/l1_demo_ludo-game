@@ -1,4 +1,5 @@
 import { BaseColors } from 'state/interfaces';
+import { BaseID } from 'containers/Ludo/state/interfaces';
 
 // Base size constants (in cells)
 export const UNIT_SIZE = 1;                                   // Base unit size: 1 cell
@@ -27,6 +28,7 @@ export const COIN_PLACEHOLDER_SIZE = COIN_PLACEHOLDER_DIMENSION; // Coin placeho
 
 // Game rules
 export const WINNING_MOVES = 56;
+export const DEFAULT_STARTING_BASE = BaseID.BASE_3; // Default base that starts the game (BLUE player)
 export const BASE_COLORS: { [key: string]: string } = {
   [BaseColors.RED]: '#D22E2E',
   [BaseColors.GREEN]: '#088812',

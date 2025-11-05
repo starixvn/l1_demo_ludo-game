@@ -133,7 +133,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
    * Renders the complete Ludo game interface
    */
   render() {
-    const { currentTurn } = this.props;
+    const { currentTurn, bases } = this.props;
 
     return (
       <div className={styles.Container}>
@@ -144,12 +144,12 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <Player
               baseID={BaseID.BASE_1} // Red player
               placement="top" // Position at top of container
-              disabled={currentTurn !== BaseID.BASE_1} // Disable if not their turn
+              disabled={currentTurn !== BaseID.BASE_1 || !bases[BaseID.BASE_1]?.enabled} // Disable if not their turn or base not enabled
             />
             <Player
               baseID={BaseID.BASE_3} // Yellow player
               placement="bottom" // Position at bottom of container
-              disabled={currentTurn !== BaseID.BASE_3} // Disable if not their turn
+              disabled={currentTurn !== BaseID.BASE_3 || !bases[BaseID.BASE_3]?.enabled} // Disable if not their turn or base not enabled
             />
           </div>
 
@@ -168,12 +168,12 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <Player
               baseID={BaseID.BASE_2} // Blue player
               placement="top"
-              disabled={currentTurn !== BaseID.BASE_2}
+              disabled={currentTurn !== BaseID.BASE_2 || !bases[BaseID.BASE_2]?.enabled}
             />
             <Player
               baseID={BaseID.BASE_4} // Green player
               placement="bottom"
-              disabled={currentTurn !== BaseID.BASE_4}
+              disabled={currentTurn !== BaseID.BASE_4 || !bases[BaseID.BASE_4]?.enabled}
             />
           </div>
         </div>

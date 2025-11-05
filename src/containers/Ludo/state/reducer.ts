@@ -6,10 +6,9 @@
  * Each case corresponds to a specific game event or user interaction.
  */
 
-import { WINNING_MOVES } from 'globalConstants';
-
 import { Actions, ActionTypes } from './actions';
-import { BaseID, IState } from './interfaces';
+import { IState } from './interfaces';
+import { DEFAULT_STARTING_BASE, WINNING_MOVES } from 'globalConstants';
 
 /**
  * Initial state for the Ludo game
@@ -19,7 +18,7 @@ const initialState: IState = {
   bases: {},        // Will contain all player bases
   cells: {},        // Will contain all board cells organized by position
   coins: {},        // Will contain all game coins
-  currentTurn: BaseID.BASE_3, // Default starting turn (can be configured)
+  currentTurn: DEFAULT_STARTING_BASE, // Default starting turn (can be configured)
   links: {},        // Will contain cell connectivity information
   relationships: [], // Will contain relationships between board entities
   walkways: {},     // Will contain all walkway segments

@@ -21,7 +21,7 @@ import { enableDie, invalidateDieRoll, ActionTypes as DiceActionTypes } from 'co
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from 'containers/Dice/state/selectors';
-import { WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } from 'globalConstants';
+import { DEFAULT_STARTING_BASE, WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
 import {
@@ -98,7 +98,7 @@ function * getInitialGameDataSaga() {
     availableActions: null,             // No action selection initially
     availableActionsDieValue: null,     // No die value for actions initially
     highlightedCells: null,             // No cells highlighted initially
-    currentTurn: BaseID.BASE_3,         // Start with red player (arbitrary choice)
+    currentTurn: DEFAULT_STARTING_BASE, // Start with configured default base
     links: data.links,                  // Movement connectivity between cells
     relationships: data.relationships,  // Component relationships for rendering
     walkways: mapByProperty(data.walkways, 'ID'), // Walkway configurations
