@@ -46,3 +46,4 @@ export const AUTO_ACTION_TIMEOUT = 200;             // Default timeout for auto-
 export const DICE_COUNTDOWN_TIMEOUT = 10;           // Countdown timer duration in seconds when player needs to roll dice (30s)
 export const DICE_COUNTDOWN_WARNING_THRESHOLD = 3; // Show warning color when time remaining is <= this value (in seconds)
 export const DICE_ROLLING_ANIMATION_DURATION = 800; // Dice rolling animation duration in milliseconds (1.2 seconds)
+export const NO_MOVE_DELAY = 2000;                  // Delay before passing turn when coin cannot move (2 seconds) - allows player to see dice result

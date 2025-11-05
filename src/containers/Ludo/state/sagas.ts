@@ -21,7 +21,7 @@ import { enableDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from 'containers/Dice/state/selectors';
-import { DEFAULT_STARTING_BASE, WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY } from 'globalConstants';
+import { DEFAULT_STARTING_BASE, WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY, NO_MOVE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
 import {
@@ -312,6 +312,8 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   if (blockingInfo) {
     console.warn(`Coin ${coinID} cannot move - blocked by ${blockingInfo.blockingCoinID}`);
     yield put(moveCoinFailure());
+    // Wait for player to see the dice result before passing turn
+    yield delay(NO_MOVE_DELAY);
     yield put(nextTurn());
     yield put(enableDie());
     return;

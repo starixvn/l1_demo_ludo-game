@@ -33,7 +33,7 @@ import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/stat
 import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
-import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION } from 'globalConstants';
+import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY } from 'globalConstants';
 
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
@@ -699,17 +699,10 @@ function * handleNonSpawnableRoll(
  * Handles when no valid moves are available
  */
 function * handleNoValidMoves(): Generator<any, void, any> {
-  // Check if base has no spawned coins - if so, delay 2 seconds to show roll result
-  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-  const currentTurnBase = bases[currentTurn];
-  const spawnedCoinIDs = currentTurnBase.coinIDs.filter((coinID) => coins[coinID].isSpawned && !coins[coinID].isRetired);
-  
-  // If no spawned coins, wait 2 seconds to show the roll result before passing turn
-  if (spawnedCoinIDs.length === 0) {
-    yield delay(2000); // 2 seconds delay
-  }
+  // Always wait to show the dice result before passing turn
+  // This allows players to see the roll result whether they have no spawned coins
+  // or their coins are blocked and cannot move
+  yield delay(NO_MOVE_DELAY);
   
   yield put(invalidateDieRoll());
   yield put(nextTurn());
