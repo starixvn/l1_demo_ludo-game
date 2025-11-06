@@ -112,9 +112,10 @@ export const moveCoin = (
   walkwayPosition: WalkwayPosition, 
   cellID: ICell['cellID'],
   blockingCoinID?: ICoin['coinID'],
-  stepsBeforeBlocking?: number
-): IReduxAction<ActionTypes.MOVE_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; blockingCoinID?: ICoin['coinID']; stepsBeforeBlocking?: number }> => ({
-  data: { cellID, coinID, walkwayPosition, blockingCoinID, stepsBeforeBlocking },
+  stepsBeforeBlocking?: number,
+  stepsToUse?: number
+): IReduxAction<ActionTypes.MOVE_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; blockingCoinID?: ICoin['coinID']; stepsBeforeBlocking?: number; stepsToUse?: number }> => ({
+  data: { cellID, coinID, walkwayPosition, blockingCoinID, stepsBeforeBlocking, stepsToUse },
   type: ActionTypes.MOVE_COIN,
 });
 
@@ -246,6 +247,8 @@ export interface IAvailableAction {
   blockingCoinID?: ICoin['coinID'];
   /** For 'move_before' action: number of steps to move before blocking coin */
   stepsBeforeBlocking?: number;
+  /** Optional: steps to use for this move (when using single die instead of sum) */
+  stepsToUse?: number;
 }
 
 /**

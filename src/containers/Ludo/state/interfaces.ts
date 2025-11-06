@@ -169,6 +169,8 @@ export interface IAvailableAction {
   blockingCoinID?: ICoin['coinID'];
   /** For 'move_before' action: number of steps to move before blocking coin */
   stepsBeforeBlocking?: number;
+  /** Optional: steps to use for this move (when using single die instead of sum) */
+  stepsToUse?: number;
 }
 
 /**

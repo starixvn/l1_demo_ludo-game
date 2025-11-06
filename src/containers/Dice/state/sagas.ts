@@ -28,12 +28,12 @@ import {
 } from 'containers/Ludo/state/actions';
 import { rollDie } from './actions';
 import { BaseID, CellType, IBase, ICoin } from 'containers/Ludo/state/interfaces';
-import { getMovableCoins, calculateReachableCells, findBlockingCoin } from 'containers/Ludo/state/sagas';
+import { getMovableCoins, calculateReachableCells, findBlockingCoin, isCurrentMoveValid } from 'containers/Ludo/state/sagas';
 import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/state/actions';
-import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector } from 'containers/Ludo/state/selectors';
+import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector, walkwaysSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
-import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY } from 'globalConstants';
+import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY, WINNING_MOVES } from 'globalConstants';
 
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
@@ -377,25 +377,98 @@ function * buildAvailableActions(
 ): Generator<any, IAvailableAction[], any> {
   const actions: IAvailableAction[] = [];
 
-  // Add spawn actions
-  for (const coinID of spawnableCoins) {
-    actions.push({
-      type: 'spawn',
-      coinID,
-      label: `Spawn Coin ${coinID.split('_')[1]}`,
-      description: 'Bring a new coin onto the board',
-    });
+  // Check if there's a coin on the spawn cell that hasn't moved yet
+  // If so, prevent spawning additional coins until that coin moves
+  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
+  
+  // Find the spawn cell for this base
+  const walkway = Object.values(walkways).find((w) => w.baseID === currentTurnBase.ID);
+  let spawnCellID: string | null = null;
+  if (walkway) {
+    const walkwayCells = cells[walkway.position];
+    const spawnCell = Object.values(walkwayCells).find(
+      (cell) => cell.cellType === CellType.SPAWN && cell.baseID === currentTurnBase.ID
+    );
+    if (spawnCell) {
+      spawnCellID = spawnCell.cellID;
+    }
+  }
+  
+  // Check if any spawned coin is still on the spawn cell (hasn't moved yet)
+  let hasCoinOnSpawnCell = false;
+  if (spawnCellID) {
+    for (const coinID of currentTurnBase.coinIDs) {
+      const coin = coins[coinID];
+      if (coin.isSpawned && !coin.isRetired && coin.cellID === spawnCellID && coin.steps === 0) {
+        hasCoinOnSpawnCell = true;
+        break;
+      }
+    }
+  }
+
+  // Add spawn actions only if no coin is stuck on spawn cell
+  if (!hasCoinOnSpawnCell) {
+    for (const coinID of spawnableCoins) {
+      actions.push({
+        type: 'spawn',
+        coinID,
+        label: `Spawn Coin ${coinID.split('_')[1]}`,
+        description: 'Bring a new coin onto the board',
+      });
+    }
   }
 
   // Add move actions with priority information and blocking detection
+  // Get the current dice values to check if it's a pair
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  const isPair = roll1 === roll2;
+  
   for (const coinID of movableCoins) {
-    // Check for blocking coins
-    const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null = 
+    // Check for blocking coins (same color or opponent)
+    const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
       yield call(findBlockingCoin, coinID, dieValue);
 
     if (blockingInfo) {
-      // Blocking coin found - cannot move at all, pass turn to next base
-      // No actions are added when a blocking coin is detected
+      // Blocking coin found - check if we can use one die value (when it's a pair)
+      if (isPair) {
+        const singleDieValue = roll1; // Both dice are the same, use one value
+        
+        // Check if we can move using one die value (avoiding the blocker)
+        const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
+        
+        if (singleDieValue < blockingStep) {
+          // One die value is less than blocking step - can move to valid cell before blocker
+          // Check if this move is valid (won't overshoot home)
+          const coin = coins[coinID];
+          if (coin.steps + singleDieValue <= WINNING_MOVES) {
+            // Check if there's a valid cell reachable with one die value
+            const canMoveWithOneDie: boolean = yield call(isCurrentMoveValid, coinID, singleDieValue as Rolls);
+            if (canMoveWithOneDie) {
+              actions.push({
+                type: 'move',
+                coinID,
+                label: `Move Coin ${coinID.split('_')[1]} (${singleDieValue} steps)`,
+                description: `Move ${singleDieValue} spaces using one die (pair rolled, avoiding blocker)`,
+                stepsToUse: singleDieValue,
+              });
+            }
+          }
+        } else if (singleDieValue === blockingStep && !blockingInfo.isSameColor) {
+          // One die value equals blocking step AND blocking coin is opponent - can kick
+          actions.push({
+            type: 'move',
+            coinID,
+            label: `Move Coin ${coinID.split('_')[1]} (Kick Blocking Coin)`,
+            description: `Move ${singleDieValue} spaces and kick opponent coin using one die (pair rolled)`,
+            stepsToUse: singleDieValue,
+          });
+        }
+        // If singleDieValue > blockingStep, cannot move (would overshoot)
+      }
+      // If not a pair, no actions available (blocked by sum of both dice)
     } else {
       // No blocking - normal move action
       const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
@@ -519,6 +592,9 @@ function * handleRollSpawnable(
  */
 function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
   yield put(enableDie());
+  
+  // Small delay to ensure all state updates are processed
+  yield delay(100);
   
   // Recalculate and highlight reachable cells for the bonus turn
   // Since the player's turn continues (no PASS_TURN_TO action), we need to recalculate highlighting
@@ -775,6 +851,9 @@ function * spawnCoinSuccessSaga() {
     // Player gets a bonus turn - enable die and recalculate highlighting
     yield put(enableDie());
     
+    // Small delay to ensure all state updates (coin positions) are processed
+    yield delay(100);
+    
     // Recalculate and highlight reachable cells for the bonus turn
     yield put(clearHighlightedCells());
     const reachableCells: Set<string> = yield call(calculateReachableCells);
@@ -865,6 +944,10 @@ function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boo
     // Player got a bonus turn - enable die and recalculate highlighting
     // Dice will be clickable now because isDieRollValid is false
     yield put(enableDie());
+    
+    // Small delay to ensure all state updates (coin positions, disqualifications) are processed
+    // This is especially important after captures, where coins are sent back to base
+    yield delay(100);
     
     // Recalculate and highlight reachable cells for the bonus turn
     yield put(clearHighlightedCells());

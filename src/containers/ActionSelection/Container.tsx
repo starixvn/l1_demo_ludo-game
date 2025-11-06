@@ -5,22 +5,26 @@
  * Shows buttons for each available action with descriptions.
  */
 
-import React from 'react';
-import { connect } from 'react-redux';
-import { createStructuredSelector } from 'reselect';
+import React from "react";
+import { connect } from "react-redux";
+import { createStructuredSelector } from "reselect";
 
-import { clearAvailableActions, IAvailableAction, spawnCoin } from 'containers/Ludo/state/actions';
-import { moveCoin } from 'containers/Ludo/state/actions';
+import {
+  clearAvailableActions,
+  IAvailableAction,
+  spawnCoin,
+} from "containers/Ludo/state/actions";
+import { moveCoin } from "containers/Ludo/state/actions";
 import {
   availableActionsSelector,
   availableActionsDieValueSelector,
   basesSelector,
   coinsSelector,
   currentTurnSelector,
-} from 'containers/Ludo/state/selectors';
-import { getBaseHexColor } from 'containers/utils';
+} from "containers/Ludo/state/selectors";
+import { getBaseHexColor } from "containers/utils";
 
-import styles from './Container.module.css';
+import styles from "./Container.module.css";
 
 /**
  * Props from Redux state
@@ -81,21 +85,40 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
     // Clear the action selection UI
     this.props.clearAvailableActions();
 
-    if (action.type === 'spawn') {
+    if (action.type === "spawn") {
       // Spawn the coin
       this.props.spawnCoin(bases[currentTurn].ID, action.coinID);
-    } else if (action.type === 'move') {
+    } else if (action.type === "move") {
       // Move the coin
       const coin = coins[action.coinID];
-      this.props.moveCoin(action.coinID, coin.position, coin.cellID);
-    } else if (action.type === 'kick') {
+      // If stepsToUse is provided (when using one die from a pair), pass it to moveCoin
+      this.props.moveCoin(
+        action.coinID,
+        coin.position,
+        coin.cellID,
+        undefined,
+        undefined,
+        action.stepsToUse
+      );
+    } else if (action.type === "kick") {
       // Kick action: move coin and disqualify blocking coin
       const coin = coins[action.coinID];
-      this.props.moveCoin(action.coinID, coin.position, coin.cellID, action.blockingCoinID);
-    } else if (action.type === 'move_before') {
+      this.props.moveCoin(
+        action.coinID,
+        coin.position,
+        coin.cellID,
+        action.blockingCoinID
+      );
+    } else if (action.type === "move_before") {
       // Move before blocking: move only specified steps
       const coin = coins[action.coinID];
-      this.props.moveCoin(action.coinID, coin.position, coin.cellID, undefined, action.stepsBeforeBlocking);
+      this.props.moveCoin(
+        action.coinID,
+        coin.position,
+        coin.cellID,
+        undefined,
+        action.stepsBeforeBlocking
+      );
     }
   };
 
@@ -103,11 +126,12 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
    * Renders the action selection panel
    */
   render() {
-    const { availableActions, availableActionsDieValue, bases, currentTurn } = this.props;
+    const { availableActions, availableActionsDieValue, bases, currentTurn } =
+      this.props;
 
     // Debug logging to help troubleshoot
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[ActionSelection] Render check:', {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[ActionSelection] Render check:", {
         availableActions,
         availableActionsLength: availableActions?.length,
         availableActionsDieValue,
@@ -136,7 +160,10 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
               {currentBase.color} Player - Choose settlement action
             </h3>
             <div className={styles.DieValue}>
-              Rolled: <span className={styles.DieNumber}>{availableActionsDieValue}</span>
+              Rolled:{" "}
+              <span className={styles.DieNumber}>
+                {availableActionsDieValue}
+              </span>
             </div>
           </div>
           <div className={styles.ActionsList}>
@@ -144,17 +171,21 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
               const coin = this.props.coins[action.coinID];
               const coinBase = coin ? this.props.bases[coin.baseID] : null;
               // Get the base color for the current turn (the base performing the action)
-              const baseColor = currentBase.color ? getBaseHexColor(currentBase.color) : null;
-              
+              const baseColor = currentBase.color
+                ? getBaseHexColor(currentBase.color)
+                : null;
+
               return (
                 <button
                   key={`${action.type}-${action.coinID}-${index}`}
                   className={`${styles.ActionButton} ${
-                    action.type === 'spawn' ? styles.SpawnButton : styles.MoveButton
+                    action.type === "spawn"
+                      ? styles.SpawnButton
+                      : styles.MoveButton
                   }`}
                   onClick={() => this.handleActionClick(action)}
                 >
-                  <div 
+                  <div
                     className={styles.ActionLabel}
                     style={baseColor ? { color: baseColor } : undefined}
                   >
@@ -163,17 +194,23 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
                   <div className={styles.ActionDetails}>
                     <div className={styles.DetailRow}>
                       <span className={styles.DetailLabel}>Coin ID:</span>
-                      <span className={styles.DetailValue}>{action.coinID}</span>
+                      <span className={styles.DetailValue}>
+                        {action.coinID}
+                      </span>
                     </div>
                     {coinBase && (
                       <div className={styles.DetailRow}>
                         <span className={styles.DetailLabel}>Base ID:</span>
-                        <span className={styles.DetailValue}>{coinBase.ID}</span>
+                        <span className={styles.DetailValue}>
+                          {coinBase.ID}
+                        </span>
                       </div>
                     )}
                   </div>
                   {action.description && (
-                    <div className={styles.ActionDescription}>{action.description}</div>
+                    <div className={styles.ActionDescription}>
+                      {action.description}
+                    </div>
                   )}
                 </button>
               );
@@ -192,4 +229,3 @@ export const ActionSelection = connect(
   mapStateToProps,
   mapDispatchToProps
 )(ActionSelectionBare) as unknown as React.ComponentClass<{}>;
-

@@ -20,7 +20,7 @@ import { mapByProperty } from 'common/utils';
 import { enableDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
-import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from 'containers/Dice/state/selectors';
+import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector, isDieRollAllowedSelector } from 'containers/Dice/state/selectors';
 import { DEFAULT_STARTING_BASE, WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY, NO_MOVE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
@@ -175,7 +175,7 @@ function * watchForMoveCoin() {
  * @param stepsToTake - Number of steps from the die roll
  * @returns true if the move is valid (won't overshoot home)
  */
-function * isCurrentMoveValid(coinID: ICoin['coinID'], stepsToTake: Rolls) {
+export function * isCurrentMoveValid(coinID: ICoin['coinID'], stepsToTake: Rolls) {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const coin = coins[coinID];
   return coin.steps + stepsToTake <= WINNING_MOVES;
@@ -219,7 +219,7 @@ export function * getMovableCoins(stepsToTake: Rolls) {
 export function * findBlockingCoin(
   coinID: ICoin['coinID'],
   stepsToTake: Rolls
-): Generator<any, { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null, any> {
+): Generator<any, { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null, any> {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
   const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
@@ -262,17 +262,19 @@ export function * findBlockingCoin(
     if (nextCell.cellID !== 'HOME') {
       const cellData = cells[nextCell.position]?.[nextCell.cellID];
       if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
-        // Found a blocking coin - check if it's the same base (can't block own coins)
+        // Found a blocking coin - can be same color or different color
         const blockingCoinID = cellData.coinIDs[0]; // Get first coin on the cell
         const blockingCoin = coins[blockingCoinID];
         
-        // Only block if it's a different base (opponent's coin)
-        if (blockingCoin && blockingCoin.baseID !== currentCoin.baseID) {
+        if (blockingCoin) {
           // Blocking coin found at this step - can move up to 'step' steps before it
+          // Track whether it's same color or different color
+          const isSameColor = blockingCoin.baseID === currentCoin.baseID;
           return {
             blockingCoinID,
             blockingCellID: nextCell.cellID,
             stepsBeforeBlocking: step, // Number of steps we can take before hitting the blocker
+            isSameColor, // Whether the blocking coin is the same color
           };
         }
       }
@@ -301,30 +303,50 @@ export function * findBlockingCoin(
  */
 function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   let { cellID, walkwayPosition } = { ...action.data! };
-  const { coinID } = action.data!;
+  const { coinID, stepsToUse } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
   
+  // Determine how many steps to move
+  // If stepsToUse is provided (when using one die from a pair), use that instead of the sum
+  const stepsToMove = stepsToUse !== undefined ? stepsToUse : currentDieRoll;
+  
   // Check for blocking coins BEFORE allowing movement
-  const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null = 
-    yield call(findBlockingCoin, coinID, currentDieRoll);
+  // Use the actual steps we're moving, not the full die sum
+  const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+    yield call(findBlockingCoin, coinID, stepsToMove as Rolls);
   
-  // If blocking coin is detected, cannot move at all - fail the move and pass turn
+  // Track if we can kick the blocking coin (if any)
+  let canKickBlockingCoin = false;
+  let blockingCellIDToKick: string | null = null;
+  
+  // If blocking coin is detected, check if we can kick it
+  // Blocking applies to both same-color and different-color coins
+  // But we can kick opponent coins if stepsToMove exactly equals the blocking step
   if (blockingInfo) {
-    console.warn(`Coin ${coinID} cannot move - blocked by ${blockingInfo.blockingCoinID}`);
-    yield put(moveCoinFailure());
-    // Wait for player to see the dice result before passing turn
-    yield delay(NO_MOVE_DELAY);
-    yield put(nextTurn());
-    yield put(enableDie());
-    return;
+    const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
+    
+    // Check if we can kick this blocking coin
+    // Can kick if: stepsToMove === blockingStep AND blocking coin is opponent (not same color)
+    canKickBlockingCoin = stepsToMove === blockingStep && !blockingInfo.isSameColor;
+    
+    if (!canKickBlockingCoin) {
+      // Cannot kick - block the movement
+      console.warn(`Coin ${coinID} cannot move - blocked by ${blockingInfo.blockingCoinID} (same color: ${blockingInfo.isSameColor}, steps: ${stepsToMove}, blockingStep: ${blockingStep})`);
+      yield put(moveCoinFailure());
+      // Wait for player to see the dice result before passing turn
+      yield delay(NO_MOVE_DELAY);
+      yield put(nextTurn());
+      yield put(enableDie());
+      return;
+    }
+    // If canKickBlockingCoin is true, proceed with movement (will kick the blocking coin)
+    blockingCellIDToKick = blockingInfo.blockingCellID;
   }
-  
-  // Determine how many steps to move (always use full die roll - no partial moves allowed)
-  const stepsToMove = currentDieRoll;
 
   // Validate that this move is possible
-  const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
-  const isCurrentMovePossible: boolean = yield call(isCurrentMoveValid, coinID, currentDieRoll);
+  // Use the actual steps we're moving, not necessarily the full die sum
+  const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, stepsToMove as Rolls);
+  const isCurrentMovePossible: boolean = yield call(isCurrentMoveValid, coinID, stepsToMove as Rolls);
 
   // If no coins can move, skip turn
   if (movableCoins.length === 0) {
@@ -482,16 +504,19 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
     }
 
     // Check for blocking coin on next cell - if found, cannot move over
+    // Blocking applies to both same-color and different-color coins
+    // Exception: If we're allowed to kick this specific blocking cell, allow movement to it
     if (nextCell.cellID !== 'HOME') {
       const nextCellData = cells[nextCell.position]?.[nextCell.cellID];
       if (nextCellData && nextCellData.coinIDs && nextCellData.coinIDs.length > 0) {
-        // Found a coin on the next cell
-        const coinOnNextCell = coins[nextCellData.coinIDs[0]];
-        const currentCoin = coins[coinID];
-        
-        // Check if it's a blocking coin (different base) - cannot move over
-        if (coinOnNextCell && coinOnNextCell.baseID !== currentCoin.baseID) {
-          // Blocking coin encountered - cannot move over
+        // Found a coin on the next cell - check if we can kick it
+        // Allow movement if this is the blocking cell we're allowed to kick
+        if (canKickBlockingCoin && blockingCellIDToKick && nextCell.cellID === blockingCellIDToKick) {
+          // This is the blocking cell we're allowed to kick - proceed with movement
+          // The kick will be handled by performDisqualificationCheck later
+        } else {
+          // Cannot kick this coin - block the movement
+          // Note: We cannot kick same-color coins, so any blocking coin prevents movement
           console.warn(`Coin ${coinID} cannot move to ${nextCell.cellID} - blocked by ${nextCellData.coinIDs[0]}`);
           yield put(moveCoinFailure());
           yield put(nextTurn());
@@ -579,20 +604,103 @@ function * performDisqualificationCheck(activeCoinID: ICoin['coinID'], walkwayPo
   // Debug logging for development
   console.log(cellInWhichCoinLanded, activeCoin);
 
-  // Only normal cells allow captures (not spawn or home path cells)
-  if (cellInWhichCoinLanded.cellType === CellType.NORMAL) {
-    // Check each coin on the target cell
-    for (const coinID of cellInWhichCoinLanded.coinIDs) {
-      const coin = coins[coinID];
-      // If it's an opponent coin, disqualify it
-      if (activeCoin.baseID !== coin.baseID) {
-        yield put(disqualifyCoin(coinID, walkwayPosition, cellID));
-        return true; // Bonus turn for successful capture
-      }
+  // Any cell type (NORMAL, SPAWN, HOMEPATH) allows captures if it has opponent coins
+  // Check each coin on the target cell
+  for (const coinID of cellInWhichCoinLanded.coinIDs) {
+    const coin = coins[coinID];
+    // If it's an opponent coin, disqualify it (kick it)
+    if (activeCoin.baseID !== coin.baseID) {
+      yield put(disqualifyCoin(coinID, walkwayPosition, cellID));
+      return true; // Bonus turn for successful capture
     }
   }
 
   return false; // No captures occurred
+}
+
+/**
+ * Helper function to highlight cells reachable with a specific number of steps
+ * Used for highlighting cells when using one die value from a pair
+ */
+// eslint-disable-next-line require-yield
+function * highlightCellsWithSteps(
+  coin: ICoin,
+  startCellID: string,
+  steps: number,
+  blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null,
+  reachableCells: Set<string>,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>,
+  coins: ReturnType<typeof coinsSelector>
+): Generator<any, void, any> {
+  const visited = new Map<string, number>();
+  const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
+    { cellID: startCellID, position: coin.position, stepsRemaining: steps },
+  ];
+
+  while (queue.length > 0) {
+    const { cellID, position, stepsRemaining } = queue.shift()!;
+
+    if (stepsRemaining === 0) {
+      // We've reached this cell in exactly the right number of steps
+      if (cellID !== 'HOME') {
+        const cellData = cells[position]?.[cellID];
+        if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
+          const coinOnCell = coins[cellData.coinIDs[0]];
+          // If it's a blocking coin, don't highlight (we're avoiding it)
+          if (coinOnCell) {
+            // Only skip if it's the specific blocking cell we're trying to avoid
+            if (blockingInfo && cellID === blockingInfo.blockingCellID) {
+              continue; // This is the blocking cell - don't highlight
+            }
+            // Otherwise, if there's a coin but it's not the blocking one, we can still highlight
+            // (this handles cases where there might be other coins on the path)
+          }
+        }
+      }
+      reachableCells.add(cellID);
+      continue;
+    }
+
+    const prevStepsRemaining = visited.get(cellID);
+    if (prevStepsRemaining !== undefined && prevStepsRemaining >= stepsRemaining) {
+      continue;
+    }
+    visited.set(cellID, stepsRemaining);
+
+    const nextCells = links[cellID];
+    if (!nextCells || nextCells.length === 0) {
+      continue;
+    }
+
+    for (const nextCell of nextCells) {
+      if (nextCell.cellID === 'HOME' && stepsRemaining > 1) {
+        continue;
+      }
+
+      if (nextCell.cellID !== 'HOME') {
+        const cellData = cells[nextCell.position]?.[nextCell.cellID];
+        if (cellData && cellData.cellType === CellType.HOMEPATH) {
+          if (cellData.baseID !== coin.baseID) {
+            continue;
+          }
+        }
+        
+        // Check if next cell has a blocking coin - skip if it's the blocking cell we're avoiding
+        if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
+          const coinOnCell = coins[cellData.coinIDs[0]];
+          if (coinOnCell) {
+            // If this is the blocking cell we're trying to avoid, don't explore past it
+            if (blockingInfo && nextCell.cellID === blockingInfo.blockingCellID) {
+              continue; // Don't explore past the blocking cell
+            }
+          }
+        }
+      }
+
+      queue.push({ cellID: nextCell.cellID, position: nextCell.position, stepsRemaining: stepsRemaining - 1 });
+    }
+  }
 }
 
 /**
@@ -605,6 +713,20 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
   const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+
+  // Get current dice values to check if it's a pair (for the new blocking rule)
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  const isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector> = yield select(isDieRollAllowedSelector);
+  const isPair = roll1 === roll2 && roll1 >= 1 && roll1 <= 6; // Check if it's a valid pair
+  const singleDieValue = isPair ? roll1 : null; // If pair, use one die value (both are the same)
+  
+  // Before rolling (when dice are clickable but not yet rolled), show step 1 as a potential option
+  // This allows players to see that step 1 is possible if they roll a pair like 1-1
+  // Show step 1 whenever dice are allowed to roll - this ensures consistency even if state is slightly out of sync
+  // The key insight: if dice can be rolled (isDieRollAllowed), show step 1 as a potential option
+  // This works for both initial turns and bonus turns
+  const showPreRollStep1 = isDieRollAllowed;
 
   const reachableCells = new Set<string>();
   const currentBase = bases[currentTurn];
@@ -651,7 +773,7 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
         }
 
         // Check for blocking coins for this specific step count
-        const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number } | null = 
+        const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
           yield call(findBlockingCoin, coin.coinID, steps as Rolls);
         
         let maxStepsToExplore = steps;
@@ -663,20 +785,28 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
           
           if (steps < blockingStep) {
             // Die roll is less than blocking step - can only move steps before blocker
+            // Don't explore any further - stop immediately
             maxStepsToExplore = blockingInfo.stepsBeforeBlocking;
-          } else if (steps > blockingStep) {
-            // Die roll is greater than blocking step - can kick the blocking coin
-            // Highlight the blocking cell itself
+            if (maxStepsToExplore <= 0) {
+              continue; // Cannot move at all - skip this step count
+            }
+          } else if (steps === blockingStep && !blockingInfo.isSameColor) {
+            // Die roll equals blocking step AND blocking coin is opponent (different color)
+            // Can kick the blocking coin - highlight the blocking cell itself
+            // Note: Same-color coins cannot be kicked, so we skip highlighting
             shouldHighlightBlockingCell = true;
             maxStepsToExplore = steps; // Can move full distance and kick
           } else {
-            // Die roll equals blocking step - cannot move (would land exactly on blocker)
+            // Either:
+            // - Die roll > blocking step (cannot kick, would overshoot)
+            // - Die roll == blocking step but blocking coin is same color (cannot kick same color)
             continue; // Skip this step count - no highlighting
           }
         }
 
         // Use BFS to find all cells reachable in exactly 'maxStepsToExplore' moves
-        const visited = new Set<string>();
+        // Track visited cells with their step count to avoid revisiting with more steps
+        const visited = new Map<string, number>(); // cellID -> minimum steps to reach
         const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
           { cellID: startCellID, position: coin.position, stepsRemaining: maxStepsToExplore },
         ];
@@ -690,13 +820,16 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
               const cellData = cells[position]?.[cellID];
               if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
                 const coinOnCell = coins[cellData.coinIDs[0]];
-                // If it's a blocking coin and we can kick it, highlight it
-                if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
-                  if (shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID) {
-                    // This is the blocking cell and we can kick it - highlight it
+                // If it's a blocking coin (opponent or same color)
+                if (coinOnCell) {
+                  // Can only kick opponent coins (different color), not same-color coins
+                  const isOpponentCoin = coinOnCell.baseID !== coin.baseID;
+                  if (isOpponentCoin && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
+                    // This is the opponent blocking cell and we can kick it - highlight it
                     reachableCells.add(cellID);
                   }
-                  continue; // Otherwise, blocked - don't highlight
+                  // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
+                  continue;
                 }
               }
             }
@@ -704,10 +837,12 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
             continue;
           }
 
-          if (visited.has(cellID)) {
-            continue;
+          // Check if we've already visited this cell with fewer or equal steps remaining
+          const prevStepsRemaining = visited.get(cellID);
+          if (prevStepsRemaining !== undefined && prevStepsRemaining >= stepsRemaining) {
+            continue; // Already visited with equal or better path
           }
-          visited.add(cellID);
+          visited.set(cellID, stepsRemaining);
 
           const nextCells = links[cellID];
           if (!nextCells || nextCells.length === 0) {
@@ -733,21 +868,88 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
               // Check if next cell has a blocking coin
               if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
                 const coinOnCell = coins[cellData.coinIDs[0]];
-                // If it's an opponent's coin
-                if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
-                  // If we can kick it (die roll > blocking step), allow exploring this path to reach the blocking cell
-                  // Otherwise, this path is blocked - skip it
-                  if (!shouldHighlightBlockingCell || nextCell.cellID !== blockingInfo?.blockingCellID) {
-                    continue; // Blocked by opponent coin - don't explore this path
+                // If it's any blocking coin (same color or opponent)
+                if (coinOnCell) {
+                  // Check if we can kick this specific blocking coin
+                  // We can only kick opponent coins (different color) if:
+                  // 1. We have blockingInfo for this step count
+                  // 2. This is the exact blocking cell we detected
+                  // 3. The die roll equals the blocking step (steps === blockingStep)
+                  // 4. The blocking coin is NOT same color (!blockingInfo.isSameColor)
+                  const isOpponentCoin = coinOnCell.baseID !== coin.baseID;
+                  if (isOpponentCoin && blockingInfo && nextCell.cellID === blockingInfo.blockingCellID && shouldHighlightBlockingCell && !blockingInfo.isSameColor) {
+                    // This is the opponent blocking cell we detected and we can kick it - allow exploring to reach it
+                    // Continue to queue.push below
+                  } else {
+                    // Blocked by coin (same-color or opponent we can't kick) - don't explore this path
+                    // This prevents highlighting cells beyond any blocking coin
+                    // This handles cases where:
+                    // - The blocking coin is same color (cannot kick)
+                    // - The blocking coin is not the one we detected for this step count
+                    // - We cannot kick it (steps <= blockingStep)
+                    // - We're exploring a different path that also has a blocking coin
+                    continue;
                   }
-                  // If we can kick and this is the blocking cell, continue exploring to reach it
                 }
               }
+              
             }
 
             queue.push({ cellID: nextCell.cellID, position: nextCell.position, stepsRemaining: stepsRemaining - 1 });
           }
         }
+      }
+      
+      // Additional logic: If it's a pair OR before rolling, also check if we can use one die value
+      // This allows players to move with one die when blocking is detected for the full sum
+      // OR when they want to move with just one die value instead of the sum
+      // OR before rolling (to show step 1 as a potential option if a pair is rolled)
+      // This is especially important for coins on the spawn cell (steps === 0) to show step 1
+      if ((isPair && singleDieValue && singleDieValue >= 1 && singleDieValue <= 6) || showPreRollStep1) {
+        // Determine which single die value to use
+        let valueToUse = singleDieValue;
+        if (showPreRollStep1 && !isPair) {
+          // Before rolling, show step 1 as a potential option (in case 1-1 is rolled)
+          // This is important for coins on spawn cell (steps === 0) to show they can move 1 step
+          valueToUse = 1;
+        }
+        
+        // Ensure we have a valid value to use (should be 1-6)
+        // If showPreRollStep1 is true but valueToUse is still null/invalid, set it to 1
+        if (showPreRollStep1 && (!valueToUse || valueToUse < 1 || valueToUse > 6)) {
+          valueToUse = 1;
+        }
+        
+        if (valueToUse && valueToUse >= 1 && valueToUse <= 6) {
+          // Always check for blocking for the single die value first
+          const blockingInfoForSingle: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+            yield call(findBlockingCoin, coin.coinID, valueToUse as Rolls);
+          
+          // Check if we can move with one die value
+          // For coins on spawn cell (steps === 0), this should always be true for step 1
+          if (coin.steps + valueToUse <= WINNING_MOVES) {
+            if (blockingInfoForSingle) {
+              // Blocking detected for single die value
+              const blockingStep = blockingInfoForSingle.stepsBeforeBlocking + 1;
+              
+              if (valueToUse < blockingStep) {
+                // One die value is less than blocking step - can move to valid cell before blocker
+                yield call(highlightCellsWithSteps, coin, startCellID, valueToUse, blockingInfoForSingle, reachableCells, cells, links, coins);
+              } else if (valueToUse === blockingStep && !blockingInfoForSingle.isSameColor) {
+                // One die value equals blocking step AND blocking coin is opponent - can kick
+                // Highlight the blocking cell itself
+                reachableCells.add(blockingInfoForSingle.blockingCellID);
+              }
+              // If valueToUse > blockingStep, cannot move (would overshoot)
+            } else {
+              // No blocking for single die value - show all cells reachable with one die value
+              // This is important for coins on spawn cell to show step 1 highlighting
+              yield call(highlightCellsWithSteps, coin, startCellID, valueToUse, null, reachableCells, cells, links, coins);
+            }
+          }
+        }
+        // Note: The main loop above already handles highlighting for the full sum (dieSum = roll1 + roll2)
+        // So we don't need to check blocking for the full sum here
       }
     }
   }
