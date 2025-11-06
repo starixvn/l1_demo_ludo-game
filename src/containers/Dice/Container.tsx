@@ -4,6 +4,7 @@ import React from "react";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
+import { hexToRgba } from "common/utils";
 import { getBaseHexColor } from "containers/utils";
 import { BaseColors } from "state/interfaces";
 
@@ -154,14 +155,6 @@ class DiceBare extends React.PureComponent<IProps> {
     if (shouldHighlight && baseHexColor) {
       // Highlighted (clickable) - use base color with yellow tint
       // Convert base color to rgba and blend with yellow for highlight effect
-      const hexToRgba = (hex: string, opacity: number): string => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        if (!result) return hex;
-        const r = parseInt(result[1], 16);
-        const g = parseInt(result[2], 16);
-        const b = parseInt(result[3], 16);
-        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-      };
       const highlightColor = hexToRgba(baseHexColor, 0.9);
       dice1Style = {
         ...dice1Style,
@@ -175,14 +168,6 @@ class DiceBare extends React.PureComponent<IProps> {
       };
     } else if (isRolled && baseHexColor) {
       // Rolled (action chosen) - use base color with purple tint
-      const hexToRgba = (hex: string, opacity: number): string => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        if (!result) return hex;
-        const r = parseInt(result[1], 16);
-        const g = parseInt(result[2], 16);
-        const b = parseInt(result[3], 16);
-        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-      };
       const rolledColor = hexToRgba(baseHexColor, 0.9);
       dice1Style = {
         ...dice1Style,

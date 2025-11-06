@@ -26,6 +26,7 @@ import {
   coinsSelector,
   currentTurnSelector,
   highlightedCellsSelector,
+  highlightedCellsByCoinSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
@@ -65,6 +66,7 @@ interface IStateProps {
   links: ReturnType<typeof linksSelector>; // Cell connectivity links
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
   highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
+  highlightedCellsByCoin: ReturnType<typeof highlightedCellsByCoinSelector>; // Map of cellID to coins that can reach it
   currentTurnBaseColor?: BaseColors; // Color of the current player for highlighting
 }
 
@@ -100,6 +102,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentTurn: currentTurnSelector, // Get current player turn
   links: linksSelector, // Get cell connectivity links
   highlightedCells: highlightedCellsSelector, // Get highlighted cells
+  highlightedCellsByCoin: highlightedCellsByCoinSelector, // Get cell-to-coin mapping
   currentTurnBaseColor: createSelector(
     [basesSelector, currentTurnSelector],
     (
@@ -168,6 +171,10 @@ class WalkwayBare extends React.PureComponent<IProps> {
       cellConfigurations[position]
     );
 
+    // Track which (coinID, moveType) combinations have shown popovers
+    // This ensures only one popover per coin per move type across all walkways
+    const globalSeenCoinMoveTypes = new Set<string>();
+
     // Process each cell configuration and create Cell components
     cellConfigurationsForWalkway.forEach((cellConfiguration, index) => {
       // Skip cells that should not be rendered in walkway
@@ -189,6 +196,34 @@ class WalkwayBare extends React.PureComponent<IProps> {
 
       // Check if this cell should be highlighted
       const isHighlighted = this.props.highlightedCells?.has(cellID) || false;
+
+      // Determine if we should show a popover for this cell
+      // Show popover only for the first cell of each (coinID, moveType) combination
+      let showPopover = false;
+      let popoverText = "";
+
+      if (isHighlighted && this.props.highlightedCellsByCoin) {
+        const coinMoveTypes = this.props.highlightedCellsByCoin.get(cellID);
+        if (coinMoveTypes && coinMoveTypes.length > 0) {
+          // Find the first (coinID, moveType) pair that hasn't been seen yet globally
+          for (const { coinID, moveType } of coinMoveTypes) {
+            const key = `${coinID}_${moveType}`;
+            if (!globalSeenCoinMoveTypes.has(key)) {
+              globalSeenCoinMoveTypes.add(key);
+              showPopover = true;
+              // Determine popover text based on move type
+              if (moveType === "spawn") {
+                popoverText = "Place bet on spawn coin";
+              } else if (moveType === "kick") {
+                popoverText = "Place bet on kick blocking coin";
+              } else {
+                popoverText = "Place bet on cells";
+              }
+              break; // Only show one popover per cell (first unseen coin/moveType)
+            }
+          }
+        }
+      }
 
       // Get the base that this cell belongs to (use cell's baseID, not walkway's baseID)
       const cellBase = bases[cellConfiguration.baseID];
@@ -215,6 +250,8 @@ class WalkwayBare extends React.PureComponent<IProps> {
           isHighlighted={isHighlighted} // Whether this cell is highlighted
           highlightColor={this.props.currentTurnBaseColor} // Color to use for highlighting (current player's color)
           index={cellConfiguration.index} // Index value for debugging
+          showPopover={showPopover} // Whether to show popover (only for first cell of each coin/moveType)
+          popoverText={popoverText} // Text to display in popover
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
         >
           {

@@ -5,6 +5,21 @@
  */
 
 /**
+ * Converts a hex color string to rgba format with specified opacity
+ * @param hex - Hex color string (e.g., "#FF0000" or "FF0000")
+ * @param opacity - Opacity value between 0 and 1 (e.g., 0.8 for 80% opacity)
+ * @returns RGBA color string (e.g., "rgba(255, 0, 0, 0.8)") or original hex if invalid
+ */
+export const hexToRgba = (hex: string, opacity: number): string => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return hex; // Return original if invalid hex
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+/**
  * Converts an array of objects into a dictionary/map keyed by a property
  * @param array - Array of objects to convert
  * @param property - Property name to use as the key

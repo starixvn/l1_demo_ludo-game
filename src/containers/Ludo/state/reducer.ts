@@ -25,6 +25,7 @@ const initialState: IState = {
   availableActions: null, // No actions available initially
   availableActionsDieValue: null, // No die value initially
   highlightedCells: null, // No cells highlighted initially
+  highlightedCellsByCoin: null, // No cell-to-coin mapping initially
 };
 
 /**
@@ -308,10 +309,11 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
      * Set highlighted cells for showing reachable destinations
      */
     case ActionTypes.SET_HIGHLIGHTED_CELLS: {
-      const { cellIDs } = action.data!;
+      const { cellIDs, cellsByCoin } = action.data!;
       return {
         ...state,
         highlightedCells: cellIDs, // Store set of highlighted cell IDs
+        highlightedCellsByCoin: cellsByCoin || null, // Store cell-to-coin mapping
       };
     }
 
@@ -322,6 +324,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
       return {
         ...state,
         highlightedCells: null, // Clear highlighted cells
+        highlightedCellsByCoin: null, // Clear cell-to-coin mapping
       };
     }
 

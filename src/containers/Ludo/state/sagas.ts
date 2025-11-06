@@ -98,6 +98,7 @@ function * getInitialGameDataSaga() {
     availableActions: null,             // No action selection initially
     availableActionsDieValue: null,     // No die value for actions initially
     highlightedCells: null,             // No cells highlighted initially
+    highlightedCellsByCoin: null,       // No cell-to-coin mapping initially
     currentTurn: DEFAULT_STARTING_BASE, // Start with configured default base
     links: data.links,                  // Movement connectivity between cells
     relationships: data.relationships,  // Component relationships for rendering
@@ -631,7 +632,9 @@ function * highlightCellsWithSteps(
   reachableCells: Set<string>,
   cells: ReturnType<typeof cellsSelector>,
   links: ReturnType<typeof linksSelector>,
-  coins: ReturnType<typeof coinsSelector>
+  coins: ReturnType<typeof coinsSelector>,
+  cellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>>,
+  addReachableCell: (cellID: string, coinID: ICoin['coinID'], moveType: 'spawn' | 'kick' | 'move') => void
 ): Generator<any, void, any> {
   const visited = new Map<string, number>();
   const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
@@ -658,7 +661,16 @@ function * highlightCellsWithSteps(
           }
         }
       }
-      reachableCells.add(cellID);
+      // Determine move type: check if there's an opponent coin on this cell (kick) or normal move
+      const cellDataForType = cells[position]?.[cellID];
+      let moveType: 'kick' | 'move' = 'move';
+      if (cellDataForType && cellDataForType.coinIDs && cellDataForType.coinIDs.length > 0) {
+        const coinOnCell = coins[cellDataForType.coinIDs[0]];
+        if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
+          moveType = 'kick'; // Opponent coin can be kicked
+        }
+      }
+      addReachableCell(cellID, coin.coinID, moveType);
       continue;
     }
 
@@ -706,8 +718,9 @@ function * highlightCellsWithSteps(
 /**
  * Calculates all reachable cells for the current player's coins
  * Returns a Set of cell IDs that can be reached with any valid dice roll (sum of 2-12)
+ * Also returns a Map of cellID -> Array<{coinID, moveType}> to track which coins can reach which cells
  */
-export function * calculateReachableCells(): Generator<any, Set<string>, any> {
+export function * calculateReachableCells(): Generator<any, { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>> }, any> {
   const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
@@ -733,11 +746,25 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
   const showPreRollStep1 = isDieRollAllowed || (isDieRollValid && !isDieRollAllowed);
 
   const reachableCells = new Set<string>();
+  const cellsByCoin = new Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>>();
   const currentBase = bases[currentTurn];
 
   if (!currentBase) {
-    return reachableCells;
+    return { reachableCells, cellsByCoin };
   }
+
+  // Helper function to add a cell to both reachableCells and cellsByCoin
+  const addReachableCell = (cellID: string, coinID: ICoin['coinID'], moveType: 'spawn' | 'kick' | 'move') => {
+    reachableCells.add(cellID);
+    if (!cellsByCoin.has(cellID)) {
+      cellsByCoin.set(cellID, []);
+    }
+    const existing = cellsByCoin.get(cellID)!;
+    // Only add if not already present (avoid duplicates)
+    if (!existing.some(e => e.coinID === coinID && e.moveType === moveType)) {
+      existing.push({ coinID, moveType });
+    }
+  };
 
   // Get all coins for the current player
   const playerCoins = currentBase.coinIDs.map((coinID) => coins[coinID]);
@@ -761,7 +788,7 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
           (cell) => cell.cellType === CellType.SPAWN && cell.baseID === currentBase.ID
         );
         if (spawnCell) {
-          reachableCells.add(spawnCell.cellID);
+          addReachableCell(spawnCell.cellID, coin.coinID, 'spawn');
         }
       }
     } else {
@@ -830,14 +857,23 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
                   const isOpponentCoin = coinOnCell.baseID !== coin.baseID;
                   if (isOpponentCoin && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
                     // This is the opponent blocking cell and we can kick it - highlight it
-                    reachableCells.add(cellID);
+                    addReachableCell(cellID, coin.coinID, 'kick');
                   }
                   // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
                   continue;
                 }
               }
             }
-            reachableCells.add(cellID);
+            // Determine move type: check if there's an opponent coin on this cell (kick) or normal move
+            const cellDataForType = cells[position]?.[cellID];
+            let moveType: 'kick' | 'move' = 'move';
+            if (cellDataForType && cellDataForType.coinIDs && cellDataForType.coinIDs.length > 0) {
+              const coinOnCell = coins[cellDataForType.coinIDs[0]];
+              if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
+                moveType = 'kick'; // Opponent coin can be kicked
+              }
+            }
+            addReachableCell(cellID, coin.coinID, moveType);
             continue;
           }
 
@@ -933,17 +969,17 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
             
             if (step1Value < blockingStep) {
               // Step 1 is less than blocking step - can move to valid cell before blocker
-              yield call(highlightCellsWithSteps, coin, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, coins);
+              yield call(highlightCellsWithSteps, coin, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
             } else if (step1Value === blockingStep && !blockingInfoForStep1.isSameColor) {
               // Step 1 equals blocking step AND blocking coin is opponent - can kick
               // Highlight the blocking cell itself
-              reachableCells.add(blockingInfoForStep1.blockingCellID);
+              addReachableCell(blockingInfoForStep1.blockingCellID, coin.coinID, 'kick');
             }
             // If step1Value > blockingStep, cannot move (would overshoot) - but this shouldn't happen for step 1
           } else {
             // No blocking for step 1 - show all cells reachable with step 1
             // This is critical for coins on spawn cell to show step 1 highlighting
-            yield call(highlightCellsWithSteps, coin, startCellID, step1Value, null, reachableCells, cells, links, coins);
+            yield call(highlightCellsWithSteps, coin, startCellID, step1Value, null, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
           }
         }
       }
@@ -962,16 +998,16 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
             
             if (singleDieValue < blockingStep) {
               // Pair value is less than blocking step - can move to valid cell before blocker
-              yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, coins);
+              yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
             } else if (singleDieValue === blockingStep && !blockingInfoForPair.isSameColor) {
               // Pair value equals blocking step AND blocking coin is opponent - can kick
               // Highlight the blocking cell itself
-              reachableCells.add(blockingInfoForPair.blockingCellID);
+              addReachableCell(blockingInfoForPair.blockingCellID, coin.coinID, 'kick');
             }
             // If singleDieValue > blockingStep, cannot move (would overshoot)
           } else {
             // No blocking for pair value - show all cells reachable with pair value
-            yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, null, reachableCells, cells, links, coins);
+            yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, null, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
           }
         }
       }
@@ -980,7 +1016,7 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
     }
   }
 
-  return reachableCells;
+  return { reachableCells, cellsByCoin };
 }
 
 /**
@@ -1018,11 +1054,11 @@ function * passTurnToSaga() {
   yield put(clearHighlightedCells());
 
   // Calculate reachable cells for current player
-  const reachableCells: Set<string> = yield call(calculateReachableCells);
+  const result: { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
 
   // Set highlighted cells
-  if (reachableCells.size > 0) {
-    yield put(setHighlightedCells(reachableCells));
+  if (result.reachableCells.size > 0) {
+    yield put(setHighlightedCells(result.reachableCells, result.cellsByCoin));
   }
 }
 

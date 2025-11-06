@@ -151,6 +151,8 @@ export interface IState {
   availableActionsDieValue: number | null;
   /** Set of cell IDs that should be highlighted as reachable for current player */
   highlightedCells: Set<string> | null;
+  /** Map of cellID to array of coins that can reach it with their move types */
+  highlightedCellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>> | null;
 }
 
 /**

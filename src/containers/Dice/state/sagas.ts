@@ -599,9 +599,9 @@ function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
   // Recalculate and highlight reachable cells for the bonus turn
   // Since the player's turn continues (no PASS_TURN_TO action), we need to recalculate highlighting
   yield put(clearHighlightedCells());
-  const reachableCells: Set<string> = yield call(calculateReachableCells);
-  if (reachableCells.size > 0) {
-    yield put(setHighlightedCells(reachableCells));
+  const result: { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: any; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
+  if (result.reachableCells.size > 0) {
+    yield put(setHighlightedCells(result.reachableCells, result.cellsByCoin));
   }
   
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
@@ -856,9 +856,9 @@ function * spawnCoinSuccessSaga() {
     
     // Recalculate and highlight reachable cells for the bonus turn
     yield put(clearHighlightedCells());
-    const reachableCells: Set<string> = yield call(calculateReachableCells);
-    if (reachableCells.size > 0) {
-      yield put(setHighlightedCells(reachableCells));
+    const result: { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: any; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
+    if (result.reachableCells.size > 0) {
+      yield put(setHighlightedCells(result.reachableCells, result.cellsByCoin));
     }
     
     const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
@@ -951,9 +951,9 @@ function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boo
     
     // Recalculate and highlight reachable cells for the bonus turn
     yield put(clearHighlightedCells());
-    const reachableCells: Set<string> = yield call(calculateReachableCells);
-    if (reachableCells.size > 0) {
-      yield put(setHighlightedCells(reachableCells));
+    const result: { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: any; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
+    if (result.reachableCells.size > 0) {
+      yield put(setHighlightedCells(result.reachableCells, result.cellsByCoin));
     }
     
     // Check if we should auto-roll in auto-play mode

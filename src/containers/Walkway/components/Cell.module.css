@@ -141,3 +141,84 @@
     opacity: 0.9;
   }
 }
+
+/* Popover for highlighted cells */
+.Popover {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  /* Background color is set via inline styles to use base color with 0.8 opacity */
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: popoverFadeIn 0.2s ease-in-out;
+}
+
+.Popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  /* Border color matches the popover background (set via CSS variable) */
+  border-top: 6px solid var(--popover-arrow-color, rgba(0, 0, 0, 0.8));
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Bet coin/dollar icon when bet is placed */
+.BetCoinIcon {
+  position: absolute;
+  transform: translate(-50%, -50%); /* Center on the random position */
+  border-radius: 50%;
+  background-color: rgba(255, 215, 0, 0.95); /* Gold color */
+  color: #000;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(218, 165, 32, 0.8); /* Gold border */
+  animation: betCoinFadeInOut 1s ease-in-out;
+}
+
+@keyframes betCoinFadeInOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+  }
+}

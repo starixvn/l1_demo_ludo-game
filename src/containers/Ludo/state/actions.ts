@@ -274,11 +274,13 @@ export const clearAvailableActions = (): IReduxAction<ActionTypes.CLEAR_AVAILABL
 /**
  * Sets which cells should be highlighted as reachable for the current player
  * @param cellIDs - Set of cell IDs to highlight
+ * @param cellsByCoin - Map of cellID to array of coins that can reach it with their move types
  */
 export const setHighlightedCells = (
-  cellIDs: Set<string>
-): IReduxAction<ActionTypes.SET_HIGHLIGHTED_CELLS, { cellIDs: Set<string> }> => ({
-  data: { cellIDs },
+  cellIDs: Set<string>,
+  cellsByCoin?: Map<string, Array<{ coinID: string; moveType: 'spawn' | 'kick' | 'move' }>>
+): IReduxAction<ActionTypes.SET_HIGHLIGHTED_CELLS, { cellIDs: Set<string>; cellsByCoin?: Map<string, Array<{ coinID: string; moveType: 'spawn' | 'kick' | 'move' }>> }> => ({
+  data: { cellIDs, cellsByCoin },
   type: ActionTypes.SET_HIGHLIGHTED_CELLS,
 });
 

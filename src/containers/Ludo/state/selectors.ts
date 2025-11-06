@@ -55,3 +55,8 @@ export const highlightedCellsSelector = createSelector(
   [ludoStateSelector],
   (state) => state.highlightedCells,
 );
+
+export const highlightedCellsByCoinSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.highlightedCellsByCoin,
+);

@@ -352,6 +352,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           availableActions: null,
           availableActionsDieValue: null,
           highlightedCells: null,
+          highlightedCellsByCoin: null,
         });
 
         // Hide the configuration screen since we're loading an existing game
