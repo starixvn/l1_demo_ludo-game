@@ -117,9 +117,14 @@ class DiceBare extends React.PureComponent<IProps> {
   };
 
   render() {
-    const { baseColor, isDieRollAllowed, autoActionsEnabled, isDieRollValid, isRolling } =
-      this.props;
-    
+    const {
+      baseColor,
+      isDieRollAllowed,
+      autoActionsEnabled,
+      isDieRollValid,
+      isRolling,
+    } = this.props;
+
     // Dice is only clickable if:
     // 1. Rolling is allowed (isDieRollAllowed)
     // 2. Current roll is NOT valid (isDieRollValid === false) - meaning action has been chosen or no roll yet
@@ -127,12 +132,10 @@ class DiceBare extends React.PureComponent<IProps> {
     const isClickable = isDieRollAllowed && !isDieRollValid && !isRolling;
     const shouldHighlight = isClickable && !autoActionsEnabled;
     const isRolled = !isDieRollAllowed && isDieRollValid;
-    
+
     let containerClassNames;
     if (isClickable) {
-      containerClassNames = shouldHighlight
-        ? [styles.Highlighted]
-        : [];
+      containerClassNames = shouldHighlight ? [styles.Highlighted] : [];
     } else if (isRolled) {
       containerClassNames = [styles.Rolled];
     } else {
@@ -143,13 +146,71 @@ class DiceBare extends React.PureComponent<IProps> {
     const face1 = this.props.currentDieRoll1;
     const face2 = this.props.currentDieRoll2;
 
+    // Calculate highlight styles based on state and base color
+    const baseHexColor = baseColor ? getBaseHexColor(baseColor) : undefined;
+    let dice1Style: React.CSSProperties = { backgroundColor: baseHexColor };
+    let dice2Style: React.CSSProperties = { backgroundColor: baseHexColor };
+
+    if (shouldHighlight && baseHexColor) {
+      // Highlighted (clickable) - use base color with yellow tint
+      // Convert base color to rgba and blend with yellow for highlight effect
+      const hexToRgba = (hex: string, opacity: number): string => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        if (!result) return hex;
+        const r = parseInt(result[1], 16);
+        const g = parseInt(result[2], 16);
+        const b = parseInt(result[3], 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      };
+      const highlightColor = hexToRgba(baseHexColor, 0.9);
+      dice1Style = {
+        ...dice1Style,
+        boxShadow: `0 0 15px 5px ${highlightColor}, 0 0 5px`,
+        animation: "diceHighlightPulse 1.5s ease-in-out infinite",
+      };
+      dice2Style = {
+        ...dice2Style,
+        boxShadow: `0 0 15px 5px ${highlightColor}, 0 0 5px`,
+        animation: "diceHighlightPulse 1.5s ease-in-out infinite",
+      };
+    } else if (isRolled && baseHexColor) {
+      // Rolled (action chosen) - use base color with purple tint
+      const hexToRgba = (hex: string, opacity: number): string => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        if (!result) return hex;
+        const r = parseInt(result[1], 16);
+        const g = parseInt(result[2], 16);
+        const b = parseInt(result[3], 16);
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      };
+      const rolledColor = hexToRgba(baseHexColor, 0.9);
+      dice1Style = {
+        ...dice1Style,
+        boxShadow: `0 0 15px 5px ${rolledColor}, 0 0 5px`,
+        border: `3px solid ${rolledColor}`,
+        borderRadius: "10%",
+        animation: "diceRolledPulse 1.5s ease-in-out infinite",
+        pointerEvents: "none" as const,
+        cursor: "not-allowed",
+      };
+      dice2Style = {
+        ...dice2Style,
+        boxShadow: `0 0 15px 5px ${rolledColor}, 0 0 5px`,
+        border: `3px solid ${rolledColor}`,
+        borderRadius: "10%",
+        animation: "diceRolledPulse 1.5s ease-in-out infinite",
+        pointerEvents: "none" as const,
+        cursor: "not-allowed",
+      };
+    }
+
     return (
       <div className={styles.Container}>
         <div className={classnames(containerClassNames)}>
           <div
             className={styles.DiceContainer}
             onClick={isClickable ? this.handleDieClick : undefined}
-            style={{ backgroundColor: baseColor ? getBaseHexColor(baseColor) : undefined }}
+            style={dice1Style}
           >
             <div
               className={classnames(styles.Die, isRolling && styles.Rolling)}
@@ -163,7 +224,7 @@ class DiceBare extends React.PureComponent<IProps> {
           <div
             className={styles.DiceContainer}
             onClick={isClickable ? this.handleDieClick : undefined}
-            style={{ backgroundColor: baseColor ? getBaseHexColor(baseColor) : undefined }}
+            style={dice2Style}
           >
             <div
               className={classnames(
@@ -183,8 +244,8 @@ class DiceBare extends React.PureComponent<IProps> {
 
   private renderDiceFaces = (baseColor?: BaseColors) => {
     const faces = [1, 2, 3, 4, 5, 6];
-    const backgroundColor = baseColor ? getBaseHexColor(baseColor) : '#fff';
-    
+    const backgroundColor = baseColor ? getBaseHexColor(baseColor) : "#fff";
+
     return faces.map((face) => (
       <div
         key={face}

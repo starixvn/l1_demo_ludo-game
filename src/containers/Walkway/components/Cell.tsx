@@ -41,6 +41,8 @@ interface ICellProps {
   showDebugText?: boolean;
   /** Whether this cell is highlighted as reachable */
   isHighlighted?: boolean;
+  /** Color to use for highlighting (current player's base color) */
+  highlightColor?: BaseColors;
   /** Index value for NORMAL cells (for debugging) */
   index?: number;
 
@@ -116,13 +118,25 @@ export class Cell extends React.PureComponent<ICellProps> {
       cellStyle = getStyleObject(CELL_SIZE, CELL_SIZE, color); // Size and color styling
     }
 
+    // Add highlighting style if cell is highlighted
+    // Use the current player's base color for highlighting
+    if (this.props.isHighlighted && this.props.highlightColor) {
+      const highlightHexColor = getBaseHexColor(this.props.highlightColor);
+      const highlightRgba = hexToRgba(highlightHexColor, 0.8);
+      const highlightRgbaInset = hexToRgba(highlightHexColor, 0.4);
+      cellStyle = {
+        ...cellStyle,
+        boxShadow: `0 0 10px 3px ${highlightRgba}, inset 0 0 10px 2px ${highlightRgbaInset}`,
+        animation: 'highlightPulse 1.5s ease-in-out infinite',
+      };
+    }
+
     return (
       <div
         className={classnames(
           styles.Container,
-          mutipleCoinClassName,
-          this.props.isHighlighted && styles.Highlighted
-        )} // Base styles + multiple coin handling + highlighting
+          mutipleCoinClassName
+        )} // Base styles + multiple coin handling
         style={cellStyle}
         // Data attributes for event handling and identification
         data-id={cellID} // Unique cell identifier

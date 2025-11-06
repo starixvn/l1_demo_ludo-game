@@ -29,9 +29,15 @@ import {
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
-import { COIN_SIZE, WALKWAY_LENGTH, WALKWAY_WIDTH, WALKWAY_VERTICAL_HEIGHT } from "globalConstants"; // Size constants
+import {
+  COIN_SIZE,
+  WALKWAY_LENGTH,
+  WALKWAY_WIDTH,
+  WALKWAY_VERTICAL_HEIGHT,
+} from "globalConstants"; // Size constants
 import { hideContextMenu, showContextMenu } from "services/contextMenu/service"; // Context menu service
-import { WalkwayPosition } from "state/interfaces"; // Position enums
+import { BaseColors, WalkwayPosition } from "state/interfaces"; // Position enums and colors
+import { createSelector } from "reselect"; // For creating memoized selectors
 
 import { Cell } from "./components/Cell"; // Cell component
 import { IContextMenuOptions } from "./interfaces"; // Context menu types
@@ -59,6 +65,7 @@ interface IStateProps {
   links: ReturnType<typeof linksSelector>; // Cell connectivity links
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
   highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
+  currentTurnBaseColor?: BaseColors; // Color of the current player for highlighting
 }
 
 /**
@@ -93,6 +100,13 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   currentTurn: currentTurnSelector, // Get current player turn
   links: linksSelector, // Get cell connectivity links
   highlightedCells: highlightedCellsSelector, // Get highlighted cells
+  currentTurnBaseColor: createSelector(
+    [basesSelector, currentTurnSelector],
+    (
+      bases: ReturnType<typeof basesSelector>,
+      currentTurn: ReturnType<typeof currentTurnSelector>
+    ) => bases[currentTurn]?.color
+  ), // Get current player's base color for highlighting
 });
 
 /**
@@ -199,6 +213,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
           nextLinkCellIDs={nextLinkCellIDs} // Next link cell IDs for verification
           showDebugText={this.props.showDebugText} // Whether to show debug text
           isHighlighted={isHighlighted} // Whether this cell is highlighted
+          highlightColor={this.props.currentTurnBaseColor} // Color to use for highlighting (current player's color)
           index={cellConfiguration.index} // Index value for debugging
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
         >
