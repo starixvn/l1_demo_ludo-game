@@ -414,7 +414,7 @@ function * buildAvailableActions(
     actions.push({
       type: 'spawn',
       horseID,
-      label: `Spawn Horse ${horseID.split('_')[1]}`,
+      label: `Spawn Horse ${horseID.split('_')[3]}`,
       description: 'Bring a new horse onto the board',
     });
   }
@@ -450,7 +450,7 @@ function * buildAvailableActions(
               actions.push({
                 type: 'move',
                 horseID,
-                label: `Move Horse ${horseID.split('_')[1]} (${singleDieValue} steps)`,
+                label: `Move Horse ${horseID.split('_')[3]} (${singleDieValue} steps)`,
                 description: `Move ${singleDieValue} spaces using one die (pair rolled, avoiding blocker)`,
                 stepsToUse: singleDieValue,
               });
@@ -461,7 +461,7 @@ function * buildAvailableActions(
           actions.push({
             type: 'move',
             horseID,
-            label: `Move Horse ${horseID.split('_')[1]} (Kick Blocking Horse)`,
+            label: `Move Horse ${horseID.split('_')[3]} (Kick Blocking Horse)`,
             description: `Move ${singleDieValue} spaces and kick opponent horse using one die (pair rolled)`,
             stepsToUse: singleDieValue,
           });
@@ -472,14 +472,14 @@ function * buildAvailableActions(
     } else {
       // No blocking - normal move action
     const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
-    let label = `Move Horse ${horseID.split('_')[1]}`;
+    let label = `Move Horse ${horseID.split('_')[3]}`;
     let description = `Move ${dieValue} spaces`;
 
     if (result === 'HOME') {
-      label = `Move Horse ${horseID.split('_')[1]} (Can Reach Home!)`;
+      label = `Move Horse ${horseID.split('_')[3]} (Can Reach Home!)`;
       description = `Move ${dieValue} spaces - This horse can reach HOME!`;
     } else if (result === 'HOMEPATH') {
-      label = `Move Horse ${horseID.split('_')[1]} (Can Enter Home Path)`;
+      label = `Move Horse ${horseID.split('_')[3]} (Can Enter Home Path)`;
       description = `Move ${dieValue} spaces - This horse can enter the home path`;
     }
 

@@ -43,7 +43,7 @@ export const DICE_STATE_UPDATE_DELAY = 50;          // Small delay for state upd
 export const LUDO_MOVE_ANIMATION_DELAY = 100;       // Delay between horse movement steps for animation (100ms)
 export const LUDO_STATE_UPDATE_DELAY = 10;          // Small delay for state updates in ludo sagas (10ms)
 export const AUTO_ACTION_TIMEOUT = 200;             // Default timeout for auto-actions (200ms)
-export const DICE_COUNTDOWN_TIMEOUT = 7;           // Countdown timer duration in seconds when player needs to roll dice (30s)
+export const DICE_COUNTDOWN_TIMEOUT = 5;           // Countdown timer duration in seconds when player needs to roll dice (30s)
 export const DICE_COUNTDOWN_WARNING_THRESHOLD = 2; // Show warning color when time remaining is <= this value (in seconds)
 export const DICE_ROLLING_ANIMATION_DURATION = 800; // Dice rolling animation duration in milliseconds (1.2 seconds)
 export const NO_MOVE_DELAY = 2000;                  // Delay before passing turn when horse cannot move (2 seconds) - allows player to see dice result

@@ -78,8 +78,10 @@ class PlayerBare extends React.PureComponent<IProps> {
         {/* Player avatar showing their color */}
         <PlayerAvatar baseColor={base.color} />
 
-        {/* Dice component - only shown when player is active (not disabled) */}
-        {!disabled && <Dice baseColor={base.color} />}
+        {/* Dice component - always rendered to preserve layout space */}
+        <div className={disabled ? styles.DicePlaceholder : undefined}>
+          <Dice baseColor={base.color} />
+        </div>
 
         {/* Container for horses that have reached home (retired) */}
         <div className={styles.RetiredHorses}>

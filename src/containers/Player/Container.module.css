@@ -37,3 +37,9 @@
 .RetiredHorses > div {
   margin-bottom: 0; /* Override default horse margin for tight spacing */
 }
+
+/* Dice placeholder - hides dice visually but preserves layout space */
+.DicePlaceholder {
+  visibility: hidden; /* Hide dice but keep its space in layout */
+  pointer-events: none; /* Disable interactions */
+}
