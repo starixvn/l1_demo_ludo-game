@@ -18,19 +18,19 @@ import {
 
 import {
   markCurrentBase,
-  moveCoin,
+  moveHorse,
   nextTurn,
-  spawnCoin,
+  spawnHorse,
   setAvailableActions,
   clearAvailableActions,
   IAvailableAction,
   ActionTypes as LudoActionTypes,
 } from 'containers/Ludo/state/actions';
 import { rollDie } from './actions';
-import { BaseID, CellType, IBase, ICoin } from 'containers/Ludo/state/interfaces';
-import { getMovableCoins, calculateReachableCells, findBlockingCoin, isCurrentMoveValid } from 'containers/Ludo/state/sagas';
+import { BaseID, CellType, IBase, IHorse } from 'containers/Ludo/state/interfaces';
+import { getMovableHorses, calculateReachableCells, findBlockingHorse, isCurrentMoveValid } from 'containers/Ludo/state/sagas';
 import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/state/actions';
-import { basesSelector, cellsSelector, coinsSelector, currentTurnSelector, linksSelector, walkwaysSelector } from 'containers/Ludo/state/selectors';
+import { basesSelector, cellsSelector, horsesSelector, currentTurnSelector, linksSelector, walkwaysSelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
 import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY, WINNING_MOVES } from 'globalConstants';
@@ -81,23 +81,23 @@ function * rollDieSaga() {
 }
 
 /**
- * Checks if a coin can reach HOME or HOMEPATH after moving the specified number of steps
- * @param coinID - The coin to check
+ * Checks if a horse can reach HOME or HOMEPATH after moving the specified number of steps
+ * @param horseID - The horse to check
  * @param stepsToTake - Number of steps to simulate
- * @returns 'HOME' if coin can reach HOME, 'HOMEPATH' if it can reach HOMEPATH, null otherwise
+ * @returns 'HOME' if horse can reach HOME, 'HOMEPATH' if it can reach HOMEPATH, null otherwise
  */
-function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<any, 'HOME' | 'HOMEPATH' | null, any> {
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+function * canReachHome(horseID: IHorse['horseID'], stepsToTake: Rolls): Generator<any, 'HOME' | 'HOMEPATH' | null, any> {
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
   const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
   
-  const coin = coins[coinID];
-  if (!coin || !coin.isSpawned || coin.isRetired) {
+  const horse = horses[horseID];
+  if (!horse || !horse.isSpawned || horse.isRetired) {
     return null;
   }
 
-  // Simulate the path the coin would take
-  let currentCellID = coin.cellID;
+  // Simulate the path the horse would take
+  let currentCellID = horse.cellID;
   
   for (let step = 0; step < stepsToTake; step++) {
     const nextCells = links[currentCellID];
@@ -113,7 +113,7 @@ function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<
 
     let nextCell;
     
-    // Try to find a home path cell that matches this coin's base
+    // Try to find a home path cell that matches this horse's base
     const matchingHomePath = nextCells.find((cell) => {
       // Skip HOME cells - they don't exist in the cells structure
       if (cell.cellID === 'HOME') {
@@ -123,7 +123,7 @@ function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<
       if (!cellData) {
         return false;
       }
-      return cellData.cellType === CellType.HOMEPATH && coin.baseID === cellData.baseID;
+      return cellData.cellType === CellType.HOMEPATH && horse.baseID === cellData.baseID;
     });
 
     if (matchingHomePath) {
@@ -140,13 +140,13 @@ function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<
         if (!cellData) {
           return false;
         }
-        return cellData.cellType === CellType.HOMEPATH && coin.baseID === cellData.baseID;
+        return cellData.cellType === CellType.HOMEPATH && horse.baseID === cellData.baseID;
       });
       if (anyHomePath) {
         // Check if we can reach HOME from this position
         const remainingSteps = stepsToTake - step - 1;
         if (remainingSteps > 0) {
-          const deepCheck = yield call(canReachHomeFromCell, anyHomePath.cellID, coin.baseID, remainingSteps);
+          const deepCheck = yield call(canReachHomeFromCell, anyHomePath.cellID, horse.baseID, remainingSteps);
           if (deepCheck === 'HOME') {
             return 'HOME';
           }
@@ -170,7 +170,7 @@ function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<
     // Check if we're on a home path (only if not HOME)
     if (nextCell.cellID !== 'HOME') {
       const cellData = cells[nextCell.position]?.[currentCellID];
-      if (cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === coin.baseID) {
+      if (cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === horse.baseID) {
         return 'HOMEPATH'; // Can reach home path
       }
     }
@@ -180,7 +180,7 @@ function * canReachHome(coinID: ICoin['coinID'], stepsToTake: Rolls): Generator<
 }
 
 /**
- * Helper to check if a coin can reach HOME from a specific cell
+ * Helper to check if a horse can reach HOME from a specific cell
  */
 function * canReachHomeFromCell(cellID: string, baseID: BaseID, remainingSteps: number): Generator<any, 'HOME' | 'HOMEPATH' | null, any> {
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
@@ -241,120 +241,120 @@ function * canReachHomeFromCell(cellID: string, baseID: BaseID, remainingSteps: 
 /**
  * Automatically chooses and executes an action when the player doesn't respond in time
  * Prioritizes moves that can reach HOME or HOMEPATH cells
- * @param spawnableCoins - Array of coin IDs that can be spawned
- * @param movableCoins - Array of coin IDs that can be moved
+ * @param spawnableHorses - Array of horse IDs that can be spawned
+ * @param movableHorses - Array of horse IDs that can be moved
  * @param currentTurnBase - The current player's base information
  */
-function * autoChooseAction(spawnableCoins: ICoin['coinID'][], movableCoins: ICoin['coinID'][], currentTurnBase: IBase) {
+function * autoChooseAction(spawnableHorses: IHorse['horseID'][], movableHorses: IHorse['horseID'][], currentTurnBase: IBase) {
   const mt = MersenneTwister19937.autoSeed();
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
 
-  // Priority 1: Check if any movable coins can reach HOME
-  const coinsThatCanReachHome: ICoin['coinID'][] = [];
-  const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
-  const otherCoins: ICoin['coinID'][] = [];
+  // Priority 1: Check if any movable horses can reach HOME
+  const horsesThatCanReachHome: IHorse['horseID'][] = [];
+  const horsesThatCanReachHomePath: IHorse['horseID'][] = [];
+  const otherHorses: IHorse['horseID'][] = [];
 
-  if (movableCoins.length > 0) {
-    for (const coinID of movableCoins) {
-      const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, currentDieRoll);
+  if (movableHorses.length > 0) {
+    for (const horseID of movableHorses) {
+      const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, currentDieRoll);
       if (result === 'HOME') {
-        coinsThatCanReachHome.push(coinID);
+        horsesThatCanReachHome.push(horseID);
       } else if (result === 'HOMEPATH') {
-        coinsThatCanReachHomePath.push(coinID);
+        horsesThatCanReachHomePath.push(horseID);
       } else {
-        otherCoins.push(coinID);
+        otherHorses.push(horseID);
       }
     }
   }
 
-  // Priority 1: Choose coin that can reach HOME
-  if (coinsThatCanReachHome.length > 0) {
-    const chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
-    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-    const coin = coins[chosenCoinID];
+  // Priority 1: Choose horse that can reach HOME
+  if (horsesThatCanReachHome.length > 0) {
+    const chosenHorseID = horsesThatCanReachHome[integer(0, horsesThatCanReachHome.length - 1)(mt)];
+    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+    const horse = horses[chosenHorseID];
     
     yield put(addLogEntry({
       player: currentTurnBase.color,
       action: 'Auto-action',
-      details: `Automatically chose to move coin ${chosenCoinID.split('_')[1]} (can reach HOME)`,
+      details: `Automatically chose to move horse ${chosenHorseID.split('_')[1]} (can reach HOME)`,
     }));
     
-    yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+    yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
     return;
   }
 
-  // Priority 2: Choose coin that can reach HOMEPATH
-  if (coinsThatCanReachHomePath.length > 0) {
-    const chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
-    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-    const coin = coins[chosenCoinID];
+  // Priority 2: Choose horse that can reach HOMEPATH
+  if (horsesThatCanReachHomePath.length > 0) {
+    const chosenHorseID = horsesThatCanReachHomePath[integer(0, horsesThatCanReachHomePath.length - 1)(mt)];
+    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+    const horse = horses[chosenHorseID];
     
     yield put(addLogEntry({
       player: currentTurnBase.color,
       action: 'Auto-action',
-      details: `Automatically chose to move coin ${chosenCoinID.split('_')[1]} (can reach HOMEPATH)`,
+      details: `Automatically chose to move horse ${chosenHorseID.split('_')[1]} (can reach HOMEPATH)`,
     }));
     
-    yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+    yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
     return;
   }
 
   // Priority 3: Choose between spawn and move (prefer move if available)
   const availableActions = [];
-  if (movableCoins.length > 0) availableActions.push('move');
-  if (spawnableCoins.length > 0) availableActions.push('spawn');
+  if (movableHorses.length > 0) availableActions.push('move');
+  if (spawnableHorses.length > 0) availableActions.push('spawn');
 
   // Prefer move if available, otherwise spawn
   const chosenAction = availableActions[0] || (availableActions.length > 0 ? availableActions[integer(0, availableActions.length - 1)(mt)] : null);
 
-  if (chosenAction === 'move' && movableCoins.length > 0) {
-    // Double-check that the selected coin is still movable before dispatching
-    const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
-    if (currentMovableCoins.length > 0) {
-      const chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-      const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-      const coin = coins[chosenCoinID];
+  if (chosenAction === 'move' && movableHorses.length > 0) {
+    // Double-check that the selected horse is still movable before dispatching
+    const currentMovableHorses: IHorse['horseID'][] = yield call(getMovableHorses, currentDieRoll);
+    if (currentMovableHorses.length > 0) {
+      const chosenHorseID = currentMovableHorses[integer(0, currentMovableHorses.length - 1)(mt)];
+      const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+      const horse = horses[chosenHorseID];
       
       yield put(addLogEntry({
         player: currentTurnBase.color,
         action: 'Auto-action',
-        details: `Automatically chose to move coin ${chosenCoinID.split('_')[1]}`,
+        details: `Automatically chose to move horse ${chosenHorseID.split('_')[1]}`,
       }));
       
-      yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+      yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
       return;
     }
   }
 
-  if (chosenAction === 'spawn' && spawnableCoins.length > 0) {
-    // Double-check that there are still spawnable coins
+  if (chosenAction === 'spawn' && spawnableHorses.length > 0) {
+    // Double-check that there are still spawnable horses
     const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
     const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-    const currentSpawnableCoins = bases[currentTurn].coinIDs.filter((coinID) => !coins[coinID].isSpawned && !coins[coinID].isRetired);
+    const currentSpawnableHorses = bases[currentTurn].horseIDs.filter((horseID) => !horses[horseID].isSpawned && !horses[horseID].isRetired);
 
-    if (currentSpawnableCoins.length > 0) {
-      const chosenCoinID = currentSpawnableCoins[integer(0, currentSpawnableCoins.length - 1)(mt)];
+    if (currentSpawnableHorses.length > 0) {
+      const chosenHorseID = currentSpawnableHorses[integer(0, currentSpawnableHorses.length - 1)(mt)];
       
       yield put(addLogEntry({
         player: currentTurnBase.color,
         action: 'Auto-action',
-        details: `Automatically chose to spawn coin ${chosenCoinID.split('_')[1]}`,
+        details: `Automatically chose to spawn horse ${chosenHorseID.split('_')[1]}`,
       }));
       
-      yield put(spawnCoin(currentTurnBase.ID, chosenCoinID));
+      yield put(spawnHorse(currentTurnBase.ID, chosenHorseID));
       return;
     }
   }
 
   // Fallback: try move if spawn failed
-  if (movableCoins.length > 0) {
-    const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, currentDieRoll);
-    if (currentMovableCoins.length > 0) {
-      const chosenCoinID = currentMovableCoins[integer(0, currentMovableCoins.length - 1)(mt)];
-      const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-      const coin = coins[chosenCoinID];
-      yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+  if (movableHorses.length > 0) {
+    const currentMovableHorses: IHorse['horseID'][] = yield call(getMovableHorses, currentDieRoll);
+    if (currentMovableHorses.length > 0) {
+      const chosenHorseID = currentMovableHorses[integer(0, currentMovableHorses.length - 1)(mt)];
+      const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+      const horse = horses[chosenHorseID];
+      yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
     }
   }
 }
@@ -367,19 +367,19 @@ function * watchForRollDieComplete() {
 }
 
 /**
- * Builds available actions list from spawnable and movable coins
+ * Builds available actions list from spawnable and movable horses
  */
 function * buildAvailableActions(
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
+  spawnableHorses: IHorse['horseID'][],
+  movableHorses: IHorse['horseID'][],
   dieValue: Rolls,
   currentTurnBase: IBase
 ): Generator<any, IAvailableAction[], any> {
   const actions: IAvailableAction[] = [];
 
-  // Check if there's a coin on the spawn cell that hasn't moved yet
-  // If so, prevent spawning additional coins until that coin moves
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  // Check if there's a horse on the spawn cell that hasn't moved yet
+  // If so, prevent spawning additional horses until that horse moves
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
   const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
   
@@ -396,28 +396,28 @@ function * buildAvailableActions(
     }
   }
   
-  // Check if any spawned coin is still on the spawn cell (hasn't moved yet)
-  let hasCoinOnSpawnCell = false;
+  // Check if any spawned horse is still on the spawn cell (hasn't moved yet)
+  let hasHorseOnSpawnCell = false;
   if (spawnCellID) {
-    for (const coinID of currentTurnBase.coinIDs) {
-      const coin = coins[coinID];
-      if (coin.isSpawned && !coin.isRetired && coin.cellID === spawnCellID && coin.steps === 0) {
-        hasCoinOnSpawnCell = true;
-        break;
-      }
+    for (const horseID of currentTurnBase.horseIDs) {
+      const horse = horses[horseID];
+      if (horse.isSpawned && !horse.isRetired && horse.cellID === spawnCellID && horse.steps === 0) {
+        hasHorseOnSpawnCell = true;
+      break;
     }
   }
+}
 
-  // Add spawn actions only if no coin is stuck on spawn cell
-  if (!hasCoinOnSpawnCell) {
-    for (const coinID of spawnableCoins) {
-      actions.push({
-        type: 'spawn',
-        coinID,
-        label: `Spawn Coin ${coinID.split('_')[1]}`,
-        description: 'Bring a new coin onto the board',
-      });
-    }
+  // Add spawn actions only if no horse is stuck on spawn cell
+  if (!hasHorseOnSpawnCell) {
+  for (const horseID of spawnableHorses) {
+    actions.push({
+      type: 'spawn',
+      horseID,
+      label: `Spawn Horse ${horseID.split('_')[1]}`,
+      description: 'Bring a new horse onto the board',
+    });
+  }
   }
 
   // Add move actions with priority information and blocking detection
@@ -426,13 +426,13 @@ function * buildAvailableActions(
   const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
   const isPair = roll1 === roll2;
   
-  for (const coinID of movableCoins) {
-    // Check for blocking coins (same color or opponent)
-    const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-      yield call(findBlockingCoin, coinID, dieValue);
+  for (const horseID of movableHorses) {
+    // Check for blocking horses (same color or opponent)
+    const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+      yield call(findBlockingHorse, horseID, dieValue);
 
     if (blockingInfo) {
-      // Blocking coin found - check if we can use one die value (when it's a pair)
+      // Blocking horse found - check if we can use one die value (when it's a pair)
       if (isPair) {
         const singleDieValue = roll1; // Both dice are the same, use one value
         
@@ -442,27 +442,27 @@ function * buildAvailableActions(
         if (singleDieValue < blockingStep) {
           // One die value is less than blocking step - can move to valid cell before blocker
           // Check if this move is valid (won't overshoot home)
-          const coin = coins[coinID];
-          if (coin.steps + singleDieValue <= WINNING_MOVES) {
+          const horse = horses[horseID];
+          if (horse.steps + singleDieValue <= WINNING_MOVES) {
             // Check if there's a valid cell reachable with one die value
-            const canMoveWithOneDie: boolean = yield call(isCurrentMoveValid, coinID, singleDieValue as Rolls);
+            const canMoveWithOneDie: boolean = yield call(isCurrentMoveValid, horseID, singleDieValue as Rolls);
             if (canMoveWithOneDie) {
               actions.push({
                 type: 'move',
-                coinID,
-                label: `Move Coin ${coinID.split('_')[1]} (${singleDieValue} steps)`,
+                horseID,
+                label: `Move Horse ${horseID.split('_')[1]} (${singleDieValue} steps)`,
                 description: `Move ${singleDieValue} spaces using one die (pair rolled, avoiding blocker)`,
                 stepsToUse: singleDieValue,
               });
             }
           }
         } else if (singleDieValue === blockingStep && !blockingInfo.isSameColor) {
-          // One die value equals blocking step AND blocking coin is opponent - can kick
+          // One die value equals blocking step AND blocking horse is opponent - can kick
           actions.push({
             type: 'move',
-            coinID,
-            label: `Move Coin ${coinID.split('_')[1]} (Kick Blocking Coin)`,
-            description: `Move ${singleDieValue} spaces and kick opponent coin using one die (pair rolled)`,
+            horseID,
+            label: `Move Horse ${horseID.split('_')[1]} (Kick Blocking Horse)`,
+            description: `Move ${singleDieValue} spaces and kick opponent horse using one die (pair rolled)`,
             stepsToUse: singleDieValue,
           });
         }
@@ -471,24 +471,24 @@ function * buildAvailableActions(
       // If not a pair, no actions available (blocked by sum of both dice)
     } else {
       // No blocking - normal move action
-      const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
-      let label = `Move Coin ${coinID.split('_')[1]}`;
-      let description = `Move ${dieValue} spaces`;
+    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
+    let label = `Move Horse ${horseID.split('_')[1]}`;
+    let description = `Move ${dieValue} spaces`;
 
-      if (result === 'HOME') {
-        label = `Move Coin ${coinID.split('_')[1]} (Can Reach Home!)`;
-        description = `Move ${dieValue} spaces - This coin can reach HOME!`;
-      } else if (result === 'HOMEPATH') {
-        label = `Move Coin ${coinID.split('_')[1]} (Can Enter Home Path)`;
-        description = `Move ${dieValue} spaces - This coin can enter the home path`;
-      }
+    if (result === 'HOME') {
+      label = `Move Horse ${horseID.split('_')[1]} (Can Reach Home!)`;
+      description = `Move ${dieValue} spaces - This horse can reach HOME!`;
+    } else if (result === 'HOMEPATH') {
+      label = `Move Horse ${horseID.split('_')[1]} (Can Enter Home Path)`;
+      description = `Move ${dieValue} spaces - This horse can enter the home path`;
+    }
 
-      actions.push({
-        type: 'move',
-        coinID,
-        label,
-        description,
-      });
+    actions.push({
+      type: 'move',
+      horseID,
+      label,
+      description,
+    });
     }
   }
 
@@ -496,29 +496,29 @@ function * buildAvailableActions(
 }
 
 /**
- * Handles when a spawnable roll is rolled with immediate spawn condition (no coins spawned or no moves available)
+ * Handles when a spawnable roll is rolled with immediate spawn condition (no horses spawned or no moves available)
  */
 function * handleRollSpawnableImmediateSpawn(
   roll1: Rolls,
   roll2: Rolls,
   currentTurnBase: IBase,
-  spawnableCoins: ICoin['coinID'][]
+  spawnableHorses: IHorse['horseID'][]
 ): Generator<any, void, any> {
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   const dieSum: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
 
   if (autoActionsEnabled) {
     // Auto-actions enabled - immediately spawn
-    yield put(spawnCoin(currentTurnBase.ID, spawnableCoins[0]));
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    yield put(spawnHorse(currentTurnBase.ID, spawnableHorses[0]));
+    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
   } else {
     // Auto-actions disabled - show action selection UI
-    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, [], dieSum as Rolls, currentTurnBase);
+    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableHorses, [], dieSum as Rolls, currentTurnBase);
     yield put(setAvailableActions(actions, dieSum as Rolls));
     yield put(markCurrentBase(true));
     
     // Wait for user to select an action
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
     yield put(clearAvailableActions());
     yield put(markCurrentBase(false));
   }
@@ -530,8 +530,8 @@ function * handleRollSpawnableImmediateSpawn(
 function * handleRollSpawnableWithChoice(
   roll1: Rolls,
   roll2: Rolls,
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
+  spawnableHorses: IHorse['horseID'][],
+  movableHorses: IHorse['horseID'][],
   currentTurnBase: IBase
 ): Generator<any, void, any> {
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
@@ -539,13 +539,13 @@ function * handleRollSpawnableWithChoice(
 
   if (autoActionsEnabled) {
     // Auto-actions enabled - choose action automatically
-    yield call(autoChooseAction, spawnableCoins, movableCoins, currentTurnBase);
+    yield call(autoChooseAction, spawnableHorses, movableHorses, currentTurnBase);
     
     // Wait for action to complete
-    yield take([LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]);
+    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
   } else {
     // Auto-actions disabled - show action selection UI
-    yield call(buildAndHandleActions, spawnableCoins, movableCoins, dieSum as Rolls, currentTurnBase, true);
+    yield call(buildAndHandleActions, spawnableHorses, movableHorses, dieSum as Rolls, currentTurnBase, true);
   }
 }
 
@@ -555,20 +555,20 @@ function * handleRollSpawnableWithChoice(
 function * handleRollSpawnable(
   roll1: Rolls,
   roll2: Rolls,
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
-  spawnedCoinIDs: ICoin['coinID'][],
+  spawnableHorses: IHorse['horseID'][],
+  movableHorses: IHorse['horseID'][],
+  spawnedHorseIDs: IHorse['horseID'][],
   currentTurnBase: IBase
 ): Generator<any, void, any> {
   // Mark base as spawnable
   yield put(markCurrentBase(true));
 
-  if (spawnedCoinIDs.length === 0 && movableCoins.length === 0) {
-    // No coins spawned yet - must spawn
-    yield call(handleRollSpawnableImmediateSpawn, roll1, roll2, currentTurnBase, spawnableCoins);
+  if (spawnedHorseIDs.length === 0 && movableHorses.length === 0) {
+    // No horses spawned yet - must spawn
+    yield call(handleRollSpawnableImmediateSpawn, roll1, roll2, currentTurnBase, spawnableHorses);
   } else {
-    // Has spawned coins - can choose between spawn or move
-    yield call(handleRollSpawnableWithChoice, roll1, roll2, spawnableCoins, movableCoins, currentTurnBase);
+    // Has spawned horses - can choose between spawn or move
+    yield call(handleRollSpawnableWithChoice, roll1, roll2, spawnableHorses, movableHorses, currentTurnBase);
   }
 }
 
@@ -584,18 +584,18 @@ function * enableDieAndRecalculateHighlighting(shouldAutoRoll: boolean = true): 
   
   // Recalculate and highlight reachable cells for the bonus turn
   yield put(clearHighlightedCells());
-  const result: { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: any; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
+  const result: { reachableCells: Set<string>; cellsByHorse: Map<string, Array<{ horseID: any; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
   if (result.reachableCells.size > 0) {
-    yield put(setHighlightedCells(result.reachableCells, result.cellsByCoin));
+    yield put(setHighlightedCells(result.reachableCells, result.cellsByHorse));
   }
   
   if (shouldAutoRoll) {
-    const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-    if (autoActionsEnabled) {
-      // Small delay before auto-rolling for the bonus turn
-      yield delay(DICE_BONUS_TURN_DELAY);
-      // Automatically roll the dice for the bonus turn
-      yield put(rollDie());
+  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
+  if (autoActionsEnabled) {
+    // Small delay before auto-rolling for the bonus turn
+    yield delay(DICE_BONUS_TURN_DELAY);
+    // Automatically roll the dice for the bonus turn
+    yield put(rollDie());
     }
   }
 }
@@ -605,17 +605,17 @@ function * enableDieAndRecalculateHighlighting(shouldAutoRoll: boolean = true): 
  * Returns true if actions were set and user selection was handled, false if no valid moves
  */
 function * buildAndHandleActions(
-  spawnableCoins: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
+  spawnableHorses: IHorse['horseID'][],
+  movableHorses: IHorse['horseID'][],
   dieValue: Rolls,
   currentTurnBase: IBase,
   shouldMarkBase: boolean = false
 ): Generator<any, boolean, any> {
-  const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableCoins, movableCoins, dieValue, currentTurnBase);
+  const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableHorses, movableHorses, dieValue, currentTurnBase);
   
   // Check if any actions are available after blocking detection
   if (actions.length === 0) {
-    // All coins are blocked - pass turn automatically
+    // All horses are blocked - pass turn automatically
     if (shouldMarkBase) {
       yield put(markCurrentBase(false));
     }
@@ -629,9 +629,9 @@ function * buildAndHandleActions(
   }
   
   // Wait for user to select an action
-  const actionTypes = spawnableCoins.length > 0 
-    ? [LudoActionTypes.SPAWN_COIN_SUCCESS, LudoActionTypes.MOVE_COIN_SUCCESS]
-    : [LudoActionTypes.MOVE_COIN_SUCCESS];
+  const actionTypes = spawnableHorses.length > 0 
+    ? [LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]
+    : [LudoActionTypes.MOVE_HORSE_SUCCESS];
   yield take(actionTypes);
   
   yield put(clearAvailableActions());
@@ -639,8 +639,8 @@ function * buildAndHandleActions(
     yield put(markCurrentBase(false));
   }
   return true;
-}
-
+  }
+  
 /**
  * Handles bonus turn after rolling a spawnable combination (1-6, 6-1, or doubles)
  */
@@ -649,91 +649,91 @@ function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
 }
 
 /**
- * Automatically moves a single coin (only one option available)
+ * Automatically moves a single horse (only one option available)
  */
-function * handleSingleCoinMove(coinID: ICoin['coinID'], coins: { [key: string]: ICoin }): Generator<any, void, any> {
-  const coin = coins[coinID];
-  yield put(moveCoin(coinID, coin.position, coin.cellID));
+function * handleSingleHorseMove(horseID: IHorse['horseID'], horses: { [key: string]: IHorse }): Generator<any, void, any> {
+  const horse = horses[horseID];
+  yield put(moveHorse(horseID, horse.position, horse.cellID));
 }
 
 /**
- * Selects and moves a coin with priority (HOME > HOMEPATH > random)
+ * Selects and moves a horse with priority (HOME > HOMEPATH > random)
  */
-function * selectAndMoveCoinWithPriority(
-  movableCoins: ICoin['coinID'][],
+function * selectAndMoveHorseWithPriority(
+  movableHorses: IHorse['horseID'][],
   dieValue: Rolls,
-  coins: { [key: string]: ICoin },
+  horses: { [key: string]: IHorse },
   playerColor: string
 ): Generator<any, void, any> {
   const mt = MersenneTwister19937.autoSeed();
 
-  // Prioritize coins that can reach HOME or HOMEPATH
-  const coinsThatCanReachHome: ICoin['coinID'][] = [];
-  const coinsThatCanReachHomePath: ICoin['coinID'][] = [];
+  // Prioritize horses that can reach HOME or HOMEPATH
+  const horsesThatCanReachHome: IHorse['horseID'][] = [];
+  const horsesThatCanReachHomePath: IHorse['horseID'][] = [];
 
-  for (const coinID of movableCoins) {
-    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, coinID, dieValue);
+  for (const horseID of movableHorses) {
+    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
     if (result === 'HOME') {
-      coinsThatCanReachHome.push(coinID);
+      horsesThatCanReachHome.push(horseID);
     } else if (result === 'HOMEPATH') {
-      coinsThatCanReachHomePath.push(coinID);
+      horsesThatCanReachHomePath.push(horseID);
     }
   }
 
-  // Priority 1: Choose coin that can reach HOME
-  let chosenCoinID: ICoin['coinID'];
-  if (coinsThatCanReachHome.length > 0) {
-    chosenCoinID = coinsThatCanReachHome[integer(0, coinsThatCanReachHome.length - 1)(mt)];
-  } else if (coinsThatCanReachHomePath.length > 0) {
-    // Priority 2: Choose coin that can reach HOMEPATH
-    chosenCoinID = coinsThatCanReachHomePath[integer(0, coinsThatCanReachHomePath.length - 1)(mt)];
+  // Priority 1: Choose horse that can reach HOME
+  let chosenHorseID: IHorse['horseID'];
+  if (horsesThatCanReachHome.length > 0) {
+    chosenHorseID = horsesThatCanReachHome[integer(0, horsesThatCanReachHome.length - 1)(mt)];
+  } else if (horsesThatCanReachHomePath.length > 0) {
+    // Priority 2: Choose horse that can reach HOMEPATH
+    chosenHorseID = horsesThatCanReachHomePath[integer(0, horsesThatCanReachHomePath.length - 1)(mt)];
   } else {
     // Priority 3: Random selection
-    chosenCoinID = movableCoins[integer(0, movableCoins.length - 1)(mt)];
+    chosenHorseID = movableHorses[integer(0, movableHorses.length - 1)(mt)];
   }
 
-  const coin = coins[chosenCoinID];
-  const details = coinsThatCanReachHome.length > 0
-    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${dieValue} spaces (can reach HOME)`
-    : coinsThatCanReachHomePath.length > 0
-    ? `Automatically moved coin ${chosenCoinID.split('_')[1]} ${dieValue} spaces (can reach HOMEPATH)`
-    : `Automatically moved coin ${chosenCoinID.split('_')[1]} ${dieValue} spaces`;
+  const horse = horses[chosenHorseID];
+  const details = horsesThatCanReachHome.length > 0
+    ? `Automatically moved horse ${chosenHorseID.split('_')[1]} ${dieValue} spaces (can reach HOME)`
+    : horsesThatCanReachHomePath.length > 0
+    ? `Automatically moved horse ${chosenHorseID.split('_')[1]} ${dieValue} spaces (can reach HOMEPATH)`
+    : `Automatically moved horse ${chosenHorseID.split('_')[1]} ${dieValue} spaces`;
 
   yield put(addLogEntry({
     player: playerColor,
-    action: 'Auto-moved coin',
+    action: 'Auto-moved horse',
     details,
   }));
 
-  yield put(moveCoin(chosenCoinID, coin.position, coin.cellID));
+  yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
 }
 
 /**
- * Handles when multiple coins can be moved (requires user choice or auto-action)
+ * Handles when multiple horses can be moved (requires user choice or auto-action)
  */
-function * handleMultipleCoinsMove(
-  movableCoins: ICoin['coinID'][],
+function * handleMultipleHorsesMove(
+  movableHorses: IHorse['horseID'][],
   dieValue: Rolls,
-  coins: { [key: string]: ICoin }
+  horses: { [key: string]: IHorse }
 ): Generator<any, void, any> {
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
 
   if (autoActionsEnabled) {
-    // Multiple movable coins - wait for user input with timeout
+    // Multiple movable horses - wait for user input with timeout
     const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
     const { timeout } = yield race({
-      userAction: take(LudoActionTypes.MOVE_COIN_SUCCESS),
+      userAction: take(LudoActionTypes.MOVE_HORSE_SUCCESS),
       timeout: delay(timeoutDuration),
     });
 
     if (timeout) {
-      // Timeout won - auto select a movable coin (prioritizing HOME/HOMEPATH)
-      const currentMovableCoins: ICoin['coinID'][] = yield call(getMovableCoins, dieValue);
-      if (currentMovableCoins.length > 0) {
+      // Timeout won - auto select a movable horse (prioritizing HOME/HOMEPATH)
+      const currentMovableHorses: IHorse['horseID'][] = yield call(getMovableHorses, dieValue);
+      if (currentMovableHorses.length > 0) {
         const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
         const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
         const playerColor = bases[currentTurn].color;
-        yield call(selectAndMoveCoinWithPriority, currentMovableCoins, dieValue, coins, playerColor);
+        yield call(selectAndMoveHorseWithPriority, currentMovableHorses, dieValue, horses, playerColor);
       }
     }
   } else {
@@ -742,41 +742,41 @@ function * handleMultipleCoinsMove(
     const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
     const currentTurnBase = bases[currentTurn];
     
-    yield call(buildAndHandleActions, [], movableCoins, dieValue, currentTurnBase);
+    yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
   }
 }
 
 /**
- * Handles non-spawnable roll with spawned coins available
+ * Handles non-spawnable roll with spawned horses available
  */
 function * handleNonSpawnableRoll(
-  spawnedCoinIDs: ICoin['coinID'][],
-  movableCoins: ICoin['coinID'][],
+  spawnedHorseIDs: IHorse['horseID'][],
+  movableHorses: IHorse['horseID'][],
   dieValue: Rolls,
-  coins: { [key: string]: ICoin }
+  horses: { [key: string]: IHorse }
 ): Generator<any, void, any> {
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
 
   if (autoActionsEnabled) {
-    // Auto-actions enabled - auto-move if only one coin option
-    if (spawnedCoinIDs.length === 1) {
-      yield call(handleSingleCoinMove, spawnedCoinIDs[0], coins);
-    } else if (movableCoins.length === 1) {
-      yield call(handleSingleCoinMove, movableCoins[0], coins);
-    } else if (movableCoins.length > 1) {
+    // Auto-actions enabled - auto-move if only one horse option
+    if (spawnedHorseIDs.length === 1) {
+      yield call(handleSingleHorseMove, spawnedHorseIDs[0], horses);
+    } else if (movableHorses.length === 1) {
+      yield call(handleSingleHorseMove, movableHorses[0], horses);
+    } else if (movableHorses.length > 1) {
       // Multiple options - requires choice
-      yield call(handleMultipleCoinsMove, movableCoins, dieValue, coins);
+      yield call(handleMultipleHorsesMove, movableHorses, dieValue, horses);
     }
   } else {
     // Auto-actions disabled - show action selection UI even for single options
-    if (movableCoins.length > 0) {
+    if (movableHorses.length > 0) {
       const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
       const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
       const currentTurnBase = bases[currentTurn];
       
-      yield call(buildAndHandleActions, [], movableCoins, dieValue, currentTurnBase);
+      yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
     } else {
-      // No movable coins at all - pass turn
+      // No movable horses at all - pass turn
       yield call(handleNoValidMoves);
     }
   }
@@ -787,8 +787,8 @@ function * handleNonSpawnableRoll(
  */
 function * handleNoValidMoves(): Generator<any, void, any> {
   // Always wait to show the dice result before passing turn
-  // This allows players to see the roll result whether they have no spawned coins
-  // or their coins are blocked and cannot move
+  // This allows players to see the roll result whether they have no spawned horses
+  // or their horses are blocked and cannot move
   yield delay(NO_MOVE_DELAY);
   
   yield put(invalidateDieRoll());
@@ -822,34 +822,34 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
   const dieSum = roll1 + roll2;
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const currentTurnBase = bases[currentTurn];
-  const spawnedCoinIDs = currentTurnBase.coinIDs.filter((coinID) => coins[coinID].isSpawned && !coins[coinID].isRetired);
-  const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, dieSum as Rolls);
-  const spawnableCoins = bases[currentTurn].coinIDs.filter((coinID) => !coins[coinID].isSpawned && !coins[coinID].isRetired);
+  const spawnedHorseIDs = currentTurnBase.horseIDs.filter((horseID) => horses[horseID].isSpawned && !horses[horseID].isRetired);
+  const movableHorses: IHorse['horseID'][] = yield call(getMovableHorses, dieSum as Rolls);
+  const spawnableHorses = bases[currentTurn].horseIDs.filter((horseID) => !horses[horseID].isSpawned && !horses[horseID].isRetired);
 
   if (canSpawn(roll1, roll2)) {
     // Rolled a spawnable combination - can spawn and will get bonus turn
-    if (spawnableCoins.length > 0 || movableCoins.length > 0) {
-      yield call(handleRollSpawnable, roll1, roll2, spawnableCoins, movableCoins, spawnedCoinIDs, currentTurnBase);
-      // Bonus turn will be handled after action completes (in moveCoinSuccessSaga or spawnCoinSaga)
+    if (spawnableHorses.length > 0 || movableHorses.length > 0) {
+      yield call(handleRollSpawnable, roll1, roll2, spawnableHorses, movableHorses, spawnedHorseIDs, currentTurnBase);
+      // Bonus turn will be handled after action completes (in moveHorseSuccessSaga or spawnHorseSaga)
     } else {
       // Rolled spawnable combination but no valid actions - still get bonus turn
       yield put(invalidateDieRoll());
       yield call(handleBonusTurnAfterSpawnable);
     }
-  } else if (spawnedCoinIDs.length > 0) {
-    yield call(handleNonSpawnableRoll, spawnedCoinIDs, movableCoins, dieSum as Rolls, coins);
+  } else if (spawnedHorseIDs.length > 0) {
+    yield call(handleNonSpawnableRoll, spawnedHorseIDs, movableHorses, dieSum as Rolls, horses);
   } else {
     yield call(handleNoValidMoves);
   }
 }
 
 /**
- * Saga that handles bonus turns after spawning a coin
+ * Saga that handles bonus turns after spawning a horse
  * If the player rolled a spawnable combination, grant a bonus turn
  */
-function * spawnCoinSuccessSaga() {
+function * spawnHorseSuccessSaga() {
   // Invalidate the die roll first (action has been chosen)
   yield put(invalidateDieRoll());
   
@@ -869,19 +869,19 @@ function * spawnCoinSuccessSaga() {
 }
 
 /**
- * Watcher saga that listens for SPAWN_COIN_SUCCESS actions
+ * Watcher saga that listens for SPAWN_HORSE_SUCCESS actions
  * Handles bonus turns after spawning
  */
-function * watchForSpawnCoinSuccess() {
-  yield takeLatest(LudoActionTypes.SPAWN_COIN_SUCCESS, spawnCoinSuccessSaga);
+function * watchForSpawnHorseSuccess() {
+  yield takeLatest(LudoActionTypes.SPAWN_HORSE_SUCCESS, spawnHorseSuccessSaga);
 }
 
 /**
- * Watcher saga that listens for MOVE_COIN_SUCCESS actions
+ * Watcher saga that listens for MOVE_HORSE_SUCCESS actions
  * Handles automatic die rolling for bonus turns in auto-play mode
  */
-function * watchForMoveCoinSuccess() {
-  yield takeLatest(LudoActionTypes.MOVE_COIN_SUCCESS, moveCoinSuccessSaga);
+function * watchForMoveHorseSuccess() {
+  yield takeLatest(LudoActionTypes.MOVE_HORSE_SUCCESS, moveHorseSuccessSaga);
 }
 
 /**
@@ -901,33 +901,33 @@ function * passTurnToSaga() {
   // Small delay to ensure any state updates are processed
   yield delay(DICE_STATE_UPDATE_DELAY);
   
-  // In auto-play mode, automatically roll for the new player only if they have spawned coins
+  // In auto-play mode, automatically roll for the new player only if they have spawned horses
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   if (autoActionsEnabled) {
-    // Check if current player has any spawned coins before auto-rolling
+    // Check if current player has any spawned horses before auto-rolling
     const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
     const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
     
-    // Check if the current player has any coins that are spawned (not in base)
+    // Check if the current player has any horses that are spawned (not in base)
     const currentTurnBase = bases[currentTurn];
-    const hasSpawnedCoins = currentTurnBase.coinIDs.some((coinID) => {
-      const coin = coins[coinID];
-      return coin.isSpawned && !coin.isRetired;
+    const hasSpawnedHorses = currentTurnBase.horseIDs.some((horseID) => {
+      const horse = horses[horseID];
+      return horse.isSpawned && !horse.isRetired;
     });
     
-    if (hasSpawnedCoins) {
-      yield delay(DICE_BONUS_TURN_DELAY);
-      yield put(rollDie());
+    if (hasSpawnedHorses) {
+    yield delay(DICE_BONUS_TURN_DELAY);
+    yield put(rollDie());
     }
   }
 }
 
 /**
- * Saga that handles bonus turns after a successful coin move
+ * Saga that handles bonus turns after a successful horse move
  * If the player got a bonus turn (rolled spawnable combination, reached home, or captured), grant bonus turn
  */
-function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boolean; coinID: string; currentDieRoll: Rolls } }) {
+function * moveHorseSuccessSaga(action: { type: string; data?: { bonusChance: boolean; horseID: string; currentDieRoll: Rolls } }) {
   const { bonusChance } = action.data!;
   
   // Invalidate the die roll first (action has been chosen)
@@ -950,7 +950,7 @@ function * moveCoinSuccessSaga(action: { type: string; data?: { bonusChance: boo
 export const sagas = [
   watchForRollDie,          // Watches for die roll requests
   watchForRollDieComplete,  // Watches for die roll completions and handles game logic
-  watchForSpawnCoinSuccess, // Watches for successful spawns and handles bonus turns
-  watchForMoveCoinSuccess,  // Watches for successful moves and handles bonus turns
+  watchForSpawnHorseSuccess, // Watches for successful spawns and handles bonus turns
+  watchForMoveHorseSuccess,  // Watches for successful moves and handles bonus turns
   watchForPassTurnTo,       // Watches for turn changes and auto-rolls in auto-play mode
 ];

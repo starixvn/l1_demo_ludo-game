@@ -2,7 +2,7 @@
  * Cell Component
  *
  * Represents a single cell/space on the Ludo game board walkway.
- * Cells can contain coins, have different types (normal, spawn, homepath, etc.),
+ * Cells can contain horses, have different types (normal, spawn, homepath, etc.),
  * and handle user interactions like right-click context menus.
  */
 
@@ -46,7 +46,7 @@ interface ICellProps {
   highlightColor?: BaseColors;
   /** Index value for NORMAL cells (for debugging) */
   index?: number;
-  /** Whether to show the popover (only for first cell of each coin/moveType) */
+  /** Whether to show the popover (only for first cell of each horse/moveType) */
   showPopover?: boolean;
   /** Text to display in the popover */
   popoverText?: string;
@@ -57,34 +57,34 @@ interface ICellProps {
 
 /**
  * Cell component - represents a single board space
- * Handles rendering coins, special cell types, and user interactions
+ * Handles rendering horses, special cell types, and user interactions
  */
-interface IBetCoin {
+interface IBetHorse {
   id: number;
   x: number; // Random X position (0-100%)
   y: number; // Random Y position (0-100%)
 }
 
 interface ICellState {
-  betCoins: IBetCoin[];
+  betHorses: IBetHorse[];
 }
 
 export class Cell extends React.PureComponent<ICellProps, ICellState> {
-  private nextBetCoinId: number = 0;
+  private nextBetHorseId: number = 0;
 
   constructor(props: ICellProps) {
     super(props);
     this.state = {
-      betCoins: [],
+      betHorses: [],
     };
   }
 
   componentDidUpdate(prevProps: ICellProps) {
-    // Clear bet coins when highlighting changes from true to false (indicating a new roll)
+    // Clear bet horses when highlighting changes from true to false (indicating a new roll)
     // This happens when the cell is no longer highlighted after a dice roll
     if (prevProps.isHighlighted && !this.props.isHighlighted) {
-      // New roll has happened, clear all bet coins
-      this.setState({ betCoins: [] });
+      // New roll has happened, clear all bet horses
+      this.setState({ betHorses: [] });
     }
   }
 
@@ -101,17 +101,17 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
     const x = Math.random() * 80 + 10; // 10% to 90%
     const y = Math.random() * 80 + 10; // 10% to 90%
 
-    // Create a new bet coin with unique ID and random position
-    const coinId = this.nextBetCoinId++;
-    const newCoin: IBetCoin = {
-      id: coinId,
+    // Create a new bet horse with unique ID and random position
+    const horseId = this.nextBetHorseId++;
+    const newHorse: IBetHorse = {
+      id: horseId,
       x,
       y,
     };
 
-    // Add coin to state (coins will persist until next roll)
+    // Add horse to state (horses will persist until next roll)
     this.setState((prevState) => ({
-      betCoins: [...prevState.betCoins, newCoin],
+      betHorses: [...prevState.betHorses, newHorse],
     }));
   };
 
@@ -145,11 +145,11 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
           : column
         : undefined;
 
-    // Get child components (usually coins)
+    // Get child components (usually horses)
     const children = React.Children.map(this.props.children, (child) => child);
-    // Apply special styling when multiple coins are present
-    const mutipleCoinClassName =
-      children && children?.length > 1 ? styles.MultipleCoins : null;
+    // Apply special styling when multiple horses are present
+    const mutipleHorseClassName =
+      children && children?.length > 1 ? styles.MultipleHorses : null;
 
     // Use utility function for hex to rgba conversion
 
@@ -192,7 +192,7 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
 
     return (
       <div
-        className={classnames(styles.Container, mutipleCoinClassName)} // Base styles + multiple coin handling
+        className={classnames(styles.Container, mutipleHorseClassName)} // Base styles + multiple horse handling
         style={cellStyle}
         // Data attributes for event handling and identification
         data-id={cellID} // Unique cell identifier
@@ -204,7 +204,7 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
         onContextMenu={(event) => this.handleContextMenu(event)} // Right-click menu
         onClick={this.props.isHighlighted ? this.handleCellClick : undefined} // Click handler for placing bets
       >
-        {/* Popover for highlighted cells - display immediately for first cell of each coin/moveType */}
+        {/* Popover for highlighted cells - display immediately for first cell of each horse/moveType */}
         {this.props.isHighlighted &&
           this.props.showPopover &&
           this.props.popoverText && (
@@ -238,16 +238,16 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
               {this.props.popoverText}
             </div>
           )}
-        {/* Coin/dollar icons when bets are placed - multiple coins can appear */}
-        {this.state.betCoins.map((coin) => {
+        {/* Horse/dollar icons when bets are placed - multiple horses can appear */}
+        {this.state.betHorses.map((horse) => {
           const iconSize = CELL_DIMENSION * 0.3; // 20% of cell size
           return (
             <div
-              key={coin.id}
-              className={styles.BetCoinIcon}
+              key={horse.id}
+              className={styles.BetHorseIcon}
               style={{
-                left: `${coin.x}%`,
-                top: `${coin.y}%`,
+                left: `${horse.x}%`,
+                top: `${horse.y}%`,
                 width: `${iconSize}px`,
                 height: `${iconSize}px`,
                 fontSize: `${iconSize * 0.6}px`, // Font size relative to icon size
@@ -290,7 +290,7 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
           />
         )}
         {
-          children // Render child components (coins)
+          children // Render child components (horses)
         }
       </div>
     );

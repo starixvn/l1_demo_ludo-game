@@ -13,7 +13,7 @@ import { connect } from "react-redux"; // Redux connection
 import { createStructuredSelector } from "reselect"; // Optimized state selection
 
 import { flatArray } from "common/utils"; // Array flattening utility
-import { Coin } from "containers/Base/components/Coin"; // Coin component for rendering
+import { Horse } from "containers/Base/components/Horse"; // Horse component for rendering
 import {
   CellType,
   ICell,
@@ -23,15 +23,15 @@ import {
 import {
   basesSelector,
   cellsSelector,
-  coinsSelector,
+  horsesSelector,
   currentTurnSelector,
   highlightedCellsSelector,
-  highlightedCellsByCoinSelector,
+  highlightedCellsByHorseSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import {
-  COIN_SIZE,
+  HORSE_SIZE,
   WALKWAY_LENGTH,
   WALKWAY_WIDTH,
   WALKWAY_VERTICAL_HEIGHT,
@@ -62,11 +62,11 @@ interface IPublicProps {
 interface IStateProps {
   bases: ReturnType<typeof basesSelector>; // All player bases
   cells: ReturnType<typeof cellsSelector>; // All game board cells
-  coins: ReturnType<typeof coinsSelector>; // All coins in the game
+  horses: ReturnType<typeof horsesSelector>; // All horses in the game
   links: ReturnType<typeof linksSelector>; // Cell connectivity links
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
   highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
-  highlightedCellsByCoin: ReturnType<typeof highlightedCellsByCoinSelector>; // Map of cellID to coins that can reach it
+  highlightedCellsByHorse: ReturnType<typeof highlightedCellsByHorseSelector>; // Map of cellID to horses that can reach it
   currentTurnBaseColor?: BaseColors; // Color of the current player for highlighting
 }
 
@@ -74,7 +74,7 @@ interface IStateProps {
  * Props for Redux dispatch actions
  */
 interface IDispatchProps {
-  // No dispatch props needed - coins are not clickable, actions must be chosen from action panel
+  // No dispatch props needed - horses are not clickable, actions must be chosen from action panel
 }
 
 /** Combined component props */
@@ -98,11 +98,11 @@ const cellLinks: { [cellID: string]: Set<ICell["cellID"]> } = {};
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   bases: basesSelector, // Get all player bases
   cells: cellsSelector, // Get all board cells
-  coins: coinsSelector, // Get all coins
+  horses: horsesSelector, // Get all horses
   currentTurn: currentTurnSelector, // Get current player turn
   links: linksSelector, // Get cell connectivity links
   highlightedCells: highlightedCellsSelector, // Get highlighted cells
-  highlightedCellsByCoin: highlightedCellsByCoinSelector, // Get cell-to-coin mapping
+  highlightedCellsByHorse: highlightedCellsByHorseSelector, // Get cell-to-horse mapping
   currentTurnBaseColor: createSelector(
     [basesSelector, currentTurnSelector],
     (
@@ -121,8 +121,8 @@ const mapDispatchToProps = {};
  * Global tracking for popovers across all walkways
  * These are reset when highlighting changes (detected via componentDidUpdate)
  */
-let globalSeenCoinMoveTypes = new Set<string>();
-let globalSeenMoveCoins = new Set<string>();
+let globalSeenHorseMoveTypes = new Set<string>();
+let globalSeenMoveHorses = new Set<string>();
 
 /**
  * Walkway container component class
@@ -132,21 +132,21 @@ class WalkwayBare extends React.PureComponent<IProps> {
   componentDidMount() {
     // Clear tracking on mount to ensure fresh state for first render
     // This handles the case when the component mounts after highlighting is already set
-    globalSeenCoinMoveTypes.clear();
-    globalSeenMoveCoins.clear();
+    globalSeenHorseMoveTypes.clear();
+    globalSeenMoveHorses.clear();
   }
 
   componentDidUpdate(prevProps: IProps) {
     // Reset global tracking when highlighting changes (new roll happened)
     // This handles subsequent highlighting changes after the first render
-    // Check both the Set reference and the highlightedCellsByCoin to catch all changes
+    // Check both the Set reference and the highlightedCellsByHorse to catch all changes
     const highlightingChanged =
       prevProps.highlightedCells !== this.props.highlightedCells ||
-      prevProps.highlightedCellsByCoin !== this.props.highlightedCellsByCoin;
+      prevProps.highlightedCellsByHorse !== this.props.highlightedCellsByHorse;
 
     if (highlightingChanged) {
-      globalSeenCoinMoveTypes.clear();
-      globalSeenMoveCoins.clear();
+      globalSeenHorseMoveTypes.clear();
+      globalSeenMoveHorses.clear();
     }
   }
 
@@ -180,14 +180,14 @@ class WalkwayBare extends React.PureComponent<IProps> {
 
   /**
    * Renders all cells in this walkway segment
-   * Creates a 2D grid of Cell components with appropriate styling and coin placement
+   * Creates a 2D grid of Cell components with appropriate styling and horse placement
    */
   private renderCells = () => {
     const {
       walkway: { position }, // Walkway configuration
       cells: cellConfigurations, // All cell configurations
       bases, // Player base data
-      coins, // All coin data
+      horses, // All horse data
       links, // Cell connectivity links
     } = this.props;
 
@@ -200,8 +200,8 @@ class WalkwayBare extends React.PureComponent<IProps> {
     );
 
     // Use global tracking for popovers across all walkways
-    // For "move" type, track by coinID only (one popover per coin for all move cells)
-    // For "spawn" and "kick" types, track by (coinID, moveType) combination
+    // For "move" type, track by horseID only (one popover per horse for all move cells)
+    // For "spawn" and "kick" types, track by (horseID, moveType) combination
 
     // Process each cell configuration and create Cell components
     cellConfigurationsForWalkway.forEach((cellConfiguration, index) => {
@@ -226,30 +226,30 @@ class WalkwayBare extends React.PureComponent<IProps> {
       const isHighlighted = this.props.highlightedCells?.has(cellID) || false;
 
       // Determine if we should show a popover for this cell
-      // For "move" type: show one popover per coin (first move cell encountered for each coin)
-      // For "spawn" and "kick" types: show one popover per (coinID, moveType) combination
+      // For "move" type: show one popover per horse (first move cell encountered for each horse)
+      // For "spawn" and "kick" types: show one popover per (horseID, moveType) combination
       let showPopover = false;
       let popoverText = "";
 
-      if (isHighlighted && this.props.highlightedCellsByCoin) {
-        const coinMoveTypes = this.props.highlightedCellsByCoin.get(cellID);
-        if (coinMoveTypes && coinMoveTypes.length > 0) {
-          // Check all coins to find the first one that should show a popover
-          // For "move" type: show one popover per coin (first move cell encountered for each coin)
-          // For "spawn" and "kick" types: show one popover per (coinID, moveType) combination
-          // Important: We iterate through all coins and mark them as seen when appropriate,
-          // but only show one popover per cell (the first coin that should show one)
-          for (const { coinID, moveType } of coinMoveTypes) {
+      if (isHighlighted && this.props.highlightedCellsByHorse) {
+        const horseMoveTypes = this.props.highlightedCellsByHorse.get(cellID);
+        if (horseMoveTypes && horseMoveTypes.length > 0) {
+          // Check all horses to find the first one that should show a popover
+          // For "move" type: show one popover per horse (first move cell encountered for each horse)
+          // For "spawn" and "kick" types: show one popover per (horseID, moveType) combination
+          // Important: We iterate through all horses and mark them as seen when appropriate,
+          // but only show one popover per cell (the first horse that should show one)
+          for (const { horseID, moveType } of horseMoveTypes) {
             let shouldShow = false;
 
             if (moveType === "move") {
-              // For "move" type, check if this coin has already shown a move popover
-              // If not, this is the first move cell for this coin, so show the popover
-              if (!globalSeenMoveCoins.has(coinID)) {
-                // Mark the coin as seen immediately, even if we don't show the popover on this cell
-                // This ensures that if multiple coins share this cell as their first move cell,
-                // we still track that each coin has been processed
-                globalSeenMoveCoins.add(coinID);
+              // For "move" type, check if this horse has already shown a move popover
+              // If not, this is the first move cell for this horse, so show the popover
+              if (!globalSeenMoveHorses.has(horseID)) {
+                // Mark the horse as seen immediately, even if we don't show the popover on this cell
+                // This ensures that if multiple horses share this cell as their first move cell,
+                // we still track that each horse has been processed
+                globalSeenMoveHorses.add(horseID);
                 // Only show popover if we haven't already decided to show one for this cell
                 if (!showPopover) {
                   shouldShow = true;
@@ -258,29 +258,29 @@ class WalkwayBare extends React.PureComponent<IProps> {
               }
             } else {
               // For "spawn" and "kick" types, use the original logic
-              const key = `${coinID}_${moveType}`;
-              if (!globalSeenCoinMoveTypes.has(key)) {
-                globalSeenCoinMoveTypes.add(key);
+              const key = `${horseID}_${moveType}`;
+              if (!globalSeenHorseMoveTypes.has(key)) {
+                globalSeenHorseMoveTypes.add(key);
                 // Only show popover if we haven't already decided to show one for this cell
                 if (!showPopover) {
                   shouldShow = true;
                   // Determine popover text based on move type
                   if (moveType === "spawn") {
-                    popoverText = "Place bet on spawn coin";
+                    popoverText = "Place bet on spawn horse";
                   } else if (moveType === "kick") {
-                    popoverText = "Place bet on kick blocking coin";
+                    popoverText = "Place bet on kick blocking horse";
                   }
                 }
               }
             }
 
-            // If this coin should show a popover, mark it
-            // We only show one popover per cell, but we still mark all coins as seen
+            // If this horse should show a popover, mark it
+            // We only show one popover per cell, but we still mark all horses as seen
             if (shouldShow) {
               showPopover = true;
-              // Don't break - continue to mark other coins as seen even if we don't show their popover
-              // This ensures that if coin2's first move cell comes after coin1's first move cell,
-              // coin2 will still be able to show its popover on its own first move cell
+              // Don't break - continue to mark other horses as seen even if we don't show their popover
+              // This ensures that if horse2's first move cell comes after horse1's first move cell,
+              // horse2 will still be able to show its popover on its own first move cell
             }
           }
         }
@@ -311,22 +311,22 @@ class WalkwayBare extends React.PureComponent<IProps> {
           isHighlighted={isHighlighted} // Whether this cell is highlighted
           highlightColor={this.props.currentTurnBaseColor} // Color to use for highlighting (current player's color)
           index={cellConfiguration.index} // Index value for debugging
-          showPopover={showPopover} // Whether to show popover (only for first cell of each coin/moveType)
+          showPopover={showPopover} // Whether to show popover (only for first cell of each horse/moveType)
           popoverText={popoverText} // Text to display in popover
           onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
         >
           {
-            // Render coins that are currently on this cell
-            cellConfiguration.coinIDs.map((coinID, index) => (
-              <Coin
-                baseColor={coins[coinID].color} // Coin color matches its base
-                // Smaller coins if multiple coins on same cell
-                coinSize={
-                  cellConfiguration.coinIDs.length > 1
-                    ? COIN_SIZE / 2
-                    : COIN_SIZE
+            // Render horses that are currently on this cell
+            cellConfiguration.horseIDs.map((horseID, index) => (
+              <Horse
+                baseColor={horses[horseID].color} // Horse color matches its base
+                // Smaller horses if multiple horses on same cell
+                horseSize={
+                  cellConfiguration.horseIDs.length > 1
+                    ? HORSE_SIZE / 2
+                    : HORSE_SIZE
                 }
-                // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
+                // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                 key={index}
               />
             ))
@@ -364,7 +364,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
       baseID,
       cellID,
       cellType,
-      coinIDs: [], // No coins during development
+      horseIDs: [], // No horses during development
       column,
       position,
       row,
@@ -383,7 +383,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
         {
           action: () =>
             this.markCells({ ...cellInfo, cellType: CellType.SPAWN }),
-          label: CellType.SPAWN, // Change to spawn cell (where coins enter)
+          label: CellType.SPAWN, // Change to spawn cell (where horses enter)
         },
         {
           action: () =>
@@ -445,10 +445,10 @@ class WalkwayBare extends React.PureComponent<IProps> {
   };
 
   /**
-   * Handles coin click events during gameplay
+   * Handles horse click events during gameplay
    * DISABLED - Actions must be chosen from action panel
    */
-  // private onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
+  // private onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
 }
 
 /**

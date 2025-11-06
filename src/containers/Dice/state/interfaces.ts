@@ -14,7 +14,7 @@ export enum Rolls {
   THREE = 3, // Die shows 3
   FOUR = 4,  // Die shows 4
   FIVE = 5,  // Die shows 5
-  SIX = 6,   // Die shows 6 (allows spawning coins)
+  SIX = 6,   // Die shows 6 (allows spawning horses)
 }
 
 /**

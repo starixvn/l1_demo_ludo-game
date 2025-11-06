@@ -1,7 +1,7 @@
 /**
  * Action Selection Container Component
  *
- * Displays available actions (spawn/move coins) for the player to choose from after rolling dice.
+ * Displays available actions (spawn/move horses) for the player to choose from after rolling dice.
  * Shows buttons for each available action with descriptions.
  */
 
@@ -12,14 +12,14 @@ import { createStructuredSelector } from "reselect";
 import {
   clearAvailableActions,
   IAvailableAction,
-  spawnCoin,
+  spawnHorse,
 } from "containers/Ludo/state/actions";
-import { moveCoin } from "containers/Ludo/state/actions";
+import { moveHorse } from "containers/Ludo/state/actions";
 import {
   availableActionsSelector,
   availableActionsDieValueSelector,
   basesSelector,
-  coinsSelector,
+  horsesSelector,
   currentTurnSelector,
 } from "containers/Ludo/state/selectors";
 import { getBaseHexColor } from "containers/utils";
@@ -33,7 +33,7 @@ interface IStateProps {
   availableActions: ReturnType<typeof availableActionsSelector>;
   availableActionsDieValue: ReturnType<typeof availableActionsDieValueSelector>;
   bases: ReturnType<typeof basesSelector>;
-  coins: ReturnType<typeof coinsSelector>;
+  horses: ReturnType<typeof horsesSelector>;
   currentTurn: ReturnType<typeof currentTurnSelector>;
 }
 
@@ -41,8 +41,8 @@ interface IStateProps {
  * Props for Redux dispatch actions
  */
 interface IDispatchProps {
-  spawnCoin: typeof spawnCoin;
-  moveCoin: typeof moveCoin;
+  spawnHorse: typeof spawnHorse;
+  moveHorse: typeof moveHorse;
   clearAvailableActions: typeof clearAvailableActions;
 }
 
@@ -58,7 +58,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   availableActions: availableActionsSelector,
   availableActionsDieValue: availableActionsDieValueSelector,
   bases: basesSelector,
-  coins: coinsSelector,
+  horses: horsesSelector,
   currentTurn: currentTurnSelector,
 });
 
@@ -66,8 +66,8 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
  * Maps Redux dispatch actions to component props
  */
 const mapDispatchToProps = {
-  spawnCoin,
-  moveCoin,
+  spawnHorse,
+  moveHorse,
   clearAvailableActions,
 };
 
@@ -80,42 +80,42 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
    * Handles when user clicks on an action button
    */
   private handleActionClick = (action: IAvailableAction) => {
-    const { coins, currentTurn, bases } = this.props;
+    const { horses, currentTurn, bases } = this.props;
 
     // Clear the action selection UI
     this.props.clearAvailableActions();
 
     if (action.type === "spawn") {
-      // Spawn the coin
-      this.props.spawnCoin(bases[currentTurn].ID, action.coinID);
+      // Spawn the horse
+      this.props.spawnHorse(bases[currentTurn].ID, action.horseID);
     } else if (action.type === "move") {
-      // Move the coin
-      const coin = coins[action.coinID];
-      // If stepsToUse is provided (when using one die from a pair), pass it to moveCoin
-      this.props.moveCoin(
-        action.coinID,
-        coin.position,
-        coin.cellID,
+      // Move the horse
+      const horse = horses[action.horseID];
+      // If stepsToUse is provided (when using one die from a pair), pass it to moveHorse
+      this.props.moveHorse(
+        action.horseID,
+        horse.position,
+        horse.cellID,
         undefined,
         undefined,
         action.stepsToUse
       );
     } else if (action.type === "kick") {
-      // Kick action: move coin and disqualify blocking coin
-      const coin = coins[action.coinID];
-      this.props.moveCoin(
-        action.coinID,
-        coin.position,
-        coin.cellID,
-        action.blockingCoinID
+      // Kick action: move horse and disqualify blocking horse
+      const horse = horses[action.horseID];
+      this.props.moveHorse(
+        action.horseID,
+        horse.position,
+        horse.cellID,
+        action.blockingHorseID
       );
     } else if (action.type === "move_before") {
       // Move before blocking: move only specified steps
-      const coin = coins[action.coinID];
-      this.props.moveCoin(
-        action.coinID,
-        coin.position,
-        coin.cellID,
+      const horse = horses[action.horseID];
+      this.props.moveHorse(
+        action.horseID,
+        horse.position,
+        horse.cellID,
         undefined,
         action.stepsBeforeBlocking
       );
@@ -168,8 +168,8 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
           </div>
           <div className={styles.ActionsList}>
             {availableActions.map((action, index) => {
-              const coin = this.props.coins[action.coinID];
-              const coinBase = coin ? this.props.bases[coin.baseID] : null;
+              const horse = this.props.horses[action.horseID];
+              const horseBase = horse ? this.props.bases[horse.baseID] : null;
               // Get the base color for the current turn (the base performing the action)
               const baseColor = currentBase.color
                 ? getBaseHexColor(currentBase.color)
@@ -177,7 +177,7 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
 
               return (
                 <button
-                  key={`${action.type}-${action.coinID}-${index}`}
+                  key={`${action.type}-${action.horseID}-${index}`}
                   className={`${styles.ActionButton} ${
                     action.type === "spawn"
                       ? styles.SpawnButton
@@ -193,16 +193,16 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
                   </div>
                   <div className={styles.ActionDetails}>
                     <div className={styles.DetailRow}>
-                      <span className={styles.DetailLabel}>Coin ID:</span>
+                      <span className={styles.DetailLabel}>Horse ID:</span>
                       <span className={styles.DetailValue}>
-                        {action.coinID}
+                        {action.horseID}
                       </span>
                     </div>
-                    {coinBase && (
+                    {horseBase && (
                       <div className={styles.DetailRow}>
                         <span className={styles.DetailLabel}>Base ID:</span>
                         <span className={styles.DetailValue}>
-                          {coinBase.ID}
+                          {horseBase.ID}
                         </span>
                       </div>
                     )}

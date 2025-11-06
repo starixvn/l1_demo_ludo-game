@@ -40,7 +40,7 @@ export enum WalkwayPosition {
  * Contains state slices for all major features of the Ludo game
  */
 export interface IApplicationState {
-  ludo: ILudoState;           // Main Ludo game state (coins, bases, cells)
+  ludo: ILudoState;           // Main Ludo game state (horses, bases, cells)
   contextMenu: IContextMenuState; // Right-click context menu state
   dice: IDiceState;           // Dice rolling and turn management state
   stepLogs: IStepLogsState;   // Game action logging and auto-play settings

@@ -11,7 +11,7 @@ import { BASE_COLORS, CELL_DIMENSION } from 'globalConstants'; // Color mappings
 
 /**
  * Creates a CSS style object for dynamic sizing and coloring of game elements
- * Used for cells, coins, and other components that need dynamic dimensions
+ * Used for cells, horses, and other components that need dynamic dimensions
  * @param cellCountLengthwise - Number of cells in the lengthwise direction
  * @param cellCountWidthwise - Number of cells in the widthwise direction
  * @param baseColor - Optional player color for background

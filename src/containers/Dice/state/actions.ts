@@ -2,7 +2,7 @@
  * Dice Container State Management Actions
  *
  * This file defines Redux actions for the dice functionality in the Ludo game.
- * The dice controls player movement and determines when players can spawn coins.
+ * The dice controls player movement and determines when players can spawn horses.
  */
 
 import { IReduxAction } from 'state/interfaces';

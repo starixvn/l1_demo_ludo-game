@@ -19,7 +19,7 @@ import { reducer as stepLogsReducer } from 'containers/StepLogs/state/reducer';
  * Each key represents a state slice, and the value is the corresponding reducer function
  */
 export const reducers = {
-  [ludoReducerName]: ludoReducer,              // Main Ludo game state (coins, bases, cells)
+  [ludoReducerName]: ludoReducer,              // Main Ludo game state (horses, bases, cells)
   [contextMenuReducerName]: contextMenuReducer, // Right-click context menu state
   [dieReducerNAME]: dieReducer,                 // Dice rolling and turn management
   [stepLogsReducerName]: stepLogsReducer,       // Game action logging and auto-play settings

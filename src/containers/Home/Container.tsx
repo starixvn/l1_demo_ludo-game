@@ -4,15 +4,15 @@ import { IRelationship } from "containers/Ludo/state/interfaces";
 import {
   basesSelector,
   cellsSelector,
-  coinsSelector,
+  horsesSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors";
 import { getStyleObject } from "containers/utils";
-import { COIN_SIZE } from "globalConstants";
+import { HORSE_SIZE } from "globalConstants";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
-import { Coin } from "containers/Base/components/Coin";
+import { Horse } from "containers/Base/components/Horse";
 import { Cell } from "containers/Walkway/components/Cell";
 import { WalkwayPosition } from "state/interfaces";
 
@@ -21,7 +21,7 @@ import styles from "./Container.module.css";
 interface IStateProps {
   bases: ReturnType<typeof basesSelector>;
   cells: ReturnType<typeof cellsSelector>;
-  coins: ReturnType<typeof coinsSelector>;
+  horses: ReturnType<typeof horsesSelector>;
   links: ReturnType<typeof linksSelector>;
 }
 
@@ -32,7 +32,7 @@ interface IPublicProps {
 }
 
 interface IDispatchProps {
-  // No dispatch props needed - coins are not clickable, actions must be chosen from action panel
+  // No dispatch props needed - horses are not clickable, actions must be chosen from action panel
 }
 
 interface IProps extends IStateProps, IPublicProps, IDispatchProps {}
@@ -40,7 +40,7 @@ interface IProps extends IStateProps, IPublicProps, IDispatchProps {}
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   bases: basesSelector,
   cells: cellsSelector,
-  coins: coinsSelector,
+  horses: horsesSelector,
   links: linksSelector,
 });
 
@@ -48,13 +48,13 @@ const mapDispatchToProps = {};
 
 class HomeBare extends React.PureComponent<IProps> {
   /**
-   * Handles coin click events during gameplay
+   * Handles horse click events during gameplay
    * DISABLED - Actions must be chosen from action panel
    */
-  // private onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
+  // private onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
 
   render() {
-    const { cells, links, bases, coins } = this.props;
+    const { cells, links, bases, horses } = this.props;
 
     // Filter cells that have notRenderInWalkway = true
     const homeCells: any[] = [];
@@ -101,16 +101,16 @@ class HomeBare extends React.PureComponent<IProps> {
                 onContextMenuOpened={() => {}} // No context menu for home cells
               >
                 {
-                  // Render coins that are currently on this cell
-                  cell.coinIDs.map((coinID: string, index: number) => (
-                    <Coin
-                      key={coinID}
-                      baseColor={coins[coinID].color} // Coin color matches its base
-                      // Smaller coins if multiple coins on same cell
-                      coinSize={
-                        cell.coinIDs.length > 1 ? COIN_SIZE / 2 : COIN_SIZE
+                  // Render horses that are currently on this cell
+                  cell.horseIDs.map((horseID: string, index: number) => (
+                    <Horse
+                      key={horseID}
+                      baseColor={horses[horseID].color} // Horse color matches its base
+                      // Smaller horses if multiple horses on same cell
+                      horseSize={
+                        cell.horseIDs.length > 1 ? HORSE_SIZE / 2 : HORSE_SIZE
                       }
-                      // onCoinClicked removed - coins are not clickable, actions must be chosen from action panel
+                      // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                     />
                   ))
                 }

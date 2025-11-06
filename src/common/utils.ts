@@ -73,7 +73,7 @@ export interface IGameStateFile {
   gameState: {
     currentTurn: any; // BaseID type (will be validated by caller)
     bases: any[];
-    coins: any[];
+    horses: any[];
     cells: any;
     walkways: any[];
     relationships: any[];
@@ -89,7 +89,7 @@ export interface IGameStateFile {
 export interface IRestoredGameState {
   currentTurn: any; // BaseID type (will be validated by caller)
   bases: { [key: string]: any };
-  coins: { [key: string]: any };
+  horses: { [key: string]: any };
   cells: any;
   walkways: { [key: string]: any };
   relationships: any[];
@@ -142,8 +142,8 @@ export const loadGameStateFromFile = (
             acc[base.ID] = base;
             return acc;
           }, {}),
-          coins: gameState.coins.reduce((acc: any, coin: any) => {
-            acc[coin.coinID] = coin;
+          horses: gameState.horses.reduce((acc: any, horse: any) => {
+            acc[horse.horseID] = horse;
             return acc;
           }, {}),
           cells: gameState.cells, // Already in correct format

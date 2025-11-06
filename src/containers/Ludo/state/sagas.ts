@@ -2,7 +2,7 @@
  * Ludo Game State Sagas
  *
  * Redux Sagas that handle all asynchronous game logic for the Ludo game.
- * Manages game initialization, coin movement, turn progression, and game state changes.
+ * Manages game initialization, horse movement, turn progression, and game state changes.
  * Acts as the central coordinator for all game mechanics and player interactions.
  */
 
@@ -26,29 +26,29 @@ import { WalkwayPosition } from 'state/interfaces';
 
 import {
   clearHighlightedCells,
-  disqualifyCoin,
+  disqualifyHorse,
   enableBase,
   getInitialGameDataSuccess,
-  homeCoin,
-  liftCoin,
+  homeHorse,
+  liftHorse,
   markWinner,
-  moveCoin,
-  moveCoinFailure,
-  moveCoinSuccess,
+  moveHorse,
+  moveHorseFailure,
+  moveHorseSuccess,
   nextTurn,
   passTurnTo,
-  placeCoin,
+  placeHorse,
   setHighlightedCells,
   setPlayers,
-  spawnCoin,
-  spawnCoinSuccess,
+  spawnHorse,
+  spawnHorseSuccess,
   ActionTypes,
 } from './actions';
 import {
   BaseID,
   CellType,
   ICell,
-  ICoin,
+  IHorse,
   IServerGameData,
   IState,
   IWalkway,
@@ -56,7 +56,7 @@ import {
 import {
   basesSelector,
   cellsSelector,
-  coinsSelector,
+  horsesSelector,
   currentTurnSelector,
   linksSelector,
   walkwaysSelector,
@@ -76,7 +76,7 @@ function * watchForGetInitialGameData() {
  * This is the first saga that runs when the game starts. It:
  * 1. Fetches board configuration from initialGameData.json
  * 2. Processes and transforms the data for Redux state
- * 3. Sets up all game entities (bases, coins, cells, walkways)
+ * 3. Sets up all game entities (bases, horses, cells, walkways)
  * 4. Initializes the game state with default values
  */
 function * getInitialGameDataSaga() {
@@ -87,18 +87,18 @@ function * getInitialGameDataSaga() {
   const basesArray = data.bases.map((base) => ({ ...base, spawnable: false }));
   const bases = mapByProperty(basesArray, 'ID');
 
-  // Process coins - assign colors based on their base ownership
-  const coins = data.coins.map((coin) => ({ ...coin, color: bases[coin.baseID].color }));
+  // Process horses - assign colors based on their base ownership
+  const horses = data.horses.map((horse) => ({ ...horse, color: bases[horse.baseID].color }));
 
   // Create complete game state object
   const gameData: IState = {
     bases,                              // Player bases with spawnable state
     cells: data.cells,                  // All board cells with positions and types
-    coins: mapByProperty(coins, 'coinID'), // All game coins mapped by ID
+    horses: mapByProperty(horses, 'horseID'), // All game horses mapped by ID
     availableActions: null,             // No action selection initially
     availableActionsDieValue: null,     // No die value for actions initially
     highlightedCells: null,             // No cells highlighted initially
-    highlightedCellsByCoin: null,       // No cell-to-coin mapping initially
+    highlightedCellsByHorse: null,       // No cell-to-horse mapping initially
     currentTurn: DEFAULT_STARTING_BASE, // Start with configured default base
     links: data.links,                  // Movement connectivity between cells
     relationships: data.relationships,  // Component relationships for rendering
@@ -110,24 +110,24 @@ function * getInitialGameDataSaga() {
 }
 
 /**
- * Watcher saga for coin spawning actions
- * Triggers when a player attempts to spawn a coin from their base
+ * Watcher saga for horse spawning actions
+ * Triggers when a player attempts to spawn a horse from their base
  */
-function * watchForSpawnCoin() {
-  yield takeLatest(ActionTypes.SPAWN_COIN, spawnCoinSaga);
+function * watchForSpawnHorse() {
+  yield takeLatest(ActionTypes.SPAWN_HORSE, spawnHorseSaga);
 }
 
 /**
- * Handles spawning a coin from base onto the board
+ * Handles spawning a horse from base onto the board
  *
- * This saga executes when a player rolls a 6 and chooses to spawn a coin.
- * It finds the appropriate spawn cell for the player's base and moves the coin there.
+ * This saga executes when a player rolls a 6 and chooses to spawn a horse.
+ * It finds the appropriate spawn cell for the player's base and moves the horse there.
  * After spawning, the die roll becomes invalid (can't be used again).
  *
- * @param action - Contains baseID and coinID to spawn
+ * @param action - Contains baseID and horseID to spawn
  */
-function * spawnCoinSaga(action: ReturnType<typeof spawnCoin>) {
-  const { baseID, coinID } = action.data!;
+function * spawnHorseSaga(action: ReturnType<typeof spawnHorse>) {
+  const { baseID, horseID } = action.data!;
 
   // Get current game state
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
@@ -140,97 +140,97 @@ function * spawnCoinSaga(action: ReturnType<typeof spawnCoin>) {
 
   // Get cells for this player's walkway and find the spawn cell
   const walkwayCells = cells[walkway.position];
-  const spawnCellForCoin = Object.values(walkwayCells).find((cell) => cell.cellType === CellType.SPAWN)!;
+  const spawnCellForHorse = Object.values(walkwayCells).find((cell) => cell.cellType === CellType.SPAWN)!;
 
-  // Find the specific coin ID to spawn from the base's coin list
-  const coinIDToSpawn = base.coinIDs.find((ID) => ID === coinID)!;
+  // Find the specific horse ID to spawn from the base's horse list
+  const horseIDToSpawn = base.horseIDs.find((ID) => ID === horseID)!;
 
   // Log the spawn action for game history
   yield put(addLogEntry({
     player: base.color,
-    action: 'Spawned coin',
-    details: `Spawned coin ${coinID.split('_')[1]}`,
+    action: 'Spawned horse',
+    details: `Spawned horse ${horseID.split('_')[1]}`,
   }));
 
-  // Execute the spawn - move coin from base to spawn cell
-  yield put(spawnCoinSuccess(spawnCellForCoin.cellID, coinIDToSpawn, baseID, walkway.position));
+  // Execute the spawn - move horse from base to spawn cell
+  yield put(spawnHorseSuccess(spawnCellForHorse.cellID, horseIDToSpawn, baseID, walkway.position));
 
-  // Note: Roll invalidation is handled in spawnCoinSuccessSaga (Dice sagas)
+  // Note: Roll invalidation is handled in spawnHorseSuccessSaga (Dice sagas)
 }
 
 /**
- * Watcher saga for coin movement actions
- * Triggers when a player attempts to move a coin along the board
+ * Watcher saga for horse movement actions
+ * Triggers when a player attempts to move a horse along the board
  */
-function * watchForMoveCoin() {
-  yield takeLatest(ActionTypes.MOVE_COIN, moveCoinSaga);
+function * watchForMoveHorse() {
+  yield takeLatest(ActionTypes.MOVE_HORSE, moveHorseSaga);
 }
 
 /**
- * Validates if a coin can make a specific move
+ * Validates if a horse can make a specific move
  *
- * Checks if moving the coin by the given number of steps would exceed
+ * Checks if moving the horse by the given number of steps would exceed
  * the total distance needed to reach home (WINNING_MOVES = 56).
  *
- * @param coinID - The coin to validate movement for
+ * @param horseID - The horse to validate movement for
  * @param stepsToTake - Number of steps from the die roll
  * @returns true if the move is valid (won't overshoot home)
  */
-export function * isCurrentMoveValid(coinID: ICoin['coinID'], stepsToTake: Rolls) {
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-  const coin = coins[coinID];
-  return coin.steps + stepsToTake <= WINNING_MOVES;
+export function * isCurrentMoveValid(horseID: IHorse['horseID'], stepsToTake: Rolls) {
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const horse = horses[horseID];
+  return horse.steps + stepsToTake <= WINNING_MOVES;
 }
 
 /**
- * Gets all coins that can be moved by the current player
+ * Gets all horses that can be moved by the current player
  *
- * Filters the current player's coins to find those that:
+ * Filters the current player's horses to find those that:
  * - Are spawned on the board (not in base)
  * - Are not retired (haven't reached home)
  * - Can move the rolled number of spaces without overshooting
  *
  * @param stepsToTake - Number of steps from the die roll
- * @returns Array of coin IDs that can be moved
+ * @returns Array of horse IDs that can be moved
  */
-export function * getMovableCoins(stepsToTake: Rolls) {
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+export function * getMovableHorses(stepsToTake: Rolls) {
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const currentTurnBase: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
 
-  // Filter coins that meet all movement criteria
-  const movableCoins =
-    bases[currentTurnBase].coinIDs
-    .filter((coinID) =>
-      coins[coinID].isSpawned              // Must be on the board
-      && !coins[coinID].isRetired         // Must not be home yet
-      && coins[coinID].steps + stepsToTake <= WINNING_MOVES, // Must not overshoot
+  // Filter horses that meet all movement criteria
+  const movableHorses =
+    bases[currentTurnBase].horseIDs
+    .filter((horseID) =>
+      horses[horseID].isSpawned              // Must be on the board
+      && !horses[horseID].isRetired         // Must not be home yet
+      && horses[horseID].steps + stepsToTake <= WINNING_MOVES, // Must not overshoot
     );
 
-  return movableCoins;
+  return movableHorses;
 }
 
 /**
- * Finds blocking coins along a coin's movement path
- * Returns information about the first blocking coin encountered
- * @param coinID - The coin that wants to move
+ * Finds blocking horses along a horse's movement path
+ * Returns information about the first blocking horse encountered
+ * @param horseID - The horse that wants to move
  * @param stepsToTake - Number of steps to move
- * @returns Object with blockingCoinID, blockingCellID, and stepsBeforeBlocking, or null if no blocking
+ * @returns Object with blockingHorseID, blockingCellID, and stepsBeforeBlocking, or null if no blocking
  */
-export function * findBlockingCoin(
-  coinID: ICoin['coinID'],
+export function * findBlockingHorse(
+  horseID: IHorse['horseID'],
   stepsToTake: Rolls
-): Generator<any, { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null, any> {
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+): Generator<any, { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null, any> {
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
   const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
-  const currentCoin = coins[coinID];
+  const currentHorse = horses[horseID];
 
-  if (!currentCoin.isSpawned || currentCoin.isRetired) {
-    return null; // Coin not on board or already home
+  if (!currentHorse.isSpawned || currentHorse.isRetired) {
+    return null; // Horse not on board or already home
   }
 
-  let currentCellID = currentCoin.cellID;
+  let currentCellID = currentHorse.cellID;
 
   // Traverse the path step by step
   for (let step = 0; step < stepsToTake; step++) {
@@ -250,7 +250,7 @@ export function * findBlockingCoin(
       const matchingHomePath = nextCells.find((cell) => {
         if (cell.cellID === 'HOME') return false;
         const cellData = cells[cell.position]?.[cell.cellID];
-        return cellData?.cellType === CellType.HOMEPATH && cellData.baseID === currentCoin.baseID;
+        return cellData?.cellType === CellType.HOMEPATH && cellData.baseID === currentHorse.baseID;
       });
       nextCell = matchingHomePath || nextCells[0];
     }
@@ -259,23 +259,23 @@ export function * findBlockingCoin(
       break;
     }
 
-    // Check if next cell has any coins (blocking) BEFORE moving to it
+    // Check if next cell has any horses (blocking) BEFORE moving to it
     if (nextCell.cellID !== 'HOME') {
       const cellData = cells[nextCell.position]?.[nextCell.cellID];
-      if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
-        // Found a blocking coin - can be same color or different color
-        const blockingCoinID = cellData.coinIDs[0]; // Get first coin on the cell
-        const blockingCoin = coins[blockingCoinID];
+      if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+        // Found a blocking horse - can be same color or different color
+        const blockingHorseID = cellData.horseIDs[0]; // Get first horse on the cell
+        const blockingHorse = horses[blockingHorseID];
         
-        if (blockingCoin) {
-          // Blocking coin found at this step - can move up to 'step' steps before it
+        if (blockingHorse) {
+          // Blocking horse found at this step - can move up to 'step' steps before it
           // Track whether it's same color or different color
-          const isSameColor = blockingCoin.baseID === currentCoin.baseID;
+          const isSameColor = blockingHorse.baseID === currentHorse.baseID;
           return {
-            blockingCoinID,
+            blockingHorseID,
             blockingCellID: nextCell.cellID,
             stepsBeforeBlocking: step, // Number of steps we can take before hitting the blocker
-            isSameColor, // Whether the blocking coin is the same color
+            isSameColor, // Whether the blocking horse is the same color
           };
         }
       }
@@ -285,92 +285,92 @@ export function * findBlockingCoin(
     currentCellID = nextCell.cellID;
   }
 
-  return null; // No blocking coin found
+  return null; // No blocking horse found
 }
 
 /**
- * Main saga for handling coin movement along the board
+ * Main saga for handling horse movement along the board
  *
  * This is the most complex saga in the game. It handles:
  * 1. Validating the move is possible
- * 2. Moving the coin step-by-step with animation
+ * 2. Moving the horse step-by-step with animation
  * 3. Handling special cases (home path entry, reaching home)
- * 4. Checking for coin disqualifications (captures)
+ * 4. Checking for horse disqualifications (captures)
  * 5. Determining if the player gets a bonus turn
  *
  * The movement happens one cell at a time with 100ms delays for smooth animation.
  *
- * @param action - Contains coinID, target cellID, and walkway position
+ * @param action - Contains horseID, target cellID, and walkway position
  */
-function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
+function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
   let { cellID, walkwayPosition } = { ...action.data! };
-  const { coinID, stepsToUse } = action.data!;
+  const { horseID, stepsToUse } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
   
   // Determine how many steps to move
   // If stepsToUse is provided (when using one die from a pair), use that instead of the sum
   const stepsToMove = stepsToUse !== undefined ? stepsToUse : currentDieRoll;
   
-  // Check for blocking coins BEFORE allowing movement
+  // Check for blocking horses BEFORE allowing movement
   // Use the actual steps we're moving, not the full die sum
-  const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-    yield call(findBlockingCoin, coinID, stepsToMove as Rolls);
+  const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+    yield call(findBlockingHorse, horseID, stepsToMove as Rolls);
   
-  // Track if we can kick the blocking coin (if any)
-  let canKickBlockingCoin = false;
+  // Track if we can kick the blocking horse (if any)
+  let canKickBlockingHorse = false;
   let blockingCellIDToKick: string | null = null;
   
-  // If blocking coin is detected, check if we can kick it
-  // Blocking applies to both same-color and different-color coins
-  // But we can kick opponent coins if stepsToMove exactly equals the blocking step
+  // If blocking horse is detected, check if we can kick it
+  // Blocking applies to both same-color and different-color horses
+  // But we can kick opponent horses if stepsToMove exactly equals the blocking step
   if (blockingInfo) {
     const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
     
-    // Check if we can kick this blocking coin
-    // Can kick if: stepsToMove === blockingStep AND blocking coin is opponent (not same color)
-    canKickBlockingCoin = stepsToMove === blockingStep && !blockingInfo.isSameColor;
+    // Check if we can kick this blocking horse
+    // Can kick if: stepsToMove === blockingStep AND blocking horse is opponent (not same color)
+    canKickBlockingHorse = stepsToMove === blockingStep && !blockingInfo.isSameColor;
     
-    if (!canKickBlockingCoin) {
+    if (!canKickBlockingHorse) {
       // Cannot kick - block the movement
-      console.warn(`Coin ${coinID} cannot move - blocked by ${blockingInfo.blockingCoinID} (same color: ${blockingInfo.isSameColor}, steps: ${stepsToMove}, blockingStep: ${blockingStep})`);
-      yield put(moveCoinFailure());
+      console.warn(`Horse ${horseID} cannot move - blocked by ${blockingInfo.blockingHorseID} (same color: ${blockingInfo.isSameColor}, steps: ${stepsToMove}, blockingStep: ${blockingStep})`);
+      yield put(moveHorseFailure());
       // Wait for player to see the dice result before passing turn
       yield delay(NO_MOVE_DELAY);
       yield put(nextTurn());
       yield put(enableDie());
       return;
     }
-    // If canKickBlockingCoin is true, proceed with movement (will kick the blocking coin)
+    // If canKickBlockingHorse is true, proceed with movement (will kick the blocking horse)
     blockingCellIDToKick = blockingInfo.blockingCellID;
   }
 
   // Validate that this move is possible
   // Use the actual steps we're moving, not necessarily the full die sum
-  const movableCoins: ICoin['coinID'][] = yield call(getMovableCoins, stepsToMove as Rolls);
-  const isCurrentMovePossible: boolean = yield call(isCurrentMoveValid, coinID, stepsToMove as Rolls);
+  const movableHorses: IHorse['horseID'][] = yield call(getMovableHorses, stepsToMove as Rolls);
+  const isCurrentMovePossible: boolean = yield call(isCurrentMoveValid, horseID, stepsToMove as Rolls);
 
-  // If no coins can move, skip turn
-  if (movableCoins.length === 0) {
-    yield put(moveCoinFailure());
+  // If no horses can move, skip turn
+  if (movableHorses.length === 0) {
+    yield put(moveHorseFailure());
     yield put(nextTurn());
     yield put(enableDie());
     return;
   }
-  // If this specific coin can't move, reject the action
+  // If this specific horse can't move, reject the action
   else if (!isCurrentMovePossible) {
-    yield put(moveCoinFailure());
+    yield put(moveHorseFailure());
     return;
   }
 
-  // Don't invalidate roll here - wait until action completes (handled in moveCoinSuccessSaga)
+  // Don't invalidate roll here - wait until action completes (handled in moveHorseSuccessSaga)
 
-  // Track if coin reached home during movement
-  let bonusChanceForHomeCoin = false;
+  // Track if horse reached home during movement
+  let bonusChanceForHomeHorse = false;
 
-  // Move the coin step-by-step based on steps to move
+  // Move the horse step-by-step based on steps to move
   for (let i = 0; i < stepsToMove; i++) {
     // Get fresh state for each step (state may change during movement)
-    const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
     const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
     const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
 
@@ -379,8 +379,8 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
     
     // Safety check: if no links found, this is a configuration error
     if (!nextCells || nextCells.length === 0) {
-      console.error(`No links found for cell ${cellID} - coin ${coinID} cannot move forward`);
-      yield put(moveCoinFailure());
+      console.error(`No links found for cell ${cellID} - horse ${horseID} cannot move forward`);
+      yield put(moveHorseFailure());
       yield put(nextTurn());
       yield put(enableDie());
       return; // Exit movement saga to prevent hanging
@@ -397,7 +397,7 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
         // HOME is always allowed - it's the final destination
         nextCell = homeCell;
       } else {
-        // Priority 1: Try to find a home path cell that matches this coin's base
+        // Priority 1: Try to find a home path cell that matches this horse's base
         const matchingHomePath = nextCells.find(
           (cell) => {
             // Skip HOME cells - they're handled above
@@ -410,7 +410,7 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
               return false;
             }
             return cellData.cellType === CellType.HOMEPATH
-              && coins[coinID].baseID === cellData.baseID;
+              && horses[horseID].baseID === cellData.baseID;
           }
         );
 
@@ -419,7 +419,7 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
           nextCell = matchingHomePath;
         } else {
           // No matching home path found - filter valid cells
-          // Filter out any home path cells that don't match this coin's base
+          // Filter out any home path cells that don't match this horse's base
           const validCells = nextCells.filter((cell) => {
             // HOME is always valid (handled above, but include it here as safety)
             if (cell.cellID === 'HOME') {
@@ -430,9 +430,9 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
               console.warn(`Cell data not found for ${cell.cellID} at position ${cell.position}`);
               return false;
             }
-            // Allow: non-home-path cells OR home path cells that match this coin's base
+            // Allow: non-home-path cells OR home path cells that match this horse's base
             return cellData.cellType !== CellType.HOMEPATH
-              || cellData.baseID === coins[coinID].baseID;
+              || cellData.baseID === horses[horseID].baseID;
           });
 
           if (validCells.length > 0) {
@@ -444,7 +444,7 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
               }
               const cellData = cells[cell.position]?.[cell.cellID];
               return cellData?.cellType === CellType.HOMEPATH
-                && cellData.baseID === coins[coinID].baseID;
+                && cellData.baseID === horses[horseID].baseID;
             });
             
             nextCell = homePathInValid || validCells[0]; // Prefer home path, otherwise first valid
@@ -463,10 +463,10 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
             if (nonHomePathCells.length > 0) {
               nextCell = nonHomePathCells[0]; // Use non-home-path cell as last resort
             } else {
-              // All cells are home paths but none match this coin's base
+              // All cells are home paths but none match this horse's base
               // This is a configuration error - log and fail the move
-              console.error(`Coin ${coinID} at ${cellID} has no valid moves - all next cells are other bases' home paths`);
-              yield put(moveCoinFailure());
+              console.error(`Horse ${horseID} at ${cellID} has no valid moves - all next cells are other bases' home paths`);
+              yield put(moveHorseFailure());
               yield put(nextTurn());
               yield put(enableDie());
               return; // Exit movement saga to prevent hanging
@@ -485,16 +485,16 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
         const cellData = cells[nextCells[0].position]?.[nextCells[0].cellID];
         if (!cellData) {
           console.error(`Cell data not found for ${nextCells[0].cellID} at position ${nextCells[0].position}`);
-          yield put(moveCoinFailure());
+          yield put(moveHorseFailure());
           yield put(nextTurn());
           yield put(enableDie());
           return;
         }
         
-        if (cellData.cellType === CellType.HOMEPATH && cellData.baseID !== coins[coinID].baseID) {
+        if (cellData.cellType === CellType.HOMEPATH && cellData.baseID !== horses[horseID].baseID) {
           // Prevent entering another base's home path
-          console.warn(`Coin ${coinID} cannot enter ${nextCells[0].cellID} - wrong base home path (expected ${coins[coinID].baseID}, got ${cellData.baseID})`);
-          yield put(moveCoinFailure());
+          console.warn(`Horse ${horseID} cannot enter ${nextCells[0].cellID} - wrong base home path (expected ${horses[horseID].baseID}, got ${cellData.baseID})`);
+          yield put(moveHorseFailure());
           yield put(nextTurn());
           yield put(enableDie());
           return; // Fail the move instead of allowing it
@@ -504,22 +504,22 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
       }
     }
 
-    // Check for blocking coin on next cell - if found, cannot move over
-    // Blocking applies to both same-color and different-color coins
+    // Check for blocking horse on next cell - if found, cannot move over
+    // Blocking applies to both same-color and different-color horses
     // Exception: If we're allowed to kick this specific blocking cell, allow movement to it
     if (nextCell.cellID !== 'HOME') {
       const nextCellData = cells[nextCell.position]?.[nextCell.cellID];
-      if (nextCellData && nextCellData.coinIDs && nextCellData.coinIDs.length > 0) {
-        // Found a coin on the next cell - check if we can kick it
+      if (nextCellData && nextCellData.horseIDs && nextCellData.horseIDs.length > 0) {
+        // Found a horse on the next cell - check if we can kick it
         // Allow movement if this is the blocking cell we're allowed to kick
-        if (canKickBlockingCoin && blockingCellIDToKick && nextCell.cellID === blockingCellIDToKick) {
+        if (canKickBlockingHorse && blockingCellIDToKick && nextCell.cellID === blockingCellIDToKick) {
           // This is the blocking cell we're allowed to kick - proceed with movement
           // The kick will be handled by performDisqualificationCheck later
         } else {
-          // Cannot kick this coin - block the movement
-          // Note: We cannot kick same-color coins, so any blocking coin prevents movement
-          console.warn(`Coin ${coinID} cannot move to ${nextCell.cellID} - blocked by ${nextCellData.coinIDs[0]}`);
-          yield put(moveCoinFailure());
+          // Cannot kick this horse - block the movement
+          // Note: We cannot kick same-color horses, so any blocking horse prevents movement
+          console.warn(`Horse ${horseID} cannot move to ${nextCell.cellID} - blocked by ${nextCellData.horseIDs[0]}`);
+          yield put(moveHorseFailure());
           yield put(nextTurn());
           yield put(enableDie());
           return; // Stop movement and pass turn
@@ -527,16 +527,16 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
       }
     }
 
-    // Animate: lift coin from current cell
-    yield put(liftCoin(cellID, coinID, walkwayPosition));
+    // Animate: lift horse from current cell
+    yield put(liftHorse(cellID, horseID, walkwayPosition));
 
     // Check if we've reached the home position
     if (nextCell.cellID === 'HOME') {
-      yield put(homeCoin(coinID));
-      bonusChanceForHomeCoin = true;
+      yield put(homeHorse(horseID));
+      bonusChanceForHomeHorse = true;
     } else {
-      // Place coin on next cell
-      yield put(placeCoin(nextCell.cellID, coinID, nextCell.position));
+      // Place horse on next cell
+      yield put(placeHorse(nextCell.cellID, horseID, nextCell.position));
     }
 
     // Animation delay for smooth movement
@@ -552,66 +552,66 @@ function * moveCoinSaga(action: ReturnType<typeof moveCoin>) {
   const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
   
   // Determine if player gets a bonus turn
-  const bonusChance = bonusChanceForHomeCoin                          // Reached home
-  || (yield call(performDisqualificationCheck, action.data!.coinID, walkwayPosition, cellID)) // Captured opponent
+  const bonusChance = bonusChanceForHomeHorse                          // Reached home
+  || (yield call(performDisqualificationCheck, action.data!.horseID, walkwayPosition, cellID)) // Captured opponent
   || ((roll1 === Rolls.ONE && roll2 === Rolls.SIX) || (roll1 === Rolls.SIX && roll2 === Rolls.ONE) || roll1 === roll2); // Rolled spawnable combination
 
   // Log the successful move
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
-  const playerColor = bases[coins[coinID].baseID].color;
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const playerColor = bases[horses[horseID].baseID].color;
 
   // Log the move action
   yield put(addLogEntry({
     player: playerColor,
-    action: 'Moved coin',
-    details: `Moved coin ${coinID.split('_')[1]} ${stepsToMove} spaces`,
+    action: 'Moved horse',
+    details: `Moved horse ${horseID.split('_')[1]} ${stepsToMove} spaces`,
   }));
 
   // Complete the move and handle turn progression
-  yield put(moveCoinSuccess(bonusChance, coinID, stepsToMove as Rolls));
+  yield put(moveHorseSuccess(bonusChance, horseID, stepsToMove as Rolls));
 
   // Advance to next turn unless player gets bonus
-  // Note: Roll invalidation and die enabling are handled in moveCoinSuccessSaga
+  // Note: Roll invalidation and die enabling are handled in moveHorseSuccessSaga
   if (!bonusChance) {
     yield put(nextTurn());
   }
 }
 
 /**
- * Checks if the moving coin captures any opponent coins
+ * Checks if the moving horse captures any opponent horses
  *
- * When a coin lands on a normal cell, it checks if there are any opponent coins
- * on that cell. If found, those coins are sent back to their base (disqualified).
+ * When a horse lands on a normal cell, it checks if there are any opponent horses
+ * on that cell. If found, those horses are sent back to their base (disqualified).
  * This gives the player a bonus turn for successful captures.
  *
- * @param activeCoinID - The coin that just moved
- * @param walkwayPosition - Position where the coin landed
- * @param cellID - Specific cell where the coin landed
- * @returns true if any coins were captured (player gets bonus turn)
+ * @param activeHorseID - The horse that just moved
+ * @param walkwayPosition - Position where the horse landed
+ * @param cellID - Specific cell where the horse landed
+ * @returns true if any horses were captured (player gets bonus turn)
  */
-function * performDisqualificationCheck(activeCoinID: ICoin['coinID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']) {
+function * performDisqualificationCheck(activeHorseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']) {
   // No captures possible at home position
   if (cellID === 'HOME') {
     return false;
   }
 
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
 
-  const activeCoin = coins[activeCoinID];
-  const cellInWhichCoinLanded = cells[walkwayPosition][cellID];
+  const activeHorse = horses[activeHorseID];
+  const cellInWhichHorseLanded = cells[walkwayPosition][cellID];
 
   // Debug logging for development
-  console.log(cellInWhichCoinLanded, activeCoin);
+  console.log(cellInWhichHorseLanded, activeHorse);
 
-  // Any cell type (NORMAL, SPAWN, HOMEPATH) allows captures if it has opponent coins
-  // Check each coin on the target cell
-  for (const coinID of cellInWhichCoinLanded.coinIDs) {
-    const coin = coins[coinID];
-    // If it's an opponent coin, disqualify it (kick it)
-    if (activeCoin.baseID !== coin.baseID) {
-      yield put(disqualifyCoin(coinID, walkwayPosition, cellID));
+  // Any cell type (NORMAL, SPAWN, HOMEPATH) allows captures if it has opponent horses
+  // Check each horse on the target cell
+  for (const horseID of cellInWhichHorseLanded.horseIDs) {
+    const horse = horses[horseID];
+    // If it's an opponent horse, disqualify it (kick it)
+    if (activeHorse.baseID !== horse.baseID) {
+      yield put(disqualifyHorse(horseID, walkwayPosition, cellID));
       return true; // Bonus turn for successful capture
     }
   }
@@ -625,20 +625,20 @@ function * performDisqualificationCheck(activeCoinID: ICoin['coinID'], walkwayPo
  */
 // eslint-disable-next-line require-yield
 function * highlightCellsWithSteps(
-  coin: ICoin,
+  horse: IHorse,
   startCellID: string,
   steps: number,
-  blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null,
+  blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null,
   reachableCells: Set<string>,
   cells: ReturnType<typeof cellsSelector>,
   links: ReturnType<typeof linksSelector>,
-  coins: ReturnType<typeof coinsSelector>,
-  cellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>>,
-  addReachableCell: (cellID: string, coinID: ICoin['coinID'], moveType: 'spawn' | 'kick' | 'move') => void
+  horses: ReturnType<typeof horsesSelector>,
+  cellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>>,
+  addReachableCell: (cellID: string, horseID: IHorse['horseID'], moveType: 'spawn' | 'kick' | 'move') => void
 ): Generator<any, void, any> {
   const visited = new Map<string, number>();
   const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
-    { cellID: startCellID, position: coin.position, stepsRemaining: steps },
+    { cellID: startCellID, position: horse.position, stepsRemaining: steps },
   ];
 
   while (queue.length > 0) {
@@ -648,29 +648,29 @@ function * highlightCellsWithSteps(
       // We've reached this cell in exactly the right number of steps
       if (cellID !== 'HOME') {
         const cellData = cells[position]?.[cellID];
-        if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
-          const coinOnCell = coins[cellData.coinIDs[0]];
-          // If it's a blocking coin, don't highlight (we're avoiding it)
-          if (coinOnCell) {
+        if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+          const horseOnCell = horses[cellData.horseIDs[0]];
+          // If it's a blocking horse, don't highlight (we're avoiding it)
+          if (horseOnCell) {
             // Only skip if it's the specific blocking cell we're trying to avoid
             if (blockingInfo && cellID === blockingInfo.blockingCellID) {
               continue; // This is the blocking cell - don't highlight
             }
-            // Otherwise, if there's a coin but it's not the blocking one, we can still highlight
-            // (this handles cases where there might be other coins on the path)
+            // Otherwise, if there's a horse but it's not the blocking one, we can still highlight
+            // (this handles cases where there might be other horses on the path)
           }
         }
       }
-      // Determine move type: check if there's an opponent coin on this cell (kick) or normal move
+      // Determine move type: check if there's an opponent horse on this cell (kick) or normal move
       const cellDataForType = cells[position]?.[cellID];
       let moveType: 'kick' | 'move' = 'move';
-      if (cellDataForType && cellDataForType.coinIDs && cellDataForType.coinIDs.length > 0) {
-        const coinOnCell = coins[cellDataForType.coinIDs[0]];
-        if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
-          moveType = 'kick'; // Opponent coin can be kicked
+      if (cellDataForType && cellDataForType.horseIDs && cellDataForType.horseIDs.length > 0) {
+        const horseOnCell = horses[cellDataForType.horseIDs[0]];
+        if (horseOnCell && horseOnCell.baseID !== horse.baseID) {
+          moveType = 'kick'; // Opponent horse can be kicked
         }
       }
-      addReachableCell(cellID, coin.coinID, moveType);
+      addReachableCell(cellID, horse.horseID, moveType);
       continue;
     }
 
@@ -693,15 +693,15 @@ function * highlightCellsWithSteps(
       if (nextCell.cellID !== 'HOME') {
         const cellData = cells[nextCell.position]?.[nextCell.cellID];
         if (cellData && cellData.cellType === CellType.HOMEPATH) {
-          if (cellData.baseID !== coin.baseID) {
+          if (cellData.baseID !== horse.baseID) {
             continue;
           }
         }
         
-        // Check if next cell has a blocking coin - skip if it's the blocking cell we're avoiding
-        if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
-          const coinOnCell = coins[cellData.coinIDs[0]];
-          if (coinOnCell) {
+        // Check if next cell has a blocking horse - skip if it's the blocking cell we're avoiding
+        if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+          const horseOnCell = horses[cellData.horseIDs[0]];
+          if (horseOnCell) {
             // If this is the blocking cell we're trying to avoid, don't explore past it
             if (blockingInfo && nextCell.cellID === blockingInfo.blockingCellID) {
               continue; // Don't explore past the blocking cell
@@ -716,12 +716,12 @@ function * highlightCellsWithSteps(
 }
 
 /**
- * Calculates all reachable cells for the current player's coins
+ * Calculates all reachable cells for the current player's horses
  * Returns a Set of cell IDs that can be reached with any valid dice roll (sum of 2-12)
- * Also returns a Map of cellID -> Array<{coinID, moveType}> to track which coins can reach which cells
+ * Also returns a Map of cellID -> Array<{horseID, moveType}> to track which horses can reach which cells
  */
-export function * calculateReachableCells(): Generator<any, { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>> }, any> {
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+export function * calculateReachableCells(): Generator<any, { reachableCells: Set<string>; cellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> }, any> {
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
@@ -746,37 +746,37 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
   const showPreRollStep1 = isDieRollAllowed || (isDieRollValid && !isDieRollAllowed);
 
   const reachableCells = new Set<string>();
-  const cellsByCoin = new Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>>();
+  const cellsByHorse = new Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>>();
   const currentBase = bases[currentTurn];
 
   if (!currentBase) {
-    return { reachableCells, cellsByCoin };
+    return { reachableCells, cellsByHorse };
   }
 
-  // Helper function to add a cell to both reachableCells and cellsByCoin
-  const addReachableCell = (cellID: string, coinID: ICoin['coinID'], moveType: 'spawn' | 'kick' | 'move') => {
+  // Helper function to add a cell to both reachableCells and cellsByHorse
+  const addReachableCell = (cellID: string, horseID: IHorse['horseID'], moveType: 'spawn' | 'kick' | 'move') => {
     reachableCells.add(cellID);
-    if (!cellsByCoin.has(cellID)) {
-      cellsByCoin.set(cellID, []);
+    if (!cellsByHorse.has(cellID)) {
+      cellsByHorse.set(cellID, []);
     }
-    const existing = cellsByCoin.get(cellID)!;
+    const existing = cellsByHorse.get(cellID)!;
     // Only add if not already present (avoid duplicates)
-    if (!existing.some(e => e.coinID === coinID && e.moveType === moveType)) {
-      existing.push({ coinID, moveType });
+    if (!existing.some(e => e.horseID === horseID && e.moveType === moveType)) {
+      existing.push({ horseID, moveType });
     }
   };
 
-  // Get all coins for the current player
-  const playerCoins = currentBase.coinIDs.map((coinID) => coins[coinID]);
+  // Get all horses for the current player
+  const playerHorses = currentBase.horseIDs.map((horseID) => horses[horseID]);
 
-  // For each coin, calculate reachable cells
-  for (const coin of playerCoins) {
-    if (coin.isRetired) {
-      continue; // Skip retired coins
+  // For each horse, calculate reachable cells
+  for (const horse of playerHorses) {
+    if (horse.isRetired) {
+      continue; // Skip retired horses
     }
 
-    if (!coin.isSpawned) {
-      // Unspawned coin - can spawn to spawn cell
+    if (!horse.isSpawned) {
+      // Unspawned horse - can spawn to spawn cell
       // Find the spawn cell for this base
       const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
       const walkway = Object.values(walkways).find(
@@ -788,30 +788,30 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
           (cell) => cell.cellType === CellType.SPAWN && cell.baseID === currentBase.ID
         );
         if (spawnCell) {
-          addReachableCell(spawnCell.cellID, coin.coinID, 'spawn');
+          addReachableCell(spawnCell.cellID, horse.horseID, 'spawn');
         }
       }
     } else {
-      // Spawned coin - calculate cells reachable with 2-12 steps (sum of two dice)
-      const startCellID = coin.cellID;
+      // Spawned horse - calculate cells reachable with 2-12 steps (sum of two dice)
+      const startCellID = horse.cellID;
       if (!startCellID) continue;
 
       // Calculate all cells reachable with 2-12 steps (two dice: min 1+1=2, max 6+6=12)
       for (let steps = 2; steps <= 12; steps++) {
         // Check if this move would overshoot home
-        if (coin.steps + steps > WINNING_MOVES) {
+        if (horse.steps + steps > WINNING_MOVES) {
           continue; // Skip moves that overshoot
         }
 
-        // Check for blocking coins for this specific step count
-        const blockingInfo: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-          yield call(findBlockingCoin, coin.coinID, steps as Rolls);
+        // Check for blocking horses for this specific step count
+        const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+          yield call(findBlockingHorse, horse.horseID, steps as Rolls);
         
         let maxStepsToExplore = steps;
         let shouldHighlightBlockingCell = false;
         
         if (blockingInfo) {
-          // Blocking coin detected at step (stepsBeforeBlocking + 1)
+          // Blocking horse detected at step (stepsBeforeBlocking + 1)
           const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
           
           if (steps < blockingStep) {
@@ -822,15 +822,15 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
               continue; // Cannot move at all - skip this step count
             }
           } else if (steps === blockingStep && !blockingInfo.isSameColor) {
-            // Die roll equals blocking step AND blocking coin is opponent (different color)
-            // Can kick the blocking coin - highlight the blocking cell itself
-            // Note: Same-color coins cannot be kicked, so we skip highlighting
+            // Die roll equals blocking step AND blocking horse is opponent (different color)
+            // Can kick the blocking horse - highlight the blocking cell itself
+            // Note: Same-color horses cannot be kicked, so we skip highlighting
             shouldHighlightBlockingCell = true;
             maxStepsToExplore = steps; // Can move full distance and kick
           } else {
             // Either:
             // - Die roll > blocking step (cannot kick, would overshoot)
-            // - Die roll == blocking step but blocking coin is same color (cannot kick same color)
+            // - Die roll == blocking step but blocking horse is same color (cannot kick same color)
             continue; // Skip this step count - no highlighting
           }
         }
@@ -839,7 +839,7 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
         // Track visited cells with their step count to avoid revisiting with more steps
         const visited = new Map<string, number>(); // cellID -> minimum steps to reach
         const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
-          { cellID: startCellID, position: coin.position, stepsRemaining: maxStepsToExplore },
+          { cellID: startCellID, position: horse.position, stepsRemaining: maxStepsToExplore },
         ];
 
         while (queue.length > 0) {
@@ -849,31 +849,31 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
             // We've reached this cell in exactly the right number of steps
             if (cellID !== 'HOME') {
               const cellData = cells[position]?.[cellID];
-              if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
-                const coinOnCell = coins[cellData.coinIDs[0]];
-                // If it's a blocking coin (opponent or same color)
-                if (coinOnCell) {
-                  // Can only kick opponent coins (different color), not same-color coins
-                  const isOpponentCoin = coinOnCell.baseID !== coin.baseID;
-                  if (isOpponentCoin && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
+              if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+                const horseOnCell = horses[cellData.horseIDs[0]];
+                // If it's a blocking horse (opponent or same color)
+                if (horseOnCell) {
+                  // Can only kick opponent horses (different color), not same-color horses
+                  const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+                  if (isOpponentHorse && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
                     // This is the opponent blocking cell and we can kick it - highlight it
-                    addReachableCell(cellID, coin.coinID, 'kick');
+                    addReachableCell(cellID, horse.horseID, 'kick');
                   }
                   // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
                   continue;
                 }
               }
             }
-            // Determine move type: check if there's an opponent coin on this cell (kick) or normal move
+            // Determine move type: check if there's an opponent horse on this cell (kick) or normal move
             const cellDataForType = cells[position]?.[cellID];
             let moveType: 'kick' | 'move' = 'move';
-            if (cellDataForType && cellDataForType.coinIDs && cellDataForType.coinIDs.length > 0) {
-              const coinOnCell = coins[cellDataForType.coinIDs[0]];
-              if (coinOnCell && coinOnCell.baseID !== coin.baseID) {
-                moveType = 'kick'; // Opponent coin can be kicked
+            if (cellDataForType && cellDataForType.horseIDs && cellDataForType.horseIDs.length > 0) {
+              const horseOnCell = horses[cellDataForType.horseIDs[0]];
+              if (horseOnCell && horseOnCell.baseID !== horse.baseID) {
+                moveType = 'kick'; // Opponent horse can be kicked
               }
             }
-            addReachableCell(cellID, coin.coinID, moveType);
+            addReachableCell(cellID, horse.horseID, moveType);
             continue;
           }
 
@@ -896,38 +896,38 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
               continue;
             }
 
-            // For homepath cells, only allow if they match the coin's base
+            // For homepath cells, only allow if they match the horse's base
             if (nextCell.cellID !== 'HOME') {
               const cellData = cells[nextCell.position]?.[nextCell.cellID];
               if (cellData && cellData.cellType === CellType.HOMEPATH) {
-                if (cellData.baseID !== coin.baseID) {
+                if (cellData.baseID !== horse.baseID) {
                   continue; // Skip other players' homepaths
                 }
               }
               
-              // Check if next cell has a blocking coin
-              if (cellData && cellData.coinIDs && cellData.coinIDs.length > 0) {
-                const coinOnCell = coins[cellData.coinIDs[0]];
-                // If it's any blocking coin (same color or opponent)
-                if (coinOnCell) {
-                  // Check if we can kick this specific blocking coin
-                  // We can only kick opponent coins (different color) if:
+              // Check if next cell has a blocking horse
+              if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+                const horseOnCell = horses[cellData.horseIDs[0]];
+                // If it's any blocking horse (same color or opponent)
+                if (horseOnCell) {
+                  // Check if we can kick this specific blocking horse
+                  // We can only kick opponent horses (different color) if:
                   // 1. We have blockingInfo for this step count
                   // 2. This is the exact blocking cell we detected
                   // 3. The die roll equals the blocking step (steps === blockingStep)
-                  // 4. The blocking coin is NOT same color (!blockingInfo.isSameColor)
-                  const isOpponentCoin = coinOnCell.baseID !== coin.baseID;
-                  if (isOpponentCoin && blockingInfo && nextCell.cellID === blockingInfo.blockingCellID && shouldHighlightBlockingCell && !blockingInfo.isSameColor) {
+                  // 4. The blocking horse is NOT same color (!blockingInfo.isSameColor)
+                  const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+                  if (isOpponentHorse && blockingInfo && nextCell.cellID === blockingInfo.blockingCellID && shouldHighlightBlockingCell && !blockingInfo.isSameColor) {
                     // This is the opponent blocking cell we detected and we can kick it - allow exploring to reach it
                     // Continue to queue.push below
                   } else {
-                    // Blocked by coin (same-color or opponent we can't kick) - don't explore this path
-                    // This prevents highlighting cells beyond any blocking coin
+                    // Blocked by horse (same-color or opponent we can't kick) - don't explore this path
+                    // This prevents highlighting cells beyond any blocking horse
                     // This handles cases where:
-                    // - The blocking coin is same color (cannot kick)
-                    // - The blocking coin is not the one we detected for this step count
+                    // - The blocking horse is same color (cannot kick)
+                    // - The blocking horse is not the one we detected for this step count
                     // - We cannot kick it (steps <= blockingStep)
-                    // - We're exploring a different path that also has a blocking coin
+                    // - We're exploring a different path that also has a blocking horse
                     continue;
                   }
                 }
@@ -944,13 +944,13 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
       // This allows players to move with one die when blocking is detected for the full sum
       // OR when they want to move with just one die value instead of the sum
       // OR before rolling (to show step 1 as a potential option if a pair is rolled)
-      // This is especially important for coins on the spawn cell (steps === 0) to show step 1
+      // This is especially important for horses on the spawn cell (steps === 0) to show step 1
       // ALWAYS show step 1 as an option when:
       // 1. It's a pair (any pair value) - show step 1 AND the pair value as options
       // 2. Before rolling (showPreRollStep1) - show step 1 as a potential option
-      // 3. For coins on spawn cell (steps === 0) - always show step 1 as a potential option
-      //    This ensures step 1 highlighting is never randomly missing for coins that can move
-      const isOnSpawnCell = coin.steps === 0;
+      // 3. For horses on spawn cell (steps === 0) - always show step 1 as a potential option
+      //    This ensures step 1 highlighting is never randomly missing for horses that can move
+      const isOnSpawnCell = horse.steps === 0;
       const shouldShowStep1 = isPair || showPreRollStep1 || isOnSpawnCell;
       const shouldShowPairValue = isPair && singleDieValue && singleDieValue >= 1 && singleDieValue <= 6;
       
@@ -958,28 +958,28 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
       if (shouldShowStep1) {
         const step1Value = 1;
         // Check for blocking for step 1
-        const blockingInfoForStep1: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-          yield call(findBlockingCoin, coin.coinID, step1Value as Rolls);
+        const blockingInfoForStep1: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+          yield call(findBlockingHorse, horse.horseID, step1Value as Rolls);
         
-        // For coins on spawn cell (steps === 0), this should always be true for step 1
-        if (coin.steps + step1Value <= WINNING_MOVES) {
+        // For horses on spawn cell (steps === 0), this should always be true for step 1
+        if (horse.steps + step1Value <= WINNING_MOVES) {
           if (blockingInfoForStep1) {
             // Blocking detected for step 1
             const blockingStep = blockingInfoForStep1.stepsBeforeBlocking + 1;
             
             if (step1Value < blockingStep) {
               // Step 1 is less than blocking step - can move to valid cell before blocker
-              yield call(highlightCellsWithSteps, coin, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
+              yield call(highlightCellsWithSteps, horse, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
             } else if (step1Value === blockingStep && !blockingInfoForStep1.isSameColor) {
-              // Step 1 equals blocking step AND blocking coin is opponent - can kick
+              // Step 1 equals blocking step AND blocking horse is opponent - can kick
               // Highlight the blocking cell itself
-              addReachableCell(blockingInfoForStep1.blockingCellID, coin.coinID, 'kick');
+              addReachableCell(blockingInfoForStep1.blockingCellID, horse.horseID, 'kick');
             }
             // If step1Value > blockingStep, cannot move (would overshoot) - but this shouldn't happen for step 1
           } else {
             // No blocking for step 1 - show all cells reachable with step 1
-            // This is critical for coins on spawn cell to show step 1 highlighting
-            yield call(highlightCellsWithSteps, coin, startCellID, step1Value, null, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
+            // This is critical for horses on spawn cell to show step 1 highlighting
+            yield call(highlightCellsWithSteps, horse, startCellID, step1Value, null, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
           }
         }
       }
@@ -987,27 +987,27 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
       // Also show the pair value as an option (in addition to step 1) when it's a pair
       if (shouldShowPairValue && singleDieValue !== 1) {
         // Only show pair value if it's different from step 1 (already handled above)
-        const blockingInfoForPair: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-          yield call(findBlockingCoin, coin.coinID, singleDieValue as Rolls);
+        const blockingInfoForPair: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+          yield call(findBlockingHorse, horse.horseID, singleDieValue as Rolls);
         
         // Check if we can move with the pair value
-        if (coin.steps + singleDieValue <= WINNING_MOVES) {
+        if (horse.steps + singleDieValue <= WINNING_MOVES) {
           if (blockingInfoForPair) {
             // Blocking detected for pair value
             const blockingStep = blockingInfoForPair.stepsBeforeBlocking + 1;
             
             if (singleDieValue < blockingStep) {
               // Pair value is less than blocking step - can move to valid cell before blocker
-              yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
+              yield call(highlightCellsWithSteps, horse, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
             } else if (singleDieValue === blockingStep && !blockingInfoForPair.isSameColor) {
-              // Pair value equals blocking step AND blocking coin is opponent - can kick
+              // Pair value equals blocking step AND blocking horse is opponent - can kick
               // Highlight the blocking cell itself
-              addReachableCell(blockingInfoForPair.blockingCellID, coin.coinID, 'kick');
+              addReachableCell(blockingInfoForPair.blockingCellID, horse.horseID, 'kick');
             }
             // If singleDieValue > blockingStep, cannot move (would overshoot)
           } else {
             // No blocking for pair value - show all cells reachable with pair value
-            yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, null, reachableCells, cells, links, coins, cellsByCoin, addReachableCell);
+            yield call(highlightCellsWithSteps, horse, startCellID, singleDieValue, null, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
           }
         }
       }
@@ -1016,7 +1016,7 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
     }
   }
 
-  return { reachableCells, cellsByCoin };
+  return { reachableCells, cellsByHorse };
 }
 
 /**
@@ -1047,18 +1047,18 @@ function * watchForRollDieComplete() {
 
 /**
  * Handles when turn is passed to a player
- * Calculates and highlights all reachable cells for that player's coins
+ * Calculates and highlights all reachable cells for that player's horses
  */
 function * passTurnToSaga() {
   // Clear any existing highlighting
   yield put(clearHighlightedCells());
 
   // Calculate reachable cells for current player
-  const result: { reachableCells: Set<string>; cellsByCoin: Map<string, Array<{ coinID: ICoin['coinID']; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
+  const result: { reachableCells: Set<string>; cellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
 
   // Set highlighted cells
   if (result.reachableCells.size > 0) {
-    yield put(setHighlightedCells(result.reachableCells, result.cellsByCoin));
+    yield put(setHighlightedCells(result.reachableCells, result.cellsByHorse));
   }
 }
 
@@ -1200,78 +1200,78 @@ function * setPlayersSaga(action: ReturnType<typeof setPlayers>) {
 }
 
 /**
- * Watcher saga for coin disqualification
- * Handles when coins are captured and sent back to base
+ * Watcher saga for horse disqualification
+ * Handles when horses are captured and sent back to base
  */
-function * watchForDisqualifyCoin() {
-  yield takeLatest(ActionTypes.DISQUALIFY_COIN, disqualifyCoinSaga);
+function * watchForDisqualifyHorse() {
+  yield takeLatest(ActionTypes.DISQUALIFY_HORSE, disqualifyHorseSaga);
 }
 
 /**
- * Logs when a coin is disqualified (captured by opponent)
+ * Logs when a horse is disqualified (captured by opponent)
  *
- * Called when one player's coin lands on the same cell as an opponent's coin,
- * sending the opponent's coin back to their base. This is logged for game history.
+ * Called when one player's horse lands on the same cell as an opponent's horse,
+ * sending the opponent's horse back to their base. This is logged for game history.
  *
- * @param action - Contains coinID that was disqualified
+ * @param action - Contains horseID that was disqualified
  */
-function * disqualifyCoinSaga(action: ReturnType<typeof disqualifyCoin>) {
-  const { coinID } = action.data!;
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+function * disqualifyHorseSaga(action: ReturnType<typeof disqualifyHorse>) {
+  const { horseID } = action.data!;
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-  const coin = coins[coinID];
+  const horse = horses[horseID];
 
   // Log the disqualification with highlight for importance
   yield put(addLogEntry({
-    player: bases[coin.baseID].color,
-    action: 'Coin disqualified',
-    details: `Coin ${coinID.split('_')[1]} was sent back to base`,
+    player: bases[horse.baseID].color,
+    action: 'Horse disqualified',
+    details: `Horse ${horseID.split('_')[1]} was sent back to base`,
     highlight: true, // Important event gets visual highlighting
   }));
 }
 
 /**
- * Watcher saga for coins reaching home
- * Celebrates when players successfully get coins to the finish
+ * Watcher saga for horses reaching home
+ * Celebrates when players successfully get horses to the finish
  */
-function * watchForHomeCoin() {
-  yield takeLatest(ActionTypes.HOME_COIN, homeCoinSaga);
+function * watchForHomeHorse() {
+  yield takeLatest(ActionTypes.HOME_HORSE, homeHorseSaga);
 }
 
 /**
- * Handles when a coin successfully reaches home
+ * Handles when a horse successfully reaches home
  *
- * This is the victory condition! When a coin reaches home:
+ * This is the victory condition! When a horse reaches home:
  * 1. Logs the achievement
- * 2. Checks if the player has won (all 4 coins home)
+ * 2. Checks if the player has won (all 4 horses home)
  * 3. If won, marks the player as winner and logs victory
  *
- * @param action - Contains coinID that reached home
+ * @param action - Contains horseID that reached home
  */
-function * homeCoinSaga(action: ReturnType<typeof homeCoin>) {
-  const { coinID } = action.data!;
+function * homeHorseSaga(action: ReturnType<typeof homeHorse>) {
+  const { horseID } = action.data!;
 
   // Get current game state
-  const coins: ReturnType<typeof coinsSelector> = yield select(coinsSelector);
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
 
-  // Find which player owns this coin
-  const { baseID } = coins[coinID];
+  // Find which player owns this horse
+  const { baseID } = horses[horseID];
   const base = bases[baseID];
 
-  // Count how many of this player's coins are retired (at home)
-  const retiredCoins = base.coinIDs.filter((coinID) => coins[coinID].isRetired);
+  // Count how many of this player's horses are retired (at home)
+  const retiredHorses = base.horseIDs.filter((horseID) => horses[horseID].isRetired);
 
   // Log the successful home arrival
   yield put(addLogEntry({
     player: base.color,
-    action: 'Coin reached home',
-    details: `Coin ${coinID.split('_')[1]} completed the journey!`,
+    action: 'Horse reached home',
+    details: `Horse ${horseID.split('_')[1]} completed the journey!`,
     highlight: true, // Important achievement gets highlighting
   }));
 
-  // Check for victory condition - all coins must be home
-  const hasWon = retiredCoins.length === base.coinIDs.length;
+  // Check for victory condition - all horses must be home
+  const hasWon = retiredHorses.length === base.horseIDs.length;
   if (hasWon) {
     // Player has won! Log victory and mark as winner
     yield put(addLogEntry({
@@ -1293,12 +1293,12 @@ function * homeCoinSaga(action: ReturnType<typeof homeCoin>) {
  */
 export const sagas = [
   watchForGetInitialGameData, // Game initialization from JSON
-  watchForSpawnCoin,          // Coin spawning from base
-  watchForMoveCoin,           // Coin movement along board
-  watchForDisqualifyCoin,     // Coin captures (logging only)
+  watchForSpawnHorse,          // Horse spawning from base
+  watchForMoveHorse,           // Horse movement along board
+  watchForDisqualifyHorse,     // Horse captures (logging only)
   watchForNextTurn,           // Turn progression
   watchForPassTurnTo,         // Calculate reachable cells when turn starts
   watchForRollDieComplete,    // Clear highlighting when dice is rolled
   watchForSetPlayers,         // Player count configuration
-  watchForHomeCoin,           // Victory detection
+  watchForHomeHorse,           // Victory detection
 ];

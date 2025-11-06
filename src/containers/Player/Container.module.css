@@ -26,14 +26,14 @@
   pointer-events: none;   /* Disable mouse interactions */
 }
 
-/* Container for retired coins (coins that reached home) */
-.RetiredCoins {
-  display: flex;          /* Use flexbox for coin layout */
-  flex-direction: column; /* Stack coins vertically */
-  align-items: center;    /* Center coins horizontally */
+/* Container for retired horses (horses that reached home) */
+.RetiredHorses {
+  display: flex;          /* Use flexbox for horse layout */
+  flex-direction: column; /* Stack horses vertically */
+  align-items: center;    /* Center horses horizontally */
 }
 
-/* Remove bottom margin from individual retired coins */
-.RetiredCoins > div {
-  margin-bottom: 0; /* Override default coin margin for tight spacing */
+/* Remove bottom margin from individual retired horses */
+.RetiredHorses > div {
+  margin-bottom: 0; /* Override default horse margin for tight spacing */
 }

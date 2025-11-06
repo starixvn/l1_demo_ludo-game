@@ -1,16 +1,16 @@
 /**
- * Coin Component Styles
+ * Horse Component Styles
  *
- * Displays a Unicode chess piece character (Black Knight - ♞) as the coin.
+ * Displays a Unicode chess piece character (Black Knight - ♞) as the horse.
  */
 
-/* Main coin container - displays the Unicode character */
+/* Main horse container - displays the Unicode character */
 .Container {
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  margin-bottom: 10%;              /* Spacing between coins */
+  margin-bottom: 10%;              /* Spacing between horses */
   font-size: 250%;                 /* 10x larger font size for the Unicode character */
   line-height: 1;
   z-index: 6;
