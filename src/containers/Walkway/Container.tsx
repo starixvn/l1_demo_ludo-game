@@ -118,10 +118,25 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
 const mapDispatchToProps = {};
 
 /**
+ * Global tracking for popovers across all walkways
+ * These are reset when highlighting changes (detected via componentDidUpdate)
+ */
+let globalSeenCoinMoveTypes = new Set<string>();
+let globalSeenMoveCoins = new Set<string>();
+
+/**
  * Walkway container component class
  * Renders a segment of the game board walkway with interactive cells
  */
 class WalkwayBare extends React.PureComponent<IProps> {
+  componentDidUpdate(prevProps: IProps) {
+    // Reset global tracking when highlighting changes (new roll happened)
+    if (prevProps.highlightedCells !== this.props.highlightedCells) {
+      globalSeenCoinMoveTypes.clear();
+      globalSeenMoveCoins.clear();
+    }
+  }
+
   /**
    * Renders the walkway container with appropriate dimensions
    */
@@ -171,9 +186,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
       cellConfigurations[position]
     );
 
-    // Track which (coinID, moveType) combinations have shown popovers
-    // This ensures only one popover per coin per move type across all walkways
-    const globalSeenCoinMoveTypes = new Set<string>();
+    // Use global tracking for popovers across all walkways
+    // For "move" type, track by coinID only (one popover per coin for all move cells)
+    // For "spawn" and "kick" types, track by (coinID, moveType) combination
 
     // Process each cell configuration and create Cell components
     cellConfigurationsForWalkway.forEach((cellConfiguration, index) => {
@@ -198,7 +213,8 @@ class WalkwayBare extends React.PureComponent<IProps> {
       const isHighlighted = this.props.highlightedCells?.has(cellID) || false;
 
       // Determine if we should show a popover for this cell
-      // Show popover only for the first cell of each (coinID, moveType) combination
+      // For "move" type: show one popover per coin (first move cell encountered)
+      // For "spawn" and "kick" types: show one popover per (coinID, moveType) combination
       let showPopover = false;
       let popoverText = "";
 
@@ -207,18 +223,32 @@ class WalkwayBare extends React.PureComponent<IProps> {
         if (coinMoveTypes && coinMoveTypes.length > 0) {
           // Find the first (coinID, moveType) pair that hasn't been seen yet globally
           for (const { coinID, moveType } of coinMoveTypes) {
-            const key = `${coinID}_${moveType}`;
-            if (!globalSeenCoinMoveTypes.has(key)) {
-              globalSeenCoinMoveTypes.add(key);
-              showPopover = true;
-              // Determine popover text based on move type
-              if (moveType === "spawn") {
-                popoverText = "Place bet on spawn coin";
-              } else if (moveType === "kick") {
-                popoverText = "Place bet on kick blocking coin";
-              } else {
+            let shouldShow = false;
+
+            if (moveType === "move") {
+              // For "move" type, check if this coin has already shown a move popover
+              if (!globalSeenMoveCoins.has(coinID)) {
+                globalSeenMoveCoins.add(coinID);
+                shouldShow = true;
                 popoverText = "Place bet on cells";
               }
+            } else {
+              // For "spawn" and "kick" types, use the original logic
+              const key = `${coinID}_${moveType}`;
+              if (!globalSeenCoinMoveTypes.has(key)) {
+                globalSeenCoinMoveTypes.add(key);
+                shouldShow = true;
+                // Determine popover text based on move type
+                if (moveType === "spawn") {
+                  popoverText = "Place bet on spawn coin";
+                } else if (moveType === "kick") {
+                  popoverText = "Place bet on kick blocking coin";
+                }
+              }
+            }
+
+            if (shouldShow) {
+              showPopover = true;
               break; // Only show one popover per cell (first unseen coin/moveType)
             }
           }

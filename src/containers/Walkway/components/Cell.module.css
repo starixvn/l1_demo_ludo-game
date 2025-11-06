@@ -151,7 +151,7 @@
   margin-bottom: 8px;
   padding: 8px 12px;
   /* Background color is set via inline styles to use base color with 0.8 opacity */
-  color: #fff;
+  color: #000;
   border-radius: 6px;
   font-size: 12px;
   white-space: nowrap;
