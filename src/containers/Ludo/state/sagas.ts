@@ -20,7 +20,7 @@ import { mapByProperty } from 'common/utils';
 import { enableDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
-import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector, isDieRollAllowedSelector } from 'containers/Dice/state/selectors';
+import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector, isDieRollAllowedSelector, isDieRollValidSelector } from 'containers/Dice/state/selectors';
 import { DEFAULT_STARTING_BASE, WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY, NO_MOVE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
@@ -718,15 +718,19 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
   const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
   const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
   const isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector> = yield select(isDieRollAllowedSelector);
-  const isPair = roll1 === roll2 && roll1 >= 1 && roll1 <= 6; // Check if it's a valid pair
+  const isDieRollValid: ReturnType<typeof isDieRollValidSelector> = yield select(isDieRollValidSelector);
+  
+  // Check if it's a valid pair (both dice are the same and valid values)
+  // Only consider it a pair if the roll is valid (not default/initial values)
+  const isPair = isDieRollValid && roll1 === roll2 && roll1 >= 1 && roll1 <= 6;
   const singleDieValue = isPair ? roll1 : null; // If pair, use one die value (both are the same)
   
-  // Before rolling (when dice are clickable but not yet rolled), show step 1 as a potential option
-  // This allows players to see that step 1 is possible if they roll a pair like 1-1
-  // Show step 1 whenever dice are allowed to roll - this ensures consistency even if state is slightly out of sync
-  // The key insight: if dice can be rolled (isDieRollAllowed), show step 1 as a potential option
-  // This works for both initial turns and bonus turns
-  const showPreRollStep1 = isDieRollAllowed;
+  // Show step 1 as a potential option in these cases:
+  // 1. Before rolling (isDieRollAllowed && !isDieRollValid) - dice are clickable but not rolled yet
+  // 2. After rolling a pair (isPair) - show step 1 as one option when pair is rolled
+  // 3. After rolling when dice are disabled but roll is valid - for bonus turns
+  // This ensures step 1 is always shown when appropriate, regardless of timing
+  const showPreRollStep1 = isDieRollAllowed || (isDieRollValid && !isDieRollAllowed);
 
   const reachableCells = new Set<string>();
   const currentBase = bases[currentTurn];
@@ -905,52 +909,74 @@ export function * calculateReachableCells(): Generator<any, Set<string>, any> {
       // OR when they want to move with just one die value instead of the sum
       // OR before rolling (to show step 1 as a potential option if a pair is rolled)
       // This is especially important for coins on the spawn cell (steps === 0) to show step 1
-      if ((isPair && singleDieValue && singleDieValue >= 1 && singleDieValue <= 6) || showPreRollStep1) {
-        // Determine which single die value to use
-        let valueToUse = singleDieValue;
-        if (showPreRollStep1 && !isPair) {
-          // Before rolling, show step 1 as a potential option (in case 1-1 is rolled)
-          // This is important for coins on spawn cell (steps === 0) to show they can move 1 step
-          valueToUse = 1;
-        }
+      // ALWAYS show step 1 as an option when:
+      // 1. It's a pair (any pair value) - show step 1 AND the pair value as options
+      // 2. Before rolling (showPreRollStep1) - show step 1 as a potential option
+      // 3. For coins on spawn cell (steps === 0) - always show step 1 as a potential option
+      //    This ensures step 1 highlighting is never randomly missing for coins that can move
+      const isOnSpawnCell = coin.steps === 0;
+      const shouldShowStep1 = isPair || showPreRollStep1 || isOnSpawnCell;
+      const shouldShowPairValue = isPair && singleDieValue && singleDieValue >= 1 && singleDieValue <= 6;
+      
+      // Always show step 1 when it's a pair or before rolling
+      if (shouldShowStep1) {
+        const step1Value = 1;
+        // Check for blocking for step 1
+        const blockingInfoForStep1: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+          yield call(findBlockingCoin, coin.coinID, step1Value as Rolls);
         
-        // Ensure we have a valid value to use (should be 1-6)
-        // If showPreRollStep1 is true but valueToUse is still null/invalid, set it to 1
-        if (showPreRollStep1 && (!valueToUse || valueToUse < 1 || valueToUse > 6)) {
-          valueToUse = 1;
-        }
-        
-        if (valueToUse && valueToUse >= 1 && valueToUse <= 6) {
-          // Always check for blocking for the single die value first
-          const blockingInfoForSingle: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-            yield call(findBlockingCoin, coin.coinID, valueToUse as Rolls);
-          
-          // Check if we can move with one die value
-          // For coins on spawn cell (steps === 0), this should always be true for step 1
-          if (coin.steps + valueToUse <= WINNING_MOVES) {
-            if (blockingInfoForSingle) {
-              // Blocking detected for single die value
-              const blockingStep = blockingInfoForSingle.stepsBeforeBlocking + 1;
-              
-              if (valueToUse < blockingStep) {
-                // One die value is less than blocking step - can move to valid cell before blocker
-                yield call(highlightCellsWithSteps, coin, startCellID, valueToUse, blockingInfoForSingle, reachableCells, cells, links, coins);
-              } else if (valueToUse === blockingStep && !blockingInfoForSingle.isSameColor) {
-                // One die value equals blocking step AND blocking coin is opponent - can kick
-                // Highlight the blocking cell itself
-                reachableCells.add(blockingInfoForSingle.blockingCellID);
-              }
-              // If valueToUse > blockingStep, cannot move (would overshoot)
-            } else {
-              // No blocking for single die value - show all cells reachable with one die value
-              // This is important for coins on spawn cell to show step 1 highlighting
-              yield call(highlightCellsWithSteps, coin, startCellID, valueToUse, null, reachableCells, cells, links, coins);
+        // For coins on spawn cell (steps === 0), this should always be true for step 1
+        if (coin.steps + step1Value <= WINNING_MOVES) {
+          if (blockingInfoForStep1) {
+            // Blocking detected for step 1
+            const blockingStep = blockingInfoForStep1.stepsBeforeBlocking + 1;
+            
+            if (step1Value < blockingStep) {
+              // Step 1 is less than blocking step - can move to valid cell before blocker
+              yield call(highlightCellsWithSteps, coin, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, coins);
+            } else if (step1Value === blockingStep && !blockingInfoForStep1.isSameColor) {
+              // Step 1 equals blocking step AND blocking coin is opponent - can kick
+              // Highlight the blocking cell itself
+              reachableCells.add(blockingInfoForStep1.blockingCellID);
             }
+            // If step1Value > blockingStep, cannot move (would overshoot) - but this shouldn't happen for step 1
+          } else {
+            // No blocking for step 1 - show all cells reachable with step 1
+            // This is critical for coins on spawn cell to show step 1 highlighting
+            yield call(highlightCellsWithSteps, coin, startCellID, step1Value, null, reachableCells, cells, links, coins);
           }
         }
-        // Note: The main loop above already handles highlighting for the full sum (dieSum = roll1 + roll2)
-        // So we don't need to check blocking for the full sum here
       }
+      
+      // Also show the pair value as an option (in addition to step 1) when it's a pair
+      if (shouldShowPairValue && singleDieValue !== 1) {
+        // Only show pair value if it's different from step 1 (already handled above)
+        const blockingInfoForPair: { blockingCoinID: ICoin['coinID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+          yield call(findBlockingCoin, coin.coinID, singleDieValue as Rolls);
+        
+        // Check if we can move with the pair value
+        if (coin.steps + singleDieValue <= WINNING_MOVES) {
+          if (blockingInfoForPair) {
+            // Blocking detected for pair value
+            const blockingStep = blockingInfoForPair.stepsBeforeBlocking + 1;
+            
+            if (singleDieValue < blockingStep) {
+              // Pair value is less than blocking step - can move to valid cell before blocker
+              yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, coins);
+            } else if (singleDieValue === blockingStep && !blockingInfoForPair.isSameColor) {
+              // Pair value equals blocking step AND blocking coin is opponent - can kick
+              // Highlight the blocking cell itself
+              reachableCells.add(blockingInfoForPair.blockingCellID);
+            }
+            // If singleDieValue > blockingStep, cannot move (would overshoot)
+          } else {
+            // No blocking for pair value - show all cells reachable with pair value
+            yield call(highlightCellsWithSteps, coin, startCellID, singleDieValue, null, reachableCells, cells, links, coins);
+          }
+        }
+      }
+      // Note: The main loop above already handles highlighting for the full sum (dieSum = roll1 + roll2)
+      // So we don't need to check blocking for the full sum here
     }
   }
 
