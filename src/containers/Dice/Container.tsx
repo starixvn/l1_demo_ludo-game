@@ -148,9 +148,14 @@ class DiceBare extends React.PureComponent<IProps> {
     const face2 = this.props.currentDieRoll2;
 
     // Calculate highlight styles based on state and base color
+    // Note: Background color is applied to dice faces for rotation, and container for edge coverage
     const baseHexColor = baseColor ? getBaseHexColor(baseColor) : undefined;
-    let dice1Style: React.CSSProperties = { backgroundColor: baseHexColor };
-    let dice2Style: React.CSSProperties = { backgroundColor: baseHexColor };
+    // Set background color on container to prevent white edges showing through
+    const containerBgStyle = {
+      "--dice-bg-color": baseHexColor || "transparent",
+    } as React.CSSProperties;
+    let dice1Style: React.CSSProperties = { ...containerBgStyle };
+    let dice2Style: React.CSSProperties = { ...containerBgStyle };
 
     if (shouldHighlight && baseHexColor) {
       // Highlighted (clickable) - use base color with yellow tint
@@ -171,8 +176,7 @@ class DiceBare extends React.PureComponent<IProps> {
       const rolledColor = hexToRgba(baseHexColor, 0.9);
       dice1Style = {
         ...dice1Style,
-        boxShadow: `0 0 15px 5px ${rolledColor}, 0 0 5px`,
-        border: `3px solid ${rolledColor}`,
+        boxShadow: `0 0 15px 5px ${rolledColor}, 0 0 5px, inset 0 0 0 3px ${rolledColor}`, // Use inset box-shadow for border to avoid affecting size
         borderRadius: "10%",
         animation: "diceRolledPulse 1.5s ease-in-out infinite",
         pointerEvents: "none" as const,
@@ -180,8 +184,7 @@ class DiceBare extends React.PureComponent<IProps> {
       };
       dice2Style = {
         ...dice2Style,
-        boxShadow: `0 0 15px 5px ${rolledColor}, 0 0 5px`,
-        border: `3px solid ${rolledColor}`,
+        boxShadow: `0 0 15px 5px ${rolledColor}, 0 0 5px, inset 0 0 0 3px ${rolledColor}`, // Use inset box-shadow for border to avoid affecting size
         borderRadius: "10%",
         animation: "diceRolledPulse 1.5s ease-in-out infinite",
         pointerEvents: "none" as const,

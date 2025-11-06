@@ -79,7 +79,7 @@ class PlayerBare extends React.PureComponent<IProps> {
         <PlayerAvatar baseColor={base.color} />
 
         {/* Dice component - always rendered to preserve layout space */}
-        <div className={disabled ? styles.DicePlaceholder : undefined}>
+        <div className={classnames(styles.DiceWrapper, disabled && styles.DicePlaceholder)}>
           <Dice baseColor={base.color} />
         </div>
 

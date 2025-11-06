@@ -8,6 +8,8 @@
 .Container {
   display: flex;   /* Use flexbox for layout */
   flex-grow: 1;    /* Expand to fill available space */
+  padding-right: 5px; /* Add 5px to prevent layout shifts */
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* Top placement - elements arranged from top to bottom */
@@ -42,4 +44,12 @@
 .DicePlaceholder {
   visibility: hidden; /* Hide dice but keep its space in layout */
   pointer-events: none; /* Disable interactions */
+}
+
+/* Dice wrapper - ensures consistent height regardless of dice state */
+.DiceWrapper {
+  min-height: 80px; /* Reserve space for dice (40px height + 20px margin top + 20px margin bottom) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
