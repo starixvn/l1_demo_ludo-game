@@ -82,6 +82,13 @@
   border-radius: 50%;
   background-color: #000;
   box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.3);
+  aspect-ratio: 1; /* Ensure dots are always circular (1:1 ratio) */
+  width: 100%; /* Fill the grid cell width */
+  max-width: 100%; /* Don't exceed cell width */
+  height: auto; /* Maintain aspect ratio based on width */
+  min-width: 0; /* Allow shrinking if needed */
+  min-height: 0; /* Allow shrinking if needed */
+  display: block; /* Ensure proper rendering */
 }
 
 .DotInvisible {
