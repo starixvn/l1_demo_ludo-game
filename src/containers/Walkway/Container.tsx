@@ -129,9 +129,22 @@ let globalSeenMoveCoins = new Set<string>();
  * Renders a segment of the game board walkway with interactive cells
  */
 class WalkwayBare extends React.PureComponent<IProps> {
+  componentDidMount() {
+    // Clear tracking on mount to ensure fresh state for first render
+    // This handles the case when the component mounts after highlighting is already set
+    globalSeenCoinMoveTypes.clear();
+    globalSeenMoveCoins.clear();
+  }
+
   componentDidUpdate(prevProps: IProps) {
     // Reset global tracking when highlighting changes (new roll happened)
-    if (prevProps.highlightedCells !== this.props.highlightedCells) {
+    // This handles subsequent highlighting changes after the first render
+    // Check both the Set reference and the highlightedCellsByCoin to catch all changes
+    const highlightingChanged =
+      prevProps.highlightedCells !== this.props.highlightedCells ||
+      prevProps.highlightedCellsByCoin !== this.props.highlightedCellsByCoin;
+
+    if (highlightingChanged) {
       globalSeenCoinMoveTypes.clear();
       globalSeenMoveCoins.clear();
     }
@@ -213,7 +226,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
       const isHighlighted = this.props.highlightedCells?.has(cellID) || false;
 
       // Determine if we should show a popover for this cell
-      // For "move" type: show one popover per coin (first move cell encountered)
+      // For "move" type: show one popover per coin (first move cell encountered for each coin)
       // For "spawn" and "kick" types: show one popover per (coinID, moveType) combination
       let showPopover = false;
       let popoverText = "";
@@ -221,35 +234,53 @@ class WalkwayBare extends React.PureComponent<IProps> {
       if (isHighlighted && this.props.highlightedCellsByCoin) {
         const coinMoveTypes = this.props.highlightedCellsByCoin.get(cellID);
         if (coinMoveTypes && coinMoveTypes.length > 0) {
-          // Find the first (coinID, moveType) pair that hasn't been seen yet globally
+          // Check all coins to find the first one that should show a popover
+          // For "move" type: show one popover per coin (first move cell encountered for each coin)
+          // For "spawn" and "kick" types: show one popover per (coinID, moveType) combination
+          // Important: We iterate through all coins and mark them as seen when appropriate,
+          // but only show one popover per cell (the first coin that should show one)
           for (const { coinID, moveType } of coinMoveTypes) {
             let shouldShow = false;
 
             if (moveType === "move") {
               // For "move" type, check if this coin has already shown a move popover
+              // If not, this is the first move cell for this coin, so show the popover
               if (!globalSeenMoveCoins.has(coinID)) {
+                // Mark the coin as seen immediately, even if we don't show the popover on this cell
+                // This ensures that if multiple coins share this cell as their first move cell,
+                // we still track that each coin has been processed
                 globalSeenMoveCoins.add(coinID);
-                shouldShow = true;
-                popoverText = "Place bet on cells";
+                // Only show popover if we haven't already decided to show one for this cell
+                if (!showPopover) {
+                  shouldShow = true;
+                  popoverText = "Place bet on cells";
+                }
               }
             } else {
               // For "spawn" and "kick" types, use the original logic
               const key = `${coinID}_${moveType}`;
               if (!globalSeenCoinMoveTypes.has(key)) {
                 globalSeenCoinMoveTypes.add(key);
-                shouldShow = true;
-                // Determine popover text based on move type
-                if (moveType === "spawn") {
-                  popoverText = "Place bet on spawn coin";
-                } else if (moveType === "kick") {
-                  popoverText = "Place bet on kick blocking coin";
+                // Only show popover if we haven't already decided to show one for this cell
+                if (!showPopover) {
+                  shouldShow = true;
+                  // Determine popover text based on move type
+                  if (moveType === "spawn") {
+                    popoverText = "Place bet on spawn coin";
+                  } else if (moveType === "kick") {
+                    popoverText = "Place bet on kick blocking coin";
+                  }
                 }
               }
             }
 
+            // If this coin should show a popover, mark it
+            // We only show one popover per cell, but we still mark all coins as seen
             if (shouldShow) {
               showPopover = true;
-              break; // Only show one popover per cell (first unseen coin/moveType)
+              // Don't break - continue to mark other coins as seen even if we don't show their popover
+              // This ensures that if coin2's first move cell comes after coin1's first move cell,
+              // coin2 will still be able to show its popover on its own first move cell
             }
           }
         }

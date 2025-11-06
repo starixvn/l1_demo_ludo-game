@@ -175,6 +175,21 @@
   border-top: 6px solid var(--popover-arrow-color, rgba(0, 0, 0, 0.8));
 }
 
+/* Popover positioned at bottom (for yellow spawn cells) */
+.PopoverBottom {
+  bottom: auto;
+  top: 100%;
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+.PopoverBottom::after {
+  top: auto;
+  bottom: 100%;
+  border-top: none;
+  border-bottom: 6px solid var(--popover-arrow-color, rgba(0, 0, 0, 0.8));
+}
+
 @keyframes popoverFadeIn {
   from {
     opacity: 0;

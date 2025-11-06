@@ -209,7 +209,13 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
           this.props.showPopover &&
           this.props.popoverText && (
             <div
-              className={styles.Popover}
+              className={classnames(
+                styles.Popover,
+                // Position popover at bottom for yellow spawn cells
+                this.props.cellType === CellType.SPAWN &&
+                  this.props.color === BaseColors.YELLOW &&
+                  styles.PopoverBottom
+              )}
               style={
                 this.props.highlightColor
                   ? (() => {
