@@ -284,7 +284,7 @@
         "row": 5,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 34
+        "index": 26
       },
       "SOUTH_5_1": {
         "baseID": "BASE_4",
@@ -303,7 +303,7 @@
         "row": 5,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 39
+        "index": 30
       },
       "SOUTH_6_0": {
         "baseID": "BASE_3",
@@ -313,7 +313,7 @@
         "row": 6,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 35
+        "index": 27
       },
       "SOUTH_6_1": {
         "baseID": "BASE_4",
@@ -323,7 +323,7 @@
         "row": 6,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 36
+        "index": 28
       },
       "SOUTH_6_2": {
         "baseID": "BASE_4",
@@ -333,7 +333,7 @@
         "row": 6,
         "cellType": "SPAWN",
         "horseIDs": [],
-        "index": 37
+        "index": 29
       },
       "SOUTH_4_0": {
         "baseID": "BASE_3",
@@ -343,7 +343,7 @@
         "row": 4,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 33
+        "index": 25
       },
       "SOUTH_4_1": {
         "baseID": "BASE_4",
@@ -362,7 +362,7 @@
         "row": 4,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 41
+        "index": 31
       },
       "SOUTH_3_0": {
         "baseID": "BASE_3",
@@ -372,7 +372,7 @@
         "row": 3,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 32
+        "index": 24
       },
       "SOUTH_3_1": {
         "baseID": "BASE_4",
@@ -391,7 +391,7 @@
         "row": 3,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 43
+        "index": 32
       },
       "SOUTH_2_0": {
         "baseID": "BASE_3",
@@ -401,7 +401,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 31
+        "index": 23
       },
       "SOUTH_2_1": {
         "baseID": "BASE_4",
@@ -420,7 +420,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 45
+        "index": 33
       },
       "SOUTH_1_0": {
         "baseID": "BASE_3",
@@ -430,7 +430,7 @@
         "row": 1,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 30
+        "index": 22
       },
       "SOUTH_1_1": {
         "baseID": "BASE_4",
@@ -449,7 +449,7 @@
         "row": 1,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 47
+        "index": 34
       },
       "SOUTH_0_1": {
         "baseID": "BASE_4",
@@ -471,7 +471,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 26
+        "index": 20
       },
       "WEST_2_6": {
         "baseID": "BASE_3",
@@ -481,7 +481,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 28
+        "index": 21
       },
       "WEST_2_4": {
         "baseID": "BASE_3",
@@ -491,7 +491,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 24
+        "index": 19
       },
       "WEST_2_3": {
         "baseID": "BASE_3",
@@ -501,7 +501,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 22
+        "index": 18
       },
       "WEST_2_2": {
         "baseID": "BASE_3",
@@ -511,7 +511,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 20
+        "index": 17
       },
       "WEST_2_1": {
         "baseID": "BASE_3",
@@ -521,7 +521,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 18
+        "index": 16
       },
       "WEST_2_0": {
         "baseID": "BASE_3",
@@ -531,7 +531,7 @@
         "row": 2,
         "cellType": "SPAWN",
         "horseIDs": [],
-        "index": 16
+        "index": 15
       },
       "WEST_1_0": {
         "baseID": "BASE_3",
@@ -541,7 +541,7 @@
         "row": 1,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 15
+        "index": 14
       },
       "WEST_1_1": {
         "baseID": "BASE_3",
@@ -605,7 +605,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 14
+        "index": 13
       },
       "WEST_0_1": {
         "baseID": "BASE_1",
@@ -615,7 +615,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 13
+        "index": 12
       },
       "WEST_0_2": {
         "baseID": "BASE_1",
@@ -625,7 +625,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 12
+        "index": 11
       },
       "WEST_0_3": {
         "baseID": "BASE_1",
@@ -635,7 +635,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 11
+        "index": 10
       },
       "WEST_0_4": {
         "baseID": "BASE_1",
@@ -645,7 +645,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 10
+        "index": 9
       },
       "WEST_0_5": {
         "baseID": "BASE_1",
@@ -655,7 +655,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 9
+        "index": 8
       },
       "WEST_0_6": {
         "baseID": "BASE_1",
@@ -665,7 +665,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 8
+        "index": 7
       }
     },
     "NORTH": {
@@ -737,7 +737,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 78
+        "index": 56
       },
       "NORTH_1_1": {
         "baseID": "BASE_1",
@@ -792,7 +792,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 77
+        "index": 55
       },
       "NORTH_1_2": {
         "baseID": "BASE_2",
@@ -802,7 +802,7 @@
         "row": 1,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 76
+        "index": 54
       },
       "NORTH_2_2": {
         "baseID": "BASE_2",
@@ -812,7 +812,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 75
+        "index": 53
       },
       "NORTH_3_2": {
         "baseID": "BASE_2",
@@ -822,7 +822,7 @@
         "row": 3,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 74
+        "index": 52
       },
       "NORTH_4_2": {
         "baseID": "BASE_2",
@@ -832,7 +832,7 @@
         "row": 4,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 73
+        "index": 51
       },
       "NORTH_5_2": {
         "baseID": "BASE_2",
@@ -842,7 +842,7 @@
         "row": 5,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 72
+        "index": 50
       },
       "NORTH_6_1": {
         "baseID": "BASE_1",
@@ -864,7 +864,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 70
+        "index": 49
       },
       "EAST_0_1": {
         "baseID": "BASE_2",
@@ -874,7 +874,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 69
+        "index": 48
       },
       "EAST_0_2": {
         "baseID": "BASE_2",
@@ -884,7 +884,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 67
+        "index": 47
       },
       "EAST_0_3": {
         "baseID": "BASE_2",
@@ -894,7 +894,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 65
+        "index": 46
       },
       "EAST_0_4": {
         "baseID": "BASE_2",
@@ -904,7 +904,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 63
+        "index": 45
       },
       "EAST_0_5": {
         "baseID": "BASE_2",
@@ -914,7 +914,7 @@
         "row": 0,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 61
+        "index": 44
       },
       "EAST_0_6": {
         "baseID": "BASE_2",
@@ -924,7 +924,7 @@
         "row": 0,
         "cellType": "SPAWN",
         "horseIDs": [],
-        "index": 59
+        "index": 43
       },
       "EAST_1_5": {
         "baseID": "BASE_2",
@@ -943,7 +943,7 @@
         "row": 1,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 57
+        "index": 42
       },
       "EAST_1_4": {
         "baseID": "BASE_2",
@@ -998,7 +998,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 50
+        "index": 35
       },
       "EAST_2_1": {
         "baseID": "BASE_4",
@@ -1008,7 +1008,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 51
+        "index": 36
       },
       "EAST_2_2": {
         "baseID": "BASE_4",
@@ -1018,7 +1018,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 52
+        "index": 37
       },
       "EAST_2_3": {
         "baseID": "BASE_4",
@@ -1028,7 +1028,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 53
+        "index": 38
       },
       "EAST_2_4": {
         "baseID": "BASE_4",
@@ -1038,7 +1038,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 54
+        "index": 39
       },
       "EAST_2_5": {
         "baseID": "BASE_4",
@@ -1048,7 +1048,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 55
+        "index": 40
       },
       "EAST_2_6": {
         "baseID": "BASE_4",
@@ -1058,7 +1058,7 @@
         "row": 2,
         "cellType": "NORMAL",
         "horseIDs": [],
-        "index": 56
+        "index": 41
       }
     }
   },

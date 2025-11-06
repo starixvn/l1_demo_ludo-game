@@ -20,7 +20,6 @@ import { DiceCountdown } from "containers/DiceCountdown/Container"; // Countdown
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import { loadGameStateFromFile } from "common/utils"; // Game state loading utility
 import { BOARD_SIZE } from "globalConstants"; // Board dimensions
-import { ContextMenu } from "services/contextMenu/Container"; // Right-click menu
 
 import {
   clearAvailableActions,
@@ -272,8 +271,6 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           </div>
         ) : null}
 
-        {/* Development-only context menu */}
-        {process.env.NODE_ENV === "development" ? <ContextMenu /> : null}
 
         {/* Action Selection UI - shows available actions after dice roll */}
         <ActionSelection />

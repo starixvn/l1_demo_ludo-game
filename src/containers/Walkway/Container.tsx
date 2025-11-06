@@ -36,12 +36,10 @@ import {
   WALKWAY_WIDTH,
   WALKWAY_VERTICAL_HEIGHT,
 } from "globalConstants"; // Size constants
-import { hideContextMenu, showContextMenu } from "services/contextMenu/service"; // Context menu service
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Position enums and colors
 import { createSelector } from "reselect"; // For creating memoized selectors
 
 import { Cell } from "./components/Cell"; // Cell component
-import { IContextMenuOptions } from "./interfaces"; // Context menu types
 import { generateCellID } from "./utils"; // Cell ID generation utility
 
 import styles from "./Container.module.css"; // Component styles
@@ -313,7 +311,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
           index={cellConfiguration.index} // Index value for debugging
           showPopover={showPopover} // Whether to show popover (only for first cell of each horse/moveType)
           popoverText={popoverText} // Text to display in popover
-          onContextMenuOpened={this.onContextMenuOpened} // Right-click menu handler
         >
           {
             // Render horses that are currently on this cell
@@ -349,100 +346,8 @@ class WalkwayBare extends React.PureComponent<IProps> {
       WalkwayPosition.WEST, // West walkway runs horizontally
     ].includes(this.props.walkway.position);
 
-  /**
-   * Handles right-click context menu for cell editing (development tool)
-   * Shows options to change cell type or link cells together
-   */
-  private onContextMenuOpened = (options: IContextMenuOptions) => {
-    const {
-      walkway: { baseID },
-    } = this.props;
-    const { cellID, cellType, column, position, row, x, y } = options;
 
-    // Create cell info object for the clicked cell
-    const cellInfo: ICell = {
-      baseID,
-      cellID,
-      cellType,
-      horseIDs: [], // No horses during development
-      column,
-      position,
-      row,
-    };
 
-    // Show context menu with cell editing options
-    showContextMenu(
-      x,
-      y, // Mouse position for menu placement
-      [
-        {
-          action: () =>
-            this.markCells({ ...cellInfo, cellType: CellType.NORMAL }),
-          label: CellType.NORMAL, // Change to normal walkway cell
-        },
-        {
-          action: () =>
-            this.markCells({ ...cellInfo, cellType: CellType.SPAWN }),
-          label: CellType.SPAWN, // Change to spawn cell (where horses enter)
-        },
-        {
-          action: () =>
-            this.markCells({ ...cellInfo, cellType: CellType.HOMEPATH }),
-          label: CellType.HOMEPATH, // Change to home path cell
-        },
-        {
-          action: () => this.linkCells(cellInfo),
-          label: "Link", // Link this cell to another cell
-        },
-      ]
-    );
-  };
-
-  /**
-   * Marks a cell with a specific type (development tool)
-   * Updates the global cells configuration for board design
-   */
-  private markCells = (cellInfo: ICell) => {
-    // Ensure position exists in cells configuration
-    cells[cellInfo.position] = cells[cellInfo.position] || {};
-    // Store cell configuration
-    cells[cellInfo.position][cellInfo.cellID] = cellInfo;
-    hideContextMenu(); // Close the context menu
-    console.log(JSON.stringify(cells)); // Debug output of cell configuration
-  };
-
-  /**
-   * Initiates cell linking process (development tool)
-   * Allows clicking on another cell to create a movement path
-   */
-  private linkCells = (cellInfo: ICell) => {
-    hideContextMenu(); // Close context menu
-
-    // Set up click handler for linking cells
-    const onClick = (event: MouseEvent) => {
-      const element = event.target as HTMLDivElement;
-      const cellID = element.getAttribute("data-id") as string;
-
-      // Confirm the link creation
-      const shouldLink = window.confirm(
-        `Link ${cellInfo.cellID} to ${cellID} ?`
-      );
-
-      if (shouldLink) {
-        // Create or update the link set for this cell
-        cellLinks[cellInfo.cellID] = cellLinks[cellInfo.cellID] || new Set();
-        cellLinks[cellInfo.cellID].add(cellID);
-      }
-
-      // Clean up event listener
-      document.removeEventListener("click", onClick);
-      // Make links available globally for debugging
-      (window as any).cellLinks = cellLinks;
-    };
-
-    // Listen for the next click to complete the link
-    document.addEventListener("click", onClick);
-  };
 
   /**
    * Handles horse click events during gameplay

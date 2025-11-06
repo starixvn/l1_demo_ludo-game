@@ -3,7 +3,7 @@
  *
  * Represents a single cell/space on the Ludo game board walkway.
  * Cells can contain horses, have different types (normal, spawn, homepath, etc.),
- * and handle user interactions like right-click context menus.
+ * and handle user interactions.
  */
 
 import classnames from "classnames"; // Utility for conditional CSS classes
@@ -15,7 +15,6 @@ import { getBaseHexColor, getStyleObject } from "containers/utils"; // Style uti
 import { CELL_DIMENSION, CELL_SIZE, WALKWAY_LENGTH } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Color and position types
 
-import { IContextMenuOptions } from "../interfaces"; // Context menu options type
 import { generateCellID } from "../utils"; // Utility to generate cell IDs
 
 import styles from "./Cell.module.css"; // CSS module for cell styling
@@ -51,8 +50,6 @@ interface ICellProps {
   /** Text to display in the popover */
   popoverText?: string;
 
-  /** Callback when right-click context menu is opened */
-  onContextMenuOpened: (options: IContextMenuOptions) => void;
 }
 
 /**
@@ -201,7 +198,6 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
         data-column={column}
         data-position={walkwayPosition}
         data-cell-type={cellType}
-        onContextMenu={(event) => this.handleContextMenu(event)} // Right-click menu
         onClick={this.props.isHighlighted ? this.handleCellClick : undefined} // Click handler for placing bets
       >
         {/* Popover for highlighted cells - display immediately for first cell of each horse/moveType */}
@@ -296,26 +292,4 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
     );
   }
 
-  /**
-   * Handles right-click context menu events
-   * Extracts cell information from data attributes and passes to parent
-   */
-  private handleContextMenu = (
-    event: React.MouseEvent<HTMLDivElement, MouseEvent>
-  ) => {
-    event.preventDefault(); // Prevent browser context menu
-    const target = event.target as HTMLDivElement;
-
-    // Extract cell information from data attributes
-    this.props.onContextMenuOpened({
-      cellID: target.getAttribute("data-id")!,
-      cellType: target.getAttribute("data-cell-type") as CellType,
-      baseID: target.getAttribute("data-base-id")!,
-      column: Number(target.getAttribute("data-column")),
-      position: target.getAttribute("data-position") as WalkwayPosition,
-      row: Number(target.getAttribute("data-row")),
-      x: event.clientX, // Mouse position for menu placement
-      y: event.clientY,
-    });
-  };
 }

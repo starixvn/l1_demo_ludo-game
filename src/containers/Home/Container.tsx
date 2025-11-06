@@ -98,7 +98,6 @@ class HomeBare extends React.PureComponent<IProps> {
                 nextLinkCellIDs={nextLinkCellIDs}
                 showDebugText={this.props.showDebugText}
                 index={cell.index}
-                onContextMenuOpened={() => {}} // No context menu for home cells
               >
                 {
                   // Render horses that are currently on this cell
