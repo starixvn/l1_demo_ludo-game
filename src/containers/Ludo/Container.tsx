@@ -213,7 +213,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
               }
               className={styles.Checkbox}
             />
-            <span>Auto Run</span>
+            <span className={styles.CheckboxLabelText}>Auto Run</span>
           </label>
           <label className={styles.CheckboxLabel}>
             <input
