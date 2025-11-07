@@ -35,10 +35,11 @@
 }
 
 .Button {
-  font-size: 20px;
-  padding: 10px;
+  font-size: 12px;
+  padding: 6px 12px;
   color: #555;
   font-family: Arial;
+  margin: 2px;
 }
 
 .SidePanel {

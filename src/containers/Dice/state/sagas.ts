@@ -40,7 +40,7 @@ import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_
 
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
-import { enableDie, invalidateDieRoll, rollDieComplete, startRolling, stopRolling, ActionTypes } from './actions';
+import { enableDie, disableDie, invalidateDieRoll, rollDieComplete, startRolling, stopRolling, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
 
 /**
@@ -64,6 +64,22 @@ function * watchForRollDie() {
  * Hardcodes a spawnable roll (1-1) for the first turn of each base
  */
 function * rollDieSaga() {
+  // Check if replay is paused or completed - don't roll if so
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive) {
+    if (replay.isPaused) {
+      console.log('[REPLAY] rollDieSaga - replay is paused, skipping dice roll');
+      yield put(stopRolling());
+      return;
+    }
+    if (replay.cursor >= replay.steps.length) {
+      console.log('[REPLAY] rollDieSaga - replay completed (cursor >= steps.length), skipping dice roll');
+      yield put(stopRolling());
+      yield put(disableDie());
+      return;
+    }
+  }
+
   // Start the rolling animation
   yield put(startRolling());
 
@@ -71,7 +87,6 @@ function * rollDieSaga() {
   yield delay(DICE_ROLLING_ANIMATION_DURATION);
 
   // Check if replay is active - use replay values instead of random
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   
@@ -1001,6 +1016,13 @@ function * watchForPassTurnTo() {
  * Saga that handles turn changes - enables die and auto-rolls in auto-play mode
  */
 function * passTurnToSaga() {
+  // Check if replay is paused - don't enable dice or auto-roll if paused
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && replay.isPaused) {
+    console.log('[REPLAY] passTurnToSaga - replay is paused, skipping dice enable and auto-roll');
+    return;
+  }
+
   yield put(enableDie());
   
   // Small delay to ensure any state updates are processed
@@ -1009,6 +1031,12 @@ function * passTurnToSaga() {
   // In auto-play mode, automatically roll for the new player only if they have spawned horses
   const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   if (autoActionsEnabled) {
+    // Check if replay is active and not paused - if so, replay system handles rolling
+    if (replay?.isActive && !replay.isPaused) {
+      // Replay system will handle dice rolling via replayAdvanceStepSaga
+      return;
+    }
+    
     // Check if current player has any spawned horses before auto-rolling
     const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
     const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);

@@ -17,7 +17,7 @@ import {
 
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
-import { enableDie, rollDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
+import { enableDie, disableDie, invalidateDieRoll, rollDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { setAutoActionsEnabled } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
@@ -344,6 +344,47 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
       // Cannot kick - block the movement
       console.warn(`Horse ${horseID} cannot move - blocked by ${blockingInfo.blockingHorseID} (same color: ${blockingInfo.isSameColor}, steps: ${stepsToMove}, blockingStep: ${blockingStep})`);
       yield put(moveHorseFailure());
+      
+      // Check if replay is active - replay system handles turn progression
+      const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+      if (replay?.isActive && !replay.isPaused) {
+        console.log('[REPLAY] Horse blocked - no move, advancing replay step');
+        // Wait for player to see the dice result
+        yield delay(NO_MOVE_DELAY);
+        yield put(invalidateDieRoll());
+        
+        // Manually advance replay step since no MOVE_HORSE_SUCCESS will be dispatched
+        if (replay.cursor < replay.steps.length - 1) {
+          const nextStepIndex = replay.cursor + 1;
+          yield put(nextReplayStep());
+          
+          yield delay(50); // Small delay to ensure state update
+          const updatedReplay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+          const nextStep = updatedReplay?.steps?.[updatedReplay.cursor];
+          if (nextStep) {
+            const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+            const baseID = mapPlayerIndexToBase(nextStep.currentPlayer);
+            
+            console.log('[REPLAY] Horse blocked - advancing to next step:', {
+              completedStep: replay.cursor,
+              nextStep: nextStepIndex,
+              nextStepPlayer: nextStep.currentPlayer,
+              nextStepPlayerColor: bases[baseID].color,
+            });
+            
+            yield delay(200);
+            yield put(passTurnTo(baseID));
+            yield put(enableDie());
+            yield delay(100);
+            yield put(rollDie());
+          }
+        } else {
+          // Finished
+          yield put(pauseReplay());
+        }
+        return;
+      }
+      
       // Wait for player to see the dice result before passing turn
       yield delay(NO_MOVE_DELAY);
       yield put(nextTurn());
@@ -362,6 +403,47 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
   // If no horses can move, skip turn
   if (movableHorses.length === 0) {
     yield put(moveHorseFailure());
+    
+    // Check if replay is active - replay system handles turn progression
+    const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+    if (replay?.isActive && !replay.isPaused) {
+      console.log('[REPLAY] No horses can move - advancing replay step');
+      // Wait for player to see the dice result
+      yield delay(NO_MOVE_DELAY);
+      yield put(invalidateDieRoll());
+      
+      // Manually advance replay step since no MOVE_HORSE_SUCCESS will be dispatched
+      if (replay.cursor < replay.steps.length - 1) {
+        const nextStepIndex = replay.cursor + 1;
+        yield put(nextReplayStep());
+        
+        yield delay(50); // Small delay to ensure state update
+        const updatedReplay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+        const nextStep = updatedReplay?.steps?.[updatedReplay.cursor];
+        if (nextStep) {
+          const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+          const baseID = mapPlayerIndexToBase(nextStep.currentPlayer);
+          
+          console.log('[REPLAY] No horses can move - advancing to next step:', {
+            completedStep: replay.cursor,
+            nextStep: nextStepIndex,
+            nextStepPlayer: nextStep.currentPlayer,
+            nextStepPlayerColor: bases[baseID].color,
+          });
+          
+          yield delay(200);
+          yield put(passTurnTo(baseID));
+          yield put(enableDie());
+          yield delay(100);
+          yield put(rollDie());
+        }
+      } else {
+        // Finished
+        yield put(pauseReplay());
+      }
+      return;
+    }
+    
     yield put(nextTurn());
     yield put(enableDie());
     return;
@@ -1902,6 +1984,8 @@ function * replayAdvanceStepSaga() {
       status: 'paused',
     });
     
+    // Disable dice to prevent further rolling
+    yield put(disableDie());
     yield put(pauseReplay());
   }
 }

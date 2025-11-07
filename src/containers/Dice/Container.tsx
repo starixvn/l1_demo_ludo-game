@@ -21,6 +21,7 @@ import {
   autoActionsEnabledSelector,
   autoActionTimeoutSelector,
 } from "containers/StepLogs/state/selectors";
+import { replaySelector } from "containers/Ludo/state/selectors";
 
 import styles from "./Container.module.css";
 
@@ -32,6 +33,7 @@ interface IStateProps {
   isRolling: ReturnType<typeof isRollingSelector>;
   autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>;
   autoActionTimeout: ReturnType<typeof autoActionTimeoutSelector>;
+  replay: ReturnType<typeof replaySelector>;
 }
 
 interface IDispatchProps {
@@ -52,6 +54,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   isRolling: isRollingSelector,
   autoActionsEnabled: autoActionsEnabledSelector,
   autoActionTimeout: autoActionTimeoutSelector,
+  replay: replaySelector,
 });
 
 const mapDispatchToProps = {
@@ -62,17 +65,66 @@ class DiceBare extends React.PureComponent<IProps> {
   private autoRollTimeout: NodeJS.Timeout | null = null;
 
   componentDidMount() {
-    this.startAutoRollTimer();
+    // Only start timer if replay is not active (replay system handles rolling when active)
+    const replay = this.props.replay;
+    if (!replay?.isActive) {
+      this.startAutoRollTimer();
+    }
   }
 
   componentDidUpdate(prevProps: IProps) {
+    const prevReplay = prevProps.replay;
+    const currentReplay = this.props.replay;
+
+    // Clear timer when replay is paused, completed, or active (replay system handles rolling)
+    if (currentReplay?.isActive) {
+      // Replay is active - clear timer (replay system handles rolling)
+      if (this.autoRollTimeout) {
+        if (
+          currentReplay.isPaused ||
+          currentReplay.cursor >= (currentReplay.steps?.length || 0)
+        ) {
+          console.log(
+            "Clearing auto-roll timer: replay is paused or completed"
+          );
+        } else {
+          console.log(
+            "Clearing auto-roll timer: replay is active (replay system handles rolling)"
+          );
+        }
+        this.clearAutoRollTimer();
+      }
+      return; // Don't start timer if replay is active
+    }
+
+    // Reset timer when replay is stopped (transition from active to inactive)
+    if (prevReplay?.isActive && !currentReplay?.isActive) {
+      // Replay was just stopped - reset timer if conditions are met
+      if (this.props.isDieRollAllowed && this.props.autoActionsEnabled) {
+        console.log("Resetting auto-roll timer: replay stopped");
+        this.startAutoRollTimer();
+      }
+      return;
+    }
+
     // Start timer when die becomes rollable again (only if auto-actions are enabled)
-    if (!prevProps.isDieRollAllowed && this.props.isDieRollAllowed) {
+    // Skip if replay is active (replay system handles rolling)
+    if (
+      !currentReplay?.isActive &&
+      !prevProps.isDieRollAllowed &&
+      this.props.isDieRollAllowed
+    ) {
       this.startAutoRollTimer();
     }
 
     // Start timer when auto-actions are enabled while die is already rollable
-    if (!prevProps.autoActionsEnabled && this.props.autoActionsEnabled && this.props.isDieRollAllowed) {
+    // Skip if replay is active (replay system handles rolling)
+    if (
+      !currentReplay?.isActive &&
+      !prevProps.autoActionsEnabled &&
+      this.props.autoActionsEnabled &&
+      this.props.isDieRollAllowed
+    ) {
       this.startAutoRollTimer();
     }
 
@@ -91,6 +143,18 @@ class DiceBare extends React.PureComponent<IProps> {
 
   private startAutoRollTimer = () => {
     this.clearAutoRollTimer(); // Clear any existing timer
+
+    // Don't start timer if replay is active, paused, or completed
+    const replay = this.props.replay;
+    if (replay?.isActive) {
+      if (replay.isPaused || replay.cursor >= (replay.steps?.length || 0)) {
+        // Replay is paused or completed - don't start timer
+        return;
+      }
+      // Replay is active but not paused - replay system handles rolling, don't auto-roll
+      return;
+    }
+
     // Only start auto-roll timer if die is rollable AND auto-actions are enabled
     if (this.props.isDieRollAllowed && this.props.autoActionsEnabled) {
       console.log(
@@ -100,10 +164,15 @@ class DiceBare extends React.PureComponent<IProps> {
       this.autoRollTimeout = setTimeout(() => {
         // Double-check: props may have changed during the timeout period
         // This is especially important with longer timeouts
+        const currentReplay = this.props.replay;
         if (
           this.props.isDieRollAllowed &&
           this.props.autoActionsEnabled &&
-          this.autoRollTimeout !== null
+          this.autoRollTimeout !== null &&
+          // Don't roll if replay is active, paused, or completed
+          (!currentReplay?.isActive ||
+            (!currentReplay.isPaused &&
+              currentReplay.cursor < (currentReplay.steps?.length || 0)))
         ) {
           this.props.rollDie();
         }
