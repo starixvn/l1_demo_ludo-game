@@ -70,6 +70,12 @@ class DiceBare extends React.PureComponent<IProps> {
     if (!prevProps.isDieRollAllowed && this.props.isDieRollAllowed) {
       this.startAutoRollTimer();
     }
+
+    // Start timer when auto-actions are enabled while die is already rollable
+    if (!prevProps.autoActionsEnabled && this.props.autoActionsEnabled && this.props.isDieRollAllowed) {
+      this.startAutoRollTimer();
+    }
+
     // Clear timer when die is no longer rollable or when auto-actions are disabled
     if (
       (prevProps.isDieRollAllowed && !this.props.isDieRollAllowed) ||
