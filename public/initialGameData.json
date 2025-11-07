@@ -293,7 +293,8 @@
         "position": "SOUTH",
         "row": 5,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 257
       },
       "SOUTH_5_2": {
         "baseID": "BASE_4",
@@ -352,7 +353,8 @@
         "position": "SOUTH",
         "row": 4,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 258
       },
       "SOUTH_4_2": {
         "baseID": "BASE_4",
@@ -381,7 +383,8 @@
         "position": "SOUTH",
         "row": 3,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 259
       },
       "SOUTH_3_2": {
         "baseID": "BASE_4",
@@ -410,7 +413,8 @@
         "position": "SOUTH",
         "row": 2,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 260
       },
       "SOUTH_2_2": {
         "baseID": "BASE_4",
@@ -439,7 +443,8 @@
         "position": "SOUTH",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 261
       },
       "SOUTH_1_2": {
         "baseID": "BASE_4",
@@ -459,7 +464,8 @@
         "row": 0,
         "cellType": "HOMEPATH",
         "horseIDs": [],
-        "notRenderInWalkway": true
+        "notRenderInWalkway": true,
+        "index": 262
       }
     },
     "WEST": {
@@ -550,7 +556,8 @@
         "position": "WEST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 157
       },
       "WEST_1_2": {
         "baseID": "BASE_3",
@@ -559,7 +566,9 @@
         "position": "WEST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 158
+
       },
       "WEST_1_3": {
         "baseID": "BASE_3",
@@ -568,7 +577,8 @@
         "position": "WEST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 159
       },
       "WEST_1_4": {
         "baseID": "BASE_3",
@@ -577,7 +587,8 @@
         "position": "WEST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 160
       },
       "WEST_1_5": {
         "baseID": "BASE_3",
@@ -586,7 +597,8 @@
         "position": "WEST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 161
       },
       "WEST_1_6": {
         "baseID": "BASE_3",
@@ -595,7 +607,8 @@
         "position": "WEST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 162
       },
       "WEST_0_0": {
         "baseID": "BASE_1",
@@ -746,7 +759,8 @@
         "position": "NORTH",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 57
       },
       "NORTH_2_1": {
         "baseID": "BASE_1",
@@ -755,7 +769,8 @@
         "position": "NORTH",
         "row": 2,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 58
       },
       "NORTH_3_1": {
         "baseID": "BASE_1",
@@ -764,7 +779,8 @@
         "position": "NORTH",
         "row": 3,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 59
       },
       "NORTH_4_1": {
         "baseID": "BASE_1",
@@ -773,7 +789,8 @@
         "position": "NORTH",
         "row": 4,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 60
       },
       "NORTH_5_1": {
         "baseID": "BASE_1",
@@ -782,7 +799,8 @@
         "position": "NORTH",
         "row": 5,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 61
       },
       "NORTH_0_2": {
         "baseID": "BASE_2",
@@ -852,7 +870,8 @@
         "row": 6,
         "cellType": "HOMEPATH",
         "horseIDs": [],
-        "notRenderInWalkway": true
+        "notRenderInWalkway": true,
+        "index": 62
       }
     },
     "EAST": {
@@ -933,7 +952,8 @@
         "position": "EAST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 357
       },
       "EAST_1_6": {
         "baseID": "BASE_2",
@@ -952,7 +972,8 @@
         "position": "EAST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 358
       },
       "EAST_1_3": {
         "baseID": "BASE_2",
@@ -961,7 +982,8 @@
         "position": "EAST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 359
       },
       "EAST_1_2": {
         "baseID": "BASE_2",
@@ -970,7 +992,8 @@
         "position": "EAST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 360
       },
       "EAST_1_1": {
         "baseID": "BASE_2",
@@ -979,7 +1002,8 @@
         "position": "EAST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 361
       },
       "EAST_1_0": {
         "baseID": "BASE_2",
@@ -988,7 +1012,8 @@
         "position": "EAST",
         "row": 1,
         "cellType": "HOMEPATH",
-        "horseIDs": []
+        "horseIDs": [],
+        "index": 362
       },
       "EAST_2_0": {
         "baseID": "BASE_4",

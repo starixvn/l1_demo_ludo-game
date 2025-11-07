@@ -47,6 +47,7 @@ import {
 import {
   BaseID,
   CellType,
+  IBase,
   ICell,
   IHorse,
   IServerGameData,
@@ -719,6 +720,13 @@ function * highlightCellsWithSteps(
  * Calculates all reachable cells for the current player's horses
  * Returns a Set of cell IDs that can be reached with any valid dice roll (sum of 2-12)
  * Also returns a Map of cellID -> Array<{horseID, moveType}> to track which horses can reach which cells
+ *
+ * This function handles:
+ * - Spawn moves for horses in base
+ * - Normal moves with dice sums (2-12)
+ * - Special pair handling (single die values)
+ * - Blocking horse detection and kicking logic
+ * - Home path restrictions
  */
 export function * calculateReachableCells(): Generator<any, { reachableCells: Set<string>; cellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> }, any> {
   const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
@@ -732,12 +740,12 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
   const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
   const isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector> = yield select(isDieRollAllowedSelector);
   const isDieRollValid: ReturnType<typeof isDieRollValidSelector> = yield select(isDieRollValidSelector);
-  
+
   // Check if it's a valid pair (both dice are the same and valid values)
   // Only consider it a pair if the roll is valid (not default/initial values)
   const isPair = isDieRollValid && roll1 === roll2 && roll1 >= 1 && roll1 <= 6;
   const singleDieValue = isPair ? roll1 : null; // If pair, use one die value (both are the same)
-  
+
   // Show step 1 as a potential option in these cases:
   // 1. Before rolling (isDieRollAllowed && !isDieRollValid) - dice are clickable but not rolled yet
   // 2. After rolling a pair (isPair) - show step 1 as one option when pair is rolled
@@ -769,254 +777,418 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
   // Get all horses for the current player
   const playerHorses = currentBase.horseIDs.map((horseID) => horses[horseID]);
 
-  // For each horse, calculate reachable cells
+  // Process each horse for all possible move types
   for (const horse of playerHorses) {
     if (horse.isRetired) {
       continue; // Skip retired horses
     }
 
-    if (!horse.isSpawned) {
-      // Unspawned horse - can spawn to spawn cell
-      // Find the spawn cell for this base
-      const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
-      const walkway = Object.values(walkways).find(
-        (w: IWalkway) => w.baseID === currentBase.ID
-      );
-      if (walkway) {
-        const walkwayCells = cells[walkway.position];
-        const spawnCell = Object.values(walkwayCells).find(
-          (cell) => cell.cellType === CellType.SPAWN && cell.baseID === currentBase.ID
-        );
-        if (spawnCell) {
-          addReachableCell(spawnCell.cellID, horse.horseID, 'spawn');
-        }
-      }
-    } else {
-      // Spawned horse - calculate cells reachable with 2-12 steps (sum of two dice)
-      const startCellID = horse.cellID;
-      if (!startCellID) continue;
+    // Calculate spawn moves for unspawned horses
+    yield call(calculateSpawnMoves, horse, currentBase, cells, addReachableCell);
 
-      // Calculate all cells reachable with 2-12 steps (two dice: min 1+1=2, max 6+6=12)
-      for (let steps = 2; steps <= 12; steps++) {
-        // Check if this move would overshoot home
-        if (horse.steps + steps > WINNING_MOVES) {
-          continue; // Skip moves that overshoot
-        }
-
-        // Check for blocking horses for this specific step count
-        const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-          yield call(findBlockingHorse, horse.horseID, steps as Rolls);
-        
-        let maxStepsToExplore = steps;
-        let shouldHighlightBlockingCell = false;
-        
-        if (blockingInfo) {
-          // Blocking horse detected at step (stepsBeforeBlocking + 1)
-          const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
-          
-          if (steps < blockingStep) {
-            // Die roll is less than blocking step - can only move steps before blocker
-            // Don't explore any further - stop immediately
-            maxStepsToExplore = blockingInfo.stepsBeforeBlocking;
-            if (maxStepsToExplore <= 0) {
-              continue; // Cannot move at all - skip this step count
-            }
-          } else if (steps === blockingStep && !blockingInfo.isSameColor) {
-            // Die roll equals blocking step AND blocking horse is opponent (different color)
-            // Can kick the blocking horse - highlight the blocking cell itself
-            // Note: Same-color horses cannot be kicked, so we skip highlighting
-            shouldHighlightBlockingCell = true;
-            maxStepsToExplore = steps; // Can move full distance and kick
-          } else {
-            // Either:
-            // - Die roll > blocking step (cannot kick, would overshoot)
-            // - Die roll == blocking step but blocking horse is same color (cannot kick same color)
-            continue; // Skip this step count - no highlighting
-          }
-        }
-
-        // Use BFS to find all cells reachable in exactly 'maxStepsToExplore' moves
-        // Track visited cells with their step count to avoid revisiting with more steps
-        const visited = new Map<string, number>(); // cellID -> minimum steps to reach
-        const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
-          { cellID: startCellID, position: horse.position, stepsRemaining: maxStepsToExplore },
-        ];
-
-        while (queue.length > 0) {
-          const { cellID, position, stepsRemaining } = queue.shift()!;
-
-          if (stepsRemaining === 0) {
-            // We've reached this cell in exactly the right number of steps
-            if (cellID !== 'HOME') {
-              const cellData = cells[position]?.[cellID];
-              if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
-                const horseOnCell = horses[cellData.horseIDs[0]];
-                // If it's a blocking horse (opponent or same color)
-                if (horseOnCell) {
-                  // Can only kick opponent horses (different color), not same-color horses
-                  const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
-                  if (isOpponentHorse && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
-                    // This is the opponent blocking cell and we can kick it - highlight it
-                    addReachableCell(cellID, horse.horseID, 'kick');
-                  }
-                  // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
-                  continue;
-                }
-              }
-            }
-            // Determine move type: check if there's an opponent horse on this cell (kick) or normal move
-            const cellDataForType = cells[position]?.[cellID];
-            let moveType: 'kick' | 'move' = 'move';
-            if (cellDataForType && cellDataForType.horseIDs && cellDataForType.horseIDs.length > 0) {
-              const horseOnCell = horses[cellDataForType.horseIDs[0]];
-              if (horseOnCell && horseOnCell.baseID !== horse.baseID) {
-                moveType = 'kick'; // Opponent horse can be kicked
-              }
-            }
-            addReachableCell(cellID, horse.horseID, moveType);
-            continue;
-          }
-
-          // Check if we've already visited this cell with fewer or equal steps remaining
-          const prevStepsRemaining = visited.get(cellID);
-          if (prevStepsRemaining !== undefined && prevStepsRemaining >= stepsRemaining) {
-            continue; // Already visited with equal or better path
-          }
-          visited.set(cellID, stepsRemaining);
-
-          const nextCells = links[cellID];
-          if (!nextCells || nextCells.length === 0) {
-            continue;
-          }
-
-          // Add all next cells to queue
-          for (const nextCell of nextCells) {
-            // Skip HOME cells in intermediate steps (we'll add it at the end if reachable)
-            if (nextCell.cellID === 'HOME' && stepsRemaining > 1) {
-              continue;
-            }
-
-            // For homepath cells, only allow if they match the horse's base
-            if (nextCell.cellID !== 'HOME') {
-              const cellData = cells[nextCell.position]?.[nextCell.cellID];
-              if (cellData && cellData.cellType === CellType.HOMEPATH) {
-                if (cellData.baseID !== horse.baseID) {
-                  continue; // Skip other players' homepaths
-                }
-              }
-              
-              // Check if next cell has a blocking horse
-              if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
-                const horseOnCell = horses[cellData.horseIDs[0]];
-                // If it's any blocking horse (same color or opponent)
-                if (horseOnCell) {
-                  // Check if we can kick this specific blocking horse
-                  // We can only kick opponent horses (different color) if:
-                  // 1. We have blockingInfo for this step count
-                  // 2. This is the exact blocking cell we detected
-                  // 3. The die roll equals the blocking step (steps === blockingStep)
-                  // 4. The blocking horse is NOT same color (!blockingInfo.isSameColor)
-                  const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
-                  if (isOpponentHorse && blockingInfo && nextCell.cellID === blockingInfo.blockingCellID && shouldHighlightBlockingCell && !blockingInfo.isSameColor) {
-                    // This is the opponent blocking cell we detected and we can kick it - allow exploring to reach it
-                    // Continue to queue.push below
-                  } else {
-                    // Blocked by horse (same-color or opponent we can't kick) - don't explore this path
-                    // This prevents highlighting cells beyond any blocking horse
-                    // This handles cases where:
-                    // - The blocking horse is same color (cannot kick)
-                    // - The blocking horse is not the one we detected for this step count
-                    // - We cannot kick it (steps <= blockingStep)
-                    // - We're exploring a different path that also has a blocking horse
-                    continue;
-                  }
-                }
-              }
-              
-            }
-
-            queue.push({ cellID: nextCell.cellID, position: nextCell.position, stepsRemaining: stepsRemaining - 1 });
-          }
-        }
-      }
-      
-      // Additional logic: If it's a pair OR before rolling, also check if we can use one die value
-      // This allows players to move with one die when blocking is detected for the full sum
-      // OR when they want to move with just one die value instead of the sum
-      // OR before rolling (to show step 1 as a potential option if a pair is rolled)
-      // This is especially important for horses on the spawn cell (steps === 0) to show step 1
-      // ALWAYS show step 1 as an option when:
-      // 1. It's a pair (any pair value) - show step 1 AND the pair value as options
-      // 2. Before rolling (showPreRollStep1) - show step 1 as a potential option
-      // 3. For horses on spawn cell (steps === 0) - always show step 1 as a potential option
-      //    This ensures step 1 highlighting is never randomly missing for horses that can move
-      const isOnSpawnCell = horse.steps === 0;
-      const shouldShowStep1 = isPair || showPreRollStep1 || isOnSpawnCell;
-      const shouldShowPairValue = isPair && singleDieValue && singleDieValue >= 1 && singleDieValue <= 6;
-      
-      // Always show step 1 when it's a pair or before rolling
-      if (shouldShowStep1) {
-        const step1Value = 1;
-        // Check for blocking for step 1
-        const blockingInfoForStep1: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-          yield call(findBlockingHorse, horse.horseID, step1Value as Rolls);
-        
-        // For horses on spawn cell (steps === 0), this should always be true for step 1
-        if (horse.steps + step1Value <= WINNING_MOVES) {
-          if (blockingInfoForStep1) {
-            // Blocking detected for step 1
-            const blockingStep = blockingInfoForStep1.stepsBeforeBlocking + 1;
-            
-            if (step1Value < blockingStep) {
-              // Step 1 is less than blocking step - can move to valid cell before blocker
-              yield call(highlightCellsWithSteps, horse, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
-            } else if (step1Value === blockingStep && !blockingInfoForStep1.isSameColor) {
-              // Step 1 equals blocking step AND blocking horse is opponent - can kick
-              // Highlight the blocking cell itself
-              addReachableCell(blockingInfoForStep1.blockingCellID, horse.horseID, 'kick');
-            }
-            // If step1Value > blockingStep, cannot move (would overshoot) - but this shouldn't happen for step 1
-          } else {
-            // No blocking for step 1 - show all cells reachable with step 1
-            // This is critical for horses on spawn cell to show step 1 highlighting
-            yield call(highlightCellsWithSteps, horse, startCellID, step1Value, null, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
-          }
-        }
-      }
-      
-      // Also show the pair value as an option (in addition to step 1) when it's a pair
-      if (shouldShowPairValue && singleDieValue !== 1) {
-        // Only show pair value if it's different from step 1 (already handled above)
-        const blockingInfoForPair: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-          yield call(findBlockingHorse, horse.horseID, singleDieValue as Rolls);
-        
-        // Check if we can move with the pair value
-        if (horse.steps + singleDieValue <= WINNING_MOVES) {
-          if (blockingInfoForPair) {
-            // Blocking detected for pair value
-            const blockingStep = blockingInfoForPair.stepsBeforeBlocking + 1;
-            
-            if (singleDieValue < blockingStep) {
-              // Pair value is less than blocking step - can move to valid cell before blocker
-              yield call(highlightCellsWithSteps, horse, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
-            } else if (singleDieValue === blockingStep && !blockingInfoForPair.isSameColor) {
-              // Pair value equals blocking step AND blocking horse is opponent - can kick
-              // Highlight the blocking cell itself
-              addReachableCell(blockingInfoForPair.blockingCellID, horse.horseID, 'kick');
-            }
-            // If singleDieValue > blockingStep, cannot move (would overshoot)
-          } else {
-            // No blocking for pair value - show all cells reachable with pair value
-            yield call(highlightCellsWithSteps, horse, startCellID, singleDieValue, null, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
-          }
-        }
-      }
-      // Note: The main loop above already handles highlighting for the full sum (dieSum = roll1 + roll2)
-      // So we don't need to check blocking for the full sum here
+    // Calculate normal movement for spawned horses
+    if (horse.isSpawned && horse.cellID) {
+      yield call(calculateNormalMoves, horse, cells, links, horses, reachableCells, cellsByHorse, addReachableCell);
+      yield call(calculateStep1Moves, horse, isPair, showPreRollStep1, cells, links, horses, reachableCells, cellsByHorse, addReachableCell);
+      yield call(calculatePairMoves, horse, isPair, singleDieValue, cells, links, horses, reachableCells, cellsByHorse, addReachableCell);
     }
   }
 
   return { reachableCells, cellsByHorse };
+}
+
+/**
+ * Calculates spawn moves for horses that haven't been spawned yet
+ * Horses can only spawn to their base's spawn cell when rolling 6 or doubles
+ */
+function * calculateSpawnMoves(
+  horse: IHorse,
+  currentBase: IBase,
+  cells: ReturnType<typeof cellsSelector>,
+  addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
+): Generator<any, void, any> {
+  if (horse.isSpawned) {
+    return; // Only process unspawned horses
+  }
+
+  // Find the spawn cell for this base
+  const walkways: ReturnType<typeof walkwaysSelector> = yield select(walkwaysSelector);
+  const walkway = Object.values(walkways).find(
+    (w: IWalkway) => w.baseID === currentBase.ID
+  );
+
+  if (walkway) {
+    const walkwayCells = cells[walkway.position];
+    const spawnCell = Object.values(walkwayCells).find(
+      (cell) => cell.cellType === CellType.SPAWN && cell.baseID === currentBase.ID
+    );
+    if (spawnCell) {
+      addReachableCell(spawnCell.cellID, horse.horseID, 'spawn');
+    }
+  }
+}
+
+/**
+ * Calculates normal movement for spawned horses (dice sums 2-12)
+ * Uses BFS to find all reachable cells while respecting blocking horses and game rules
+ */
+function * calculateNormalMoves(
+  horse: IHorse,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>,
+  horses: ReturnType<typeof horsesSelector>,
+  reachableCells: Set<string>,
+  cellsByHorse: Map<string, Array<{ horseID: string; moveType: 'spawn' | 'kick' | 'move' }>>,
+  addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
+): Generator<any, void, any> {
+  const startCellID = horse.cellID!;
+
+  // Calculate all cells reachable with 2-12 steps (two dice: min 1+1=2, max 6+6=12)
+  for (let steps = 2; steps <= 12; steps++) {
+    // Check if this move would overshoot home
+    if (horse.steps + steps > WINNING_MOVES) {
+      continue; // Skip moves that overshoot
+    }
+
+    // Process blocking horse logic and determine exploration parameters
+    const blockingResult = yield call(processBlockingLogic, horse.horseID, steps);
+    if (!blockingResult.canExplore) {
+      continue; // Cannot move with this step count due to blocking
+    }
+
+    const { maxStepsToExplore, shouldHighlightBlockingCell, blockingInfo } = blockingResult;
+
+    // Use BFS to find all cells reachable in exactly 'maxStepsToExplore' moves
+    yield call(exploreReachableCells,
+      horse, startCellID, maxStepsToExplore, shouldHighlightBlockingCell, blockingInfo,
+      cells, links, horses, reachableCells, cellsByHorse, addReachableCell);
+  }
+}
+
+/**
+ * Processes blocking horse logic for a specific step count
+ * Returns exploration parameters based on blocking horse analysis
+ *
+ * BLOCKING LOGIC SCENARIOS:
+ * 1. No blocking horse: Can explore full step distance
+ * 2. Blocking horse with steps < blocking step: Can only move up to blocker
+ * 3. Blocking horse with steps == blocking step && opponent: Can kick and highlight blocking cell
+ * 4. Blocking horse with steps == blocking step && same color: Cannot move (can't kick same color)
+ * 5. Blocking horse with steps > blocking step: Cannot move (would overshoot blocker)
+ */
+function * processBlockingLogic(
+  horseID: string,
+  steps: number
+): Generator<any, {
+  canExplore: boolean;
+  maxStepsToExplore: number;
+  shouldHighlightBlockingCell: boolean;
+  blockingInfo: any
+}, any> {
+  // Check for blocking horses for this specific step count
+  const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null =
+    yield call(findBlockingHorse, horseID, steps as Rolls);
+
+  let maxStepsToExplore = steps;
+  let shouldHighlightBlockingCell = false;
+  let canExplore = true;
+
+  if (blockingInfo) {
+    // Blocking horse detected at step (stepsBeforeBlocking + 1)
+    // Example: if stepsBeforeBlocking = 2, blocking horse is at step 3
+    const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
+
+    if (steps < blockingStep) {
+      // SCENARIO 2: Die roll is less than blocking step - can only move steps before blocker
+      // Example: rolling 4 but blocker at step 5 - can only move 4 steps
+      // Don't explore any further - stop immediately
+      maxStepsToExplore = blockingInfo.stepsBeforeBlocking;
+      if (maxStepsToExplore <= 0) {
+        canExplore = false; // Cannot move at all - skip this step count
+      }
+    } else if (steps === blockingStep && !blockingInfo.isSameColor) {
+      // SCENARIO 3: Die roll equals blocking step AND blocking horse is opponent (different color)
+      // Can kick the blocking horse - highlight the blocking cell itself
+      // Note: Same-color horses cannot be kicked, so we skip highlighting
+      shouldHighlightBlockingCell = true;
+      maxStepsToExplore = steps; // Can move full distance and kick
+    } else {
+      // SCENARIO 4 & 5: Either:
+      // - Die roll > blocking step (cannot kick, would overshoot)
+      // - Die roll == blocking step but blocking horse is same color (cannot kick same color)
+      canExplore = false; // Skip this step count - no highlighting
+    }
+  }
+  // SCENARIO 1: No blocking horse - canExplore = true, maxStepsToExplore = steps
+
+  return { canExplore, maxStepsToExplore, shouldHighlightBlockingCell, blockingInfo };
+}
+
+/**
+ * Explores all cells reachable from a starting position using BFS
+ * Handles the complex logic of cell traversal, blocking, and move type determination
+ */
+function * exploreReachableCells(
+  horse: IHorse,
+  startCellID: string,
+  maxStepsToExplore: number,
+  shouldHighlightBlockingCell: boolean,
+  blockingInfo: any,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>,
+  horses: ReturnType<typeof horsesSelector>,
+  reachableCells: Set<string>,
+  cellsByHorse: Map<string, Array<{ horseID: string; moveType: 'spawn' | 'kick' | 'move' }>>,
+  addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
+): Generator<any, void, any> {
+  // Track visited cells with their step count to avoid revisiting with more steps
+  const visited = new Map<string, number>(); // cellID -> minimum steps to reach
+  const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
+    { cellID: startCellID, position: horse.position, stepsRemaining: maxStepsToExplore },
+  ];
+
+  while (queue.length > 0) {
+    const { cellID, position, stepsRemaining } = queue.shift()!;
+
+    if (stepsRemaining === 0) {
+      // We've reached this cell in exactly the right number of steps
+      yield call(processReachedCell, cellID, position, shouldHighlightBlockingCell, blockingInfo,
+        cells, horses, horse, addReachableCell);
+      continue;
+    }
+
+    // Check if we've already visited this cell with fewer or equal steps remaining
+    const prevStepsRemaining = visited.get(cellID);
+    if (prevStepsRemaining !== undefined && prevStepsRemaining >= stepsRemaining) {
+      continue; // Already visited with equal or better path
+    }
+    visited.set(cellID, stepsRemaining);
+
+    const nextCells = links[cellID];
+    if (!nextCells || nextCells.length === 0) {
+      continue;
+    }
+
+    // Add all valid next cells to queue
+    for (const nextCell of nextCells) {
+      if (yield call(isValidNextCell, nextCell, stepsRemaining, horse, cells, horses, blockingInfo, shouldHighlightBlockingCell)) {
+        queue.push({ cellID: nextCell.cellID, position: nextCell.position, stepsRemaining: stepsRemaining - 1 });
+      }
+    }
+  }
+}
+
+/**
+ * Processes a cell that has been reached in exactly the target number of steps
+ * Determines if it should be highlighted based on blocking and move type logic
+ */
+function * processReachedCell(
+  cellID: string,
+  position: WalkwayPosition,
+  shouldHighlightBlockingCell: boolean,
+  blockingInfo: any,
+  cells: ReturnType<typeof cellsSelector>,
+  horses: ReturnType<typeof horsesSelector>,
+  horse: IHorse,
+  addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
+): Generator<any, void, any> {
+  if (cellID !== 'HOME') {
+    const cellData = cells[position]?.[cellID];
+    if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+      const horseOnCell = horses[cellData.horseIDs[0]];
+
+      // Check if this cell has a blocking horse that affects highlighting
+      if (horseOnCell) {
+        // Can only kick opponent horses (different color), not same-color horses
+        const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+
+        if (isOpponentHorse && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
+          // This is the opponent blocking cell we detected and we can kick it - highlight it
+          addReachableCell(cellID, horse.horseID, 'kick');
+          return;
+        } else {
+          // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
+          // This prevents showing cells that are blocked by horses
+          return;
+        }
+      }
+    }
+  }
+
+  // Determine move type: check if there's an opponent horse on this cell (kick) or normal move
+  const cellDataForType = cells[position]?.[cellID];
+  let moveType: 'kick' | 'move' = 'move';
+  if (cellDataForType && cellDataForType.horseIDs && cellDataForType.horseIDs.length > 0) {
+    const horseOnCell = horses[cellDataForType.horseIDs[0]];
+    if (horseOnCell && horseOnCell.baseID !== horse.baseID) {
+      moveType = 'kick'; // Opponent horse can be kicked
+    }
+  }
+  addReachableCell(cellID, horse.horseID, moveType);
+}
+
+/**
+ * Validates if a cell can be explored as a next move
+ * Checks home path restrictions and blocking horse rules
+ */
+function * isValidNextCell(
+  nextCell: any,
+  stepsRemaining: number,
+  horse: IHorse,
+  cells: ReturnType<typeof cellsSelector>,
+  horses: ReturnType<typeof horsesSelector>,
+  blockingInfo: any,
+  shouldHighlightBlockingCell: boolean
+): Generator<any, boolean, any> {
+  // Skip HOME cells in intermediate steps (we'll add it at the end if reachable)
+  if (nextCell.cellID === 'HOME' && stepsRemaining > 1) {
+    return false;
+  }
+
+  // For homepath cells, only allow if they match the horse's base
+  if (nextCell.cellID !== 'HOME') {
+    const cellData = cells[nextCell.position]?.[nextCell.cellID];
+    if (cellData && cellData.cellType === CellType.HOMEPATH) {
+      if (cellData.baseID !== horse.baseID) {
+        return false; // Skip other players' homepaths
+      }
+    }
+
+    // Check if next cell has a blocking horse
+    if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+      const horseOnCell = horses[cellData.horseIDs[0]];
+
+      // If it's any blocking horse (same color or opponent)
+      if (horseOnCell) {
+        // Check if we can kick this specific blocking horse
+        // We can only kick opponent horses (different color) if:
+        // 1. We have blockingInfo for this step count
+        // 2. This is the exact blocking cell we detected
+        // 3. We should highlight blocking cells (indicates we can kick)
+        // 4. The blocking horse is NOT same color (!blockingInfo.isSameColor)
+        const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+
+        if (isOpponentHorse && blockingInfo && nextCell.cellID === blockingInfo.blockingCellID && shouldHighlightBlockingCell && !blockingInfo.isSameColor) {
+          // This is the opponent blocking cell we detected and we can kick it - allow exploring to reach it
+          return true;
+        } else {
+          // Blocked by horse (same-color or opponent we can't kick) - don't explore this path
+          // This prevents highlighting cells beyond any blocking horse
+          // This handles cases where:
+          // - The blocking horse is same color (cannot kick)
+          // - The blocking horse is not the one we detected for this step count
+          // - We cannot kick it (steps <= blockingStep)
+          // - We're exploring a different path that also has a blocking horse
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Calculates step 1 highlighting for special cases
+ * Step 1 is shown when:
+ * - It's a pair (any pair value) - show step 1 AND the pair value as options
+ * - Before rolling (showPreRollStep1) - show step 1 as a potential option
+ * - For horses on spawn cell (steps === 0) - always show step 1 as a potential option
+ */
+function * calculateStep1Moves(
+  horse: IHorse,
+  isPair: boolean,
+  showPreRollStep1: boolean,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>,
+  horses: ReturnType<typeof horsesSelector>,
+  reachableCells: Set<string>,
+  cellsByHorse: Map<string, Array<{ horseID: string; moveType: 'spawn' | 'kick' | 'move' }>>,
+  addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
+): Generator<any, void, any> {
+  const startCellID = horse.cellID!;
+  const isOnSpawnCell = horse.steps === 0;
+  const shouldShowStep1 = isPair || showPreRollStep1 || isOnSpawnCell;
+
+  if (!shouldShowStep1) {
+    return;
+  }
+
+  const step1Value = 1;
+
+  // For horses on spawn cell (steps === 0), this should always be true for step 1
+  if (horse.steps + step1Value <= WINNING_MOVES) {
+    const blockingInfoForStep1 = yield call(findBlockingHorse, horse.horseID, step1Value as Rolls);
+
+    if (blockingInfoForStep1) {
+      // Blocking detected for step 1
+      const blockingStep = blockingInfoForStep1.stepsBeforeBlocking + 1;
+
+      if (step1Value < blockingStep) {
+        // Step 1 is less than blocking step - can move to valid cell before blocker
+        yield call(highlightCellsWithSteps, horse, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
+      } else if (step1Value === blockingStep && !blockingInfoForStep1.isSameColor) {
+        // Step 1 equals blocking step AND blocking horse is opponent - can kick
+        // Highlight the blocking cell itself
+        addReachableCell(blockingInfoForStep1.blockingCellID, horse.horseID, 'kick');
+      }
+      // If step1Value > blockingStep, cannot move (would overshoot) - but this shouldn't happen for step 1
+    } else {
+      // No blocking for step 1 - show all cells reachable with step 1
+      // This is critical for horses on spawn cell to show step 1 highlighting
+      yield call(highlightCellsWithSteps, horse, startCellID, step1Value, null, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
+    }
+  }
+}
+
+/**
+ * Calculates pair value highlighting when dice show doubles
+ * Shows the single die value as an additional option (besides step 1)
+ */
+function * calculatePairMoves(
+  horse: IHorse,
+  isPair: boolean,
+  singleDieValue: number | null,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>,
+  horses: ReturnType<typeof horsesSelector>,
+  reachableCells: Set<string>,
+  cellsByHorse: Map<string, Array<{ horseID: string; moveType: 'spawn' | 'kick' | 'move' }>>,
+  addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
+): Generator<any, void, any> {
+  if (!isPair || !singleDieValue || singleDieValue < 1 || singleDieValue > 6) {
+    return;
+  }
+
+  const startCellID = horse.cellID!;
+
+  // Only show pair value if it's different from step 1 (already handled above)
+  if (singleDieValue === 1) {
+    return;
+  }
+
+  // Check if we can move with the pair value
+  if (horse.steps + singleDieValue <= WINNING_MOVES) {
+    const blockingInfoForPair = yield call(findBlockingHorse, horse.horseID, singleDieValue as Rolls);
+
+    if (blockingInfoForPair) {
+      // Blocking detected for pair value
+      const blockingStep = blockingInfoForPair.stepsBeforeBlocking + 1;
+
+      if (singleDieValue < blockingStep) {
+        // Pair value is less than blocking step - can move to valid cell before blocker
+        yield call(highlightCellsWithSteps, horse, startCellID, singleDieValue, blockingInfoForPair, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
+      } else if (singleDieValue === blockingStep && !blockingInfoForPair.isSameColor) {
+        // Pair value equals blocking step AND blocking horse is opponent - can kick
+        // Highlight the blocking cell itself
+        addReachableCell(blockingInfoForPair.blockingCellID, horse.horseID, 'kick');
+      }
+      // If singleDieValue > blockingStep, cannot move (would overshoot)
+    } else {
+      // No blocking for pair value - show all cells reachable with pair value
+      yield call(highlightCellsWithSteps, horse, startCellID, singleDieValue, null, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
+    }
+  }
 }
 
 /**

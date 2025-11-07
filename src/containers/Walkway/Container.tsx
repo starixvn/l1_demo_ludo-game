@@ -16,8 +16,6 @@ import { flatArray } from "common/utils"; // Array flattening utility
 import { Horse } from "containers/Base/components/Horse"; // Horse component for rendering
 import {
   CellType,
-  ICell,
-  IServerGameData,
   IWalkway,
 } from "containers/Ludo/state/interfaces"; // Game data types
 import {
@@ -78,17 +76,6 @@ interface IDispatchProps {
 /** Combined component props */
 interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
 
-/**
- * Global storage for cell configurations during development
- * In production, this would be loaded from pre-configured data
- */
-const cells: IServerGameData["cells"] = {};
-
-/**
- * Global storage for cell links during development
- * Stores which cells are connected for valid movement paths
- */
-const cellLinks: { [cellID: string]: Set<ICell["cellID"]> } = {};
 
 /**
  * Maps Redux state to component props
