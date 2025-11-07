@@ -844,7 +844,7 @@ function * calculateNormalMoves(
   const startCellID = horse.cellID!;
 
   // Calculate all cells reachable with 2-12 steps (two dice: min 1+1=2, max 6+6=12)
-  for (let steps = 2; steps <= 12; steps++) {
+  for (let steps = 1; steps <= 12; steps++) {
     // Check if this move would overshoot home
     if (horse.steps + steps > WINNING_MOVES) {
       continue; // Skip moves that overshoot

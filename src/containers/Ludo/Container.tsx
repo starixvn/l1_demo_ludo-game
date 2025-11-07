@@ -116,7 +116,7 @@ const mapDispatchToProps = {
 class LudoBare extends React.PureComponent<IProps, IState> {
   /** Initial state shows player configuration screen */
   state: IState = {
-    showPlayerConfiguration: true,
+    showPlayerConfiguration: false,
     showDebugText: false, // Hide debug text by default
     showGameLog: false, // Hide game log by default
   };
@@ -270,7 +270,6 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             </button>
           </div>
         ) : null}
-
 
         {/* Action Selection UI - shows available actions after dice roll */}
         <ActionSelection />
