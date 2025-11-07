@@ -18,7 +18,6 @@ import { Walkway } from "containers/Walkway/Container"; // Game board walkway
 import { ActionSelection } from "containers/ActionSelection/Container"; // Action selection UI
 import { DiceCountdown } from "containers/DiceCountdown/Container"; // Countdown timer for dice roll
 import { getStyleObject } from "containers/utils"; // Styling utilities
-import { loadGameStateFromFile } from "common/utils"; // Game state loading utility
 import { BOARD_SIZE } from "globalConstants"; // Board dimensions
 
 import {
@@ -27,6 +26,13 @@ import {
   getInitialGameData,
   getInitialGameDataSuccess,
   setPlayers,
+  setReplaySteps,
+  startReplay,
+  stopReplay,
+  pauseReplay,
+  resumeReplay,
+  IReplayStep,
+  enableBase,
 } from "./state/actions"; // Ludo actions
 import { disableDie, invalidateDieRoll } from "containers/Dice/state/actions"; // Dice actions
 import {
@@ -53,6 +59,12 @@ interface IDispatchProps {
   getInitialGameData: typeof getInitialGameData; // Initialize game data
   getInitialGameDataSuccess: typeof getInitialGameDataSuccess; // Load saved game state
   setPlayers: typeof setPlayers; // Configure number of players
+  setReplaySteps: typeof setReplaySteps;
+  startReplay: typeof startReplay;
+  stopReplay: typeof stopReplay;
+  pauseReplay: typeof pauseReplay;
+  resumeReplay: typeof resumeReplay;
+  enableBase: typeof enableBase; // Enable a base
   clearLogs: typeof clearLogs; // Clear game logs
   disableDie: typeof disableDie; // Disable die
   invalidateDieRoll: typeof invalidateDieRoll; // Invalidate die roll
@@ -107,6 +119,12 @@ const mapDispatchToProps = {
   disableDie, // Action to disable die
   invalidateDieRoll, // Action to invalidate die roll
   setAutoActionsEnabled, // Action to set auto-actions enabled state
+  setReplaySteps,
+  startReplay,
+  stopReplay,
+  pauseReplay,
+  resumeReplay,
+  enableBase,
 };
 
 /**
@@ -116,22 +134,20 @@ const mapDispatchToProps = {
 class LudoBare extends React.PureComponent<IProps, IState> {
   /** Initial state shows player configuration screen */
   state: IState = {
-    showPlayerConfiguration: false,
+    showPlayerConfiguration: true, // Show configuration screen on load
     showDebugText: false, // Hide debug text by default
     showGameLog: false, // Hide game log by default
   };
 
+  private replayFileInputRef: React.RefObject<HTMLInputElement> =
+    React.createRef();
+
   /**
    * Load initial game data when component mounts
-   * Automatically start the game with 4 players after page loads
+   * User must manually start the game or load replay files
    */
   componentDidMount() {
     this.props.getInitialGameData();
-    // Auto-start game with 4 players after initial data is loaded
-    // Use a small delay to ensure game data is loaded first
-    setTimeout(() => {
-      this.startGame(4);
-    }, 100);
   }
 
   /**
@@ -215,6 +231,35 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             />
             <span className={styles.CheckboxLabelText}>Auto Run</span>
           </label>
+          {/* Replay controls - shown only during gameplay */}
+          {!this.state.showPlayerConfiguration && (
+            <div>
+              <button
+                className={styles.Button}
+                onClick={() => this.props.startReplay()}
+              >
+                Start Replay
+              </button>
+              <button
+                className={styles.Button}
+                onClick={() => this.props.pauseReplay()}
+              >
+                Pause
+              </button>
+              <button
+                className={styles.Button}
+                onClick={() => this.props.resumeReplay()}
+              >
+                Resume
+              </button>
+              <button
+                className={styles.Button}
+                onClick={() => this.props.stopReplay()}
+              >
+                Stop Replay
+              </button>
+            </div>
+          )}
           <label className={styles.CheckboxLabel}>
             <input
               type="checkbox"
@@ -249,20 +294,31 @@ class LudoBare extends React.PureComponent<IProps, IState> {
         {/* Player configuration screen (shown before game starts) */}
         {this.state.showPlayerConfiguration ? (
           <div className={styles.GameConfiguration}>
-            <button className={styles.Button} onClick={() => this.startGame(2)}>
-              2 Players
-            </button>
-            <button className={styles.Button} onClick={() => this.startGame(3)}>
-              3 Players
-            </button>
+            <h2>Start New Game</h2>
             <button className={styles.Button} onClick={() => this.startGame(4)}>
-              4 Players
+              Start Game
             </button>
+            <hr
+              style={{
+                margin: "20px 0",
+                border: "none",
+                borderTop: "1px solid #ccc",
+              }}
+            />
+            <h2>Load Replay Files</h2>
+            <input
+              ref={this.replayFileInputRef}
+              type="file"
+              accept="application/json"
+              multiple
+              style={{ display: "none" }}
+              onChange={this.handleReplayFilesSelected}
+            />
             <button
               className={styles.Button}
-              onClick={this.handleLoadGameState}
+              onClick={this.handleOpenReplayFiles}
             >
-              Load Game State
+              Load Replay Files
             </button>
           </div>
         ) : null}
@@ -329,42 +385,6 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   };
 
   /**
-   * Loads a previously saved game state from a JSON file
-   * Allows players to continue a game from a saved state
-   */
-  private handleLoadGameState = () => {
-    loadGameStateFromFile(
-      (restoredState, metadata) => {
-        // Restore the game state with proper type casting
-        // currentTurn should be a BaseID enum value
-        // availableActions, availableActionsDieValue, and highlightedCells should be null when loading a saved game
-        this.props.getInitialGameDataSuccess({
-          ...restoredState,
-          currentTurn: restoredState.currentTurn as BaseID,
-          availableActions: null,
-          availableActionsDieValue: null,
-          highlightedCells: null,
-          highlightedCellsByHorse: null,
-        });
-
-        // Hide the configuration screen since we're loading an existing game
-        this.setState({
-          showPlayerConfiguration: false,
-        });
-
-        alert(
-          `Game state loaded successfully!\nExported at: ${
-            metadata.exportedAt || "Unknown"
-          }\nTotal logs: ${metadata.totalLogs || 0}`
-        );
-      },
-      (errorMessage) => {
-        alert(errorMessage);
-      }
-    );
-  };
-
-  /**
    * Reloads the current page to start fresh
    */
   private handleResetGame = () => {
@@ -379,6 +399,64 @@ class LudoBare extends React.PureComponent<IProps, IState> {
 
     // Reload the page
     window.location.reload();
+  };
+
+  private handleOpenReplayFiles = () => {
+    if (this.replayFileInputRef.current) {
+      this.replayFileInputRef.current.value = "";
+      this.replayFileInputRef.current.click();
+    }
+  };
+
+  private handleReplayFilesSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    // Sort by numeric suffix in filename
+    const sorted = files.sort((a, b) => {
+      const ma = a.name.match(/(\d+)/);
+      const mb = b.name.match(/(\d+)/);
+      const na = ma && ma[1] ? ma[1] : "0";
+      const nb = mb && mb[1] ? mb[1] : "0";
+      return parseInt(na, 10) - parseInt(nb, 10);
+    });
+    const steps: IReplayStep[] = [];
+    for (const f of sorted) {
+      try {
+        const text = await f.text();
+        const json = JSON.parse(text);
+        if (
+          json &&
+          Array.isArray(json.dice) &&
+          typeof json.currentPlayer === "number" &&
+          json.playerAction
+        ) {
+          steps.push({
+            board: json.board || null,
+            dice: [json.dice[0], json.dice[1]],
+            currentPlayer: json.currentPlayer,
+            playerAction: json.playerAction,
+            kickedPlayer: json.kickedPlayer || null,
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to parse replay file", f.name, err);
+      }
+    }
+    if (steps.length > 0) {
+      this.props.setReplaySteps(steps);
+      // Start the game so user can use replay controls
+      this.setState({ showPlayerConfiguration: false });
+
+      // Small delay to ensure state is updated before starting replay
+      setTimeout(() => {
+        // Automatically start replay after loading files
+        this.props.startReplay();
+      }, 100);
+    } else {
+      alert("No valid replay steps found in selected files.");
+    }
   };
 }
 

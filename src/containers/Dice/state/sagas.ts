@@ -20,6 +20,9 @@ import {
   markCurrentBase,
   moveHorse,
   nextTurn,
+  nextReplayStep,
+  pauseReplay,
+  passTurnTo,
   spawnHorse,
   setAvailableActions,
   clearAvailableActions,
@@ -30,7 +33,7 @@ import { rollDie } from './actions';
 import { BaseID, CellType, IBase, IHorse } from 'containers/Ludo/state/interfaces';
 import { getMovableHorses, calculateReachableCells, findBlockingHorse, isCurrentMoveValid } from 'containers/Ludo/state/sagas';
 import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/state/actions';
-import { basesSelector, cellsSelector, horsesSelector, currentTurnSelector, linksSelector, walkwaysSelector } from 'containers/Ludo/state/selectors';
+import { basesSelector, cellsSelector, horsesSelector, currentTurnSelector, linksSelector, walkwaysSelector, replaySelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
 import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
 import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY, WINNING_MOVES } from 'globalConstants';
@@ -39,6 +42,14 @@ import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSele
 
 import { enableDie, invalidateDieRoll, rollDieComplete, startRolling, stopRolling, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
+
+/**
+ * Maps player index (0-3) to BaseID
+ * Mapping: 0 → BASE_1 (YELLOW), 1 → BASE_3 (BLUE), 2 → BASE_4 (RED), 3 → BASE_2 (GREEN)
+ */
+function mapPlayerIndexToBase(id: number): BaseID {
+  return [BaseID.BASE_1, BaseID.BASE_3, BaseID.BASE_4, BaseID.BASE_2][Math.max(0, Math.min(3, id))];
+}
 
 /**
  * Watcher saga that listens for ROLL_DIE actions and triggers the roll die saga
@@ -59,9 +70,35 @@ function * rollDieSaga() {
   // Wait for animation to complete (1.2 seconds)
   yield delay(DICE_ROLLING_ANIMATION_DURATION);
 
-  // Get current player info to check if it's their first turn
+  // Check if replay is active - use replay values instead of random
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  
+  let dieRoll1: Rolls;
+  let dieRoll2: Rolls;
+
+  if (replay?.isActive && !replay.isPaused && replay.cursor < replay.steps.length) {
+    // Use deterministic dice values from replay file
+    const step = replay.steps[replay.cursor];
+    dieRoll1 = step.dice[0] as Rolls;
+    dieRoll2 = step.dice[1] as Rolls;
+    
+    // Log replay dice information
+    console.log('[REPLAY] Dice Roll:', {
+      step: replay.cursor,
+      currentPlayer: step.currentPlayer,
+      playerColor: bases[currentTurn].color,
+      dice: [dieRoll1, dieRoll2],
+      sum: dieRoll1 + dieRoll2,
+      source: 'replay_file',
+    });
+  } else {
+    // Generate random die rolls using Mersenne Twister for better randomness
+    const mt = MersenneTwister19937.autoSeed();
+    dieRoll1 = integer(Rolls.ONE, Rolls.SIX)(mt);
+    dieRoll2 = integer(Rolls.ONE, Rolls.SIX)(mt);
+  }
   const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const currentTurnBase = bases[currentTurn];
   const playerColor = currentTurnBase.color;
@@ -804,6 +841,47 @@ function * handleNonSpawnableRoll(
  * Handles when no valid moves are available
  */
 function * handleNoValidMoves(): Generator<any, void, any> {
+  // Check if replay is active - replay system handles turn progression
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && !replay.isPaused) {
+    console.log('[REPLAY] handleNoValidMoves - no valid moves, advancing replay step');
+    // Replay system will handle turn progression via replayAdvanceStepSaga
+    // But since there's no move/spawn, we need to manually advance
+    yield delay(NO_MOVE_DELAY);
+    yield put(invalidateDieRoll());
+    
+    // Manually advance replay step since no MOVE_HORSE_SUCCESS or SPAWN_HORSE_SUCCESS will be dispatched
+    if (replay.cursor < replay.steps.length - 1) {
+      const nextStepIndex = replay.cursor + 1;
+      yield put(nextReplayStep());
+      
+      yield delay(50); // Small delay to ensure state update
+      const updatedReplay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+      const nextStep = updatedReplay?.steps?.[updatedReplay.cursor];
+      if (nextStep) {
+        const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+        const baseID = mapPlayerIndexToBase(nextStep.currentPlayer);
+        
+        console.log('[REPLAY] No valid moves - advancing to next step:', {
+          completedStep: replay.cursor,
+          nextStep: nextStepIndex,
+          nextStepPlayer: nextStep.currentPlayer,
+          nextStepPlayerColor: bases[baseID].color,
+        });
+        
+        yield delay(200);
+        yield put(passTurnTo(baseID));
+        yield put(enableDie());
+        yield delay(100);
+        yield put(rollDie());
+      }
+    } else {
+      // Finished
+      yield put(pauseReplay());
+    }
+    return;
+  }
+
   // Always wait to show the dice result before passing turn
   // This allows players to see the roll result whether they have no spawned horses
   // or their horses are blocked and cannot move
@@ -868,6 +946,15 @@ function * rollDieCompleteSaga(action: ReturnType<typeof rollDieComplete>): Gene
  * If the player rolled a spawnable combination, grant a bonus turn
  */
 function * spawnHorseSuccessSaga() {
+  // Check if replay is active - replay system handles turn progression
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && !replay.isPaused) {
+    // Replay system will handle turn progression via replayAdvanceStepSaga
+    // Just invalidate the die roll
+    yield put(invalidateDieRoll());
+    return;
+  }
+
   // Invalidate the die roll first (action has been chosen)
   yield put(invalidateDieRoll());
   

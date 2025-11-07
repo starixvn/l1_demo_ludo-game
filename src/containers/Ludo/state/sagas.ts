@@ -17,15 +17,20 @@ import {
 
 import { api } from 'common/http';
 import { mapByProperty } from 'common/utils';
-import { enableDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
+import { enableDie, rollDie, ActionTypes as DiceActionTypes } from 'containers/Dice/state/actions';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
+import { setAutoActionsEnabled } from 'containers/StepLogs/state/actions';
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector, isDieRollAllowedSelector, isDieRollValidSelector } from 'containers/Dice/state/selectors';
 import { DEFAULT_STARTING_BASE, WINNING_MOVES, LUDO_MOVE_ANIMATION_DELAY, LUDO_STATE_UPDATE_DELAY, NO_MOVE_DELAY } from 'globalConstants';
 import { WalkwayPosition } from 'state/interfaces';
 
 import {
+  clearAvailableActions,
   clearHighlightedCells,
+  setAvailableActions,
+  pauseReplay,
+  nextReplayStep,
   disqualifyHorse,
   enableBase,
   getInitialGameDataSuccess,
@@ -63,6 +68,8 @@ import {
   currentTurnSelector,
   linksSelector,
   walkwaysSelector,
+  cellIndexLookupSelector,
+  replaySelector,
 } from './selectors';
 
 /**
@@ -579,6 +586,13 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
 
   // Complete the move and handle turn progression
   yield put(moveHorseSuccess(bonusChance, horseID, stepsToMove as Rolls));
+
+  // Check if replay is active - replay system handles turn progression
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && !replay.isPaused) {
+    // Replay system will handle turn progression via replayAdvanceStepSaga
+    return;
+  }
 
   // Advance to next turn unless player gets bonus
   // Note: Roll invalidation and die enabling are handled in moveHorseSuccessSaga
@@ -1226,10 +1240,46 @@ function * watchForRollDieComplete() {
 }
 
 /**
+ * Maps player index (0-3) to BaseID
+ * Mapping: 0 → BASE_1 (YELLOW), 1 → BASE_3 (BLUE), 2 → BASE_4 (RED), 3 → BASE_2 (GREEN)
+ */
+function mapPlayerIndexToBase(id: number): BaseID {
+  return [BaseID.BASE_1, BaseID.BASE_3, BaseID.BASE_4, BaseID.BASE_2][Math.max(0, Math.min(3, id))];
+}
+
+/**
  * Handles when turn is passed to a player
  * Calculates and highlights all reachable cells for that player's horses
+ * In replay mode, ensures the turn matches the replay file
  */
 function * passTurnToSaga() {
+  // Check if replay is active and ensure turn matches replay file
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && !replay.isPaused && replay.cursor < replay.steps.length) {
+    const step = replay.steps[replay.cursor];
+    const expectedBaseID = mapPlayerIndexToBase(step.currentPlayer);
+    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+    
+    // Log turn information
+    console.log('[REPLAY] Turn Change:', {
+      step: replay.cursor,
+      expectedPlayer: step.currentPlayer,
+      expectedBaseID: expectedBaseID,
+      expectedPlayerColor: bases[expectedBaseID].color,
+      currentTurn: currentTurn,
+      currentPlayerColor: bases[currentTurn].color,
+      corrected: currentTurn !== expectedBaseID,
+    });
+    
+    // If turn doesn't match, correct it
+    if (currentTurn !== expectedBaseID) {
+      yield put(passTurnTo(expectedBaseID));
+      // Small delay to ensure state update
+      yield delay(50);
+    }
+  }
+
   // Clear any existing highlighting
   yield put(clearHighlightedCells());
 
@@ -1247,14 +1297,57 @@ function * passTurnToSaga() {
  *
  * Finds the next active player who hasn't won yet, skipping disabled players
  * or players who have already completed the game. Logs the turn transition.
+ * 
+ * Note: During replay mode, turn progression is handled by the replay system,
+ * so this saga returns early to avoid conflicts.
  */
 function * nextTurnSaga() {
-  const currentTurnBase: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+  // Skip normal turn progression during replay - replay system handles turns
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && !replay.isPaused) {
+    console.log('[REPLAY] Skipping nextTurnSaga - replay system controls turn progression');
+    return;
+  }
+
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
 
+  // Check if all bases are disabled - this shouldn't happen
+  const enabledBases = Object.keys(bases).filter(key => bases[key as BaseID]?.enabled);
+  if (enabledBases.length === 0) {
+    // Re-check replay state in case it changed
+    const currentReplay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+    console.error('[REPLAY] All bases are disabled - this should not happen', {
+      replay: currentReplay,
+      bases: Object.keys(bases).map(key => ({
+        baseID: key,
+        enabled: bases[key as BaseID]?.enabled,
+        hasWon: bases[key as BaseID]?.hasWon,
+      })),
+    });
+    // If replay is active, this is a critical error - try to enable all bases
+    if (currentReplay?.isActive) {
+      console.warn('[REPLAY] Attempting to enable all bases for replay');
+      yield put(setPlayers(4));
+      yield delay(100);
+      // Re-select bases after enabling
+      const updatedBases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+      const updatedEnabledBases = Object.keys(updatedBases).filter(key => updatedBases[key as BaseID]?.enabled);
+      if (updatedEnabledBases.length === 0) {
+        console.error('[REPLAY] Failed to enable bases - cannot proceed');
+        return;
+      }
+    } else {
+      return; // Exit if not replay and no bases enabled
+    }
+  }
+
+  // Re-select bases in case they were just enabled, or use current ones
+  const finalBases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const finalCurrentTurnBase: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+
   // Start with the configured next turn
-  let nextTurn = bases[currentTurnBase].nextTurn;
-  let nextBaseID = currentTurnBase;
+  let nextTurn = finalBases[finalCurrentTurnBase].nextTurn;
+  let nextBaseID = finalCurrentTurnBase;
   let validPlayerFound = false;
   const maxIterations = 4; // Maximum number of players to check
   let iterations = 0;
@@ -1262,8 +1355,8 @@ function * nextTurnSaga() {
   // Find next valid player (enabled and hasn't won)
   // Iterate through players with a maximum limit to prevent infinite loops
   while (iterations < maxIterations && !validPlayerFound) {
-    nextBaseID = bases[nextBaseID].nextTurn;
-    const nextBase = bases[nextBaseID];
+    nextBaseID = finalBases[nextBaseID].nextTurn;
+    const nextBase = finalBases[nextBaseID];
     
     // Check if this player is valid (enabled and hasn't won)
     if (nextBase && nextBase.enabled && !nextBase.hasWon) {
@@ -1275,7 +1368,7 @@ function * nextTurnSaga() {
     iterations++;
     
     // Prevent infinite loop if we've checked all players
-    if (nextBaseID === currentTurnBase) {
+    if (nextBaseID === finalCurrentTurnBase) {
       // We've cycled back to the starting player - no valid players found
       console.warn('No valid players found for next turn - all players disabled or won');
       break;
@@ -1283,11 +1376,18 @@ function * nextTurnSaga() {
   }
 
   // Validate that we found a valid player before proceeding
-  if (!validPlayerFound || !bases[nextTurn]) {
-    console.error('Failed to find valid next player - game may be in invalid state');
+  if (!validPlayerFound || !finalBases[nextTurn]) {
+    console.error('Failed to find valid next player - game may be in invalid state', {
+      currentTurn: finalCurrentTurnBase,
+      bases: Object.keys(finalBases).map(key => ({
+        baseID: key,
+        enabled: finalBases[key as BaseID]?.enabled,
+        hasWon: finalBases[key as BaseID]?.hasWon,
+      })),
+    });
     // Try to find any enabled player as fallback
-    for (const key in bases) {
-      if (bases[key] && bases[key].enabled && !bases[key].hasWon) {
+    for (const key in finalBases) {
+      if (finalBases[key] && finalBases[key].enabled && !finalBases[key].hasWon) {
         nextTurn = key as BaseID;
         validPlayerFound = true;
         break;
@@ -1295,8 +1395,15 @@ function * nextTurnSaga() {
     }
     
     // If still no valid player found, log error and exit
-    if (!validPlayerFound || !bases[nextTurn]) {
-      console.error('Cannot proceed - no valid players available');
+    if (!validPlayerFound || !finalBases[nextTurn]) {
+      console.error('Cannot proceed - no valid players available', {
+        currentTurn: finalCurrentTurnBase,
+        bases: Object.keys(finalBases).map(key => ({
+          baseID: key,
+          enabled: finalBases[key as BaseID]?.enabled,
+          hasWon: finalBases[key as BaseID]?.hasWon,
+        })),
+      });
       yield put(addLogEntry({
         player: 'SYSTEM',
         action: 'Game Error',
@@ -1308,9 +1415,9 @@ function * nextTurnSaga() {
 
   // Log the turn transition
   yield put(addLogEntry({
-    player: bases[nextTurn].color,
+    player: finalBases[nextTurn].color,
     action: 'Turn started',
-    details: `${bases[nextTurn].color} player's turn`,
+    details: `${finalBases[nextTurn].color} player's turn`,
   }));
 
   // Update current turn in state
@@ -1481,4 +1588,320 @@ export const sagas = [
   watchForRollDieComplete,    // Clear highlighting when dice is rolled
   watchForSetPlayers,         // Player count configuration
   watchForHomeHorse,           // Victory detection
+  watchForReplay,              // Deterministic replay controller
 ];
+
+/**
+ * Replay: watch for START_REPLAY and inject deterministic data into normal game flow
+ */
+function * watchForReplay() {
+  yield takeLatest(ActionTypes.START_REPLAY, replayFlowSaga);
+  yield takeLatest(ActionTypes.STOP_REPLAY, stopReplaySaga);
+  yield takeEvery(ActionTypes.SET_AVAILABLE_ACTIONS, replayAutoSelectActionSaga);
+  yield takeEvery(ActionTypes.MOVE_HORSE_SUCCESS, replayAdvanceStepSaga);
+  yield takeEvery(ActionTypes.SPAWN_HORSE_SUCCESS, replayAdvanceStepSaga);
+}
+
+function * stopReplaySaga() {
+  // Re-enable auto actions when replay stops (restore normal gameplay)
+  yield put(setAutoActionsEnabled(true));
+}
+
+function * replayFlowSaga() {
+  // Ensure all 4 bases are enabled for replay (replay files are from 4-player games)
+  yield put(setPlayers(4));
+  yield delay(50); // Small delay to ensure state update
+  
+  // Enable auto actions so game can proceed normally
+  yield put(setAutoActionsEnabled(true));
+  // Clear existing highlights
+  yield put(clearHighlightedCells());
+  
+  // Set initial turn from first replay step if available
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay && replay.steps && replay.steps.length > 0) {
+    const firstStep = replay.steps[0];
+    const baseID = mapPlayerIndexToBase(firstStep.currentPlayer);
+    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+    
+    console.log('[REPLAY] Replay Started:', {
+      totalSteps: replay.steps.length,
+      initialStep: 0,
+      initialPlayer: firstStep.currentPlayer,
+      initialPlayerColor: bases[baseID].color,
+      initialBaseID: baseID,
+      basesEnabled: Object.keys(bases).map(key => ({
+        baseID: key,
+        enabled: bases[key as BaseID]?.enabled,
+      })),
+    });
+    
+    yield put(passTurnTo(baseID));
+    
+    // Enable dice and trigger initial roll for first step
+    yield put(enableDie());
+    yield delay(100); // Small delay to ensure state is updated
+    yield put(rollDie()); // Trigger dice roll for first step
+  }
+}
+
+/**
+ * Auto-selects the matching action from replay file when actions become available
+ */
+function * replayAutoSelectActionSaga(action: ReturnType<typeof setAvailableActions>) {
+  console.log('[REPLAY] replayAutoSelectActionSaga triggered');
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  console.log('[REPLAY] replayAutoSelectActionSaga - replay state:', {
+    isActive: replay?.isActive,
+    isPaused: replay?.isPaused,
+    cursor: replay?.cursor,
+    totalSteps: replay?.steps?.length,
+  });
+  
+  if (!replay?.isActive || replay.isPaused || replay.cursor >= replay.steps.length) {
+    console.log('[REPLAY] replayAutoSelectActionSaga - skipping (not active, paused, or cursor out of bounds)');
+    return;
+  }
+
+  const step = replay.steps[replay.cursor];
+  const { oldPosition, newPosition } = step.playerAction || { oldPosition: 0, newPosition: 0 };
+  const availableActions = action.data?.actions || [];
+  
+  console.log('[REPLAY] replayAutoSelectActionSaga - action info:', {
+    cursor: replay.cursor,
+    oldPosition,
+    newPosition,
+    availableActionsCount: availableActions.length,
+    availableActions: availableActions.map(a => ({ type: a.type, horseID: a.horseID, label: a.label })),
+  });
+  
+  if (availableActions.length === 0) {
+    console.warn('[REPLAY] replayAutoSelectActionSaga - no available actions');
+    return;
+  }
+
+  // Find the action that matches the replay file
+  const indexMap: ReturnType<typeof cellIndexLookupSelector> = yield select(cellIndexLookupSelector);
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const baseID = mapPlayerIndexToBase(step.currentPlayer);
+
+  // Identify which horse should move based on oldPosition
+  let horseIDToMove: IHorse['horseID'] | null = null;
+  if (oldPosition === 0) {
+    // Spawn: find first unspawned horse
+    for (const hid of bases[baseID].horseIDs) {
+      if (!horses[hid].isSpawned && !horses[hid].isRetired) {
+        horseIDToMove = hid;
+        break;
+      }
+    }
+  } else {
+    // Move: find horse at oldPosition
+    const cellInfo = indexMap.get(oldPosition);
+    if (cellInfo) {
+      const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+      const cellData = (cells as any)[cellInfo.position]?.[cellInfo.cellID];
+      const ids: string[] = (cellData?.horseIDs || []).slice();
+      horseIDToMove = ids.find((hid) => horses[hid]?.baseID === baseID) || null;
+    }
+  }
+
+  if (!horseIDToMove) {
+    console.warn('[REPLAY] replayAutoSelectActionSaga - could not find horse to move', {
+      oldPosition,
+      newPosition,
+      baseID,
+    });
+    return;
+  }
+
+  console.log('[REPLAY] replayAutoSelectActionSaga - found horse to move:', horseIDToMove);
+
+  // Find the matching action and execute it
+  if (oldPosition === 0 && newPosition !== 0) {
+    // Spawn action
+    const matchingAction = availableActions.find(
+      (a) => a.type === 'spawn' && a.horseID === horseIDToMove
+    );
+    if (matchingAction) {
+      const target = indexMap.get(newPosition);
+      console.log('[REPLAY] Action Selected: SPAWN', {
+        step: replay.cursor,
+        player: step.currentPlayer,
+        playerColor: bases[baseID].color,
+        horseID: horseIDToMove,
+        oldPosition: oldPosition,
+        newPosition: newPosition,
+        targetCell: target ? { cellID: (target as any).cellID, position: (target as any).position } : null,
+        actionLabel: matchingAction.label,
+        actionDescription: matchingAction.description,
+      });
+      
+      yield delay(100); // Small delay for UI
+      yield put(clearAvailableActions());
+      console.log('[REPLAY] replayAutoSelectActionSaga - dispatching spawnHorse action');
+      yield put(spawnHorse(baseID, horseIDToMove));
+      console.log('[REPLAY] replayAutoSelectActionSaga - spawnHorse action dispatched');
+    } else {
+      console.warn('[REPLAY] replayAutoSelectActionSaga - spawn action not found for horse', horseIDToMove);
+    }
+  } else if (oldPosition !== 0 && newPosition !== 0) {
+    // Move action - find by horseID and execute
+    const matchingAction = availableActions.find(
+      (a) => (a.type === 'move' || a.type === 'kick' || a.type === 'move_before') && a.horseID === horseIDToMove
+    );
+    if (matchingAction) {
+      const horse = horses[horseIDToMove];
+      const target = indexMap.get(newPosition);
+      const oldCell = indexMap.get(oldPosition);
+      
+      // Determine action type
+      let actionType = 'move';
+      if (matchingAction.type === 'kick') {
+        actionType = 'kick';
+      } else if (matchingAction.type === 'move_before') {
+        actionType = 'move_before';
+      }
+      
+      console.log('[REPLAY] Action Selected:', actionType.toUpperCase(), {
+        step: replay.cursor,
+        player: step.currentPlayer,
+        playerColor: bases[baseID].color,
+        horseID: horseIDToMove,
+        oldPosition: oldPosition,
+        newPosition: newPosition,
+        oldCell: oldCell ? { cellID: (oldCell as any).cellID, position: (oldCell as any).position } : null,
+        targetCell: target ? { cellID: (target as any).cellID, position: (target as any).position } : null,
+        actionType: matchingAction.type,
+        actionLabel: matchingAction.label,
+        actionDescription: matchingAction.description,
+        blockingHorseID: matchingAction.blockingHorseID || null,
+        stepsBeforeBlocking: matchingAction.stepsBeforeBlocking || null,
+        stepsToUse: matchingAction.stepsToUse || null,
+        kickedPlayer: step.kickedPlayer || null,
+      });
+      
+      yield delay(100); // Small delay for UI
+      yield put(clearAvailableActions());
+      
+      console.log('[REPLAY] replayAutoSelectActionSaga - dispatching moveHorse action');
+      if (matchingAction.type === 'kick' && matchingAction.blockingHorseID) {
+        yield put(moveHorse(horseIDToMove, horse.position, horse.cellID, matchingAction.blockingHorseID));
+      } else if (matchingAction.type === 'move_before' && matchingAction.stepsBeforeBlocking !== undefined) {
+        yield put(moveHorse(horseIDToMove, horse.position, horse.cellID, undefined, matchingAction.stepsBeforeBlocking));
+      } else {
+        yield put(moveHorse(horseIDToMove, horse.position, horse.cellID, undefined, undefined, matchingAction.stepsToUse));
+      }
+      console.log('[REPLAY] replayAutoSelectActionSaga - moveHorse action dispatched');
+    } else {
+      console.warn('[REPLAY] replayAutoSelectActionSaga - move action not found for horse', horseIDToMove);
+    }
+  } else if (oldPosition !== 0 && newPosition === 0) {
+    // Disqualify action (horse sent back to base)
+    console.log('[REPLAY] Action: DISQUALIFY', {
+      step: replay.cursor,
+      player: step.currentPlayer,
+      playerColor: bases[baseID].color,
+      horseID: horseIDToMove,
+      oldPosition: oldPosition,
+      newPosition: newPosition,
+      reason: 'Horse sent back to base',
+    });
+  }
+}
+
+/**
+ * Advances replay cursor after a successful move or spawn
+ */
+function * replayAdvanceStepSaga() {
+  console.log('[REPLAY] replayAdvanceStepSaga triggered');
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  console.log('[REPLAY] replayAdvanceStepSaga - replay state:', {
+    isActive: replay?.isActive,
+    isPaused: replay?.isPaused,
+    cursor: replay?.cursor,
+    totalSteps: replay?.steps?.length,
+  });
+  
+  if (!replay?.isActive || replay.isPaused) {
+    console.log('[REPLAY] replayAdvanceStepSaga - skipping (not active or paused)');
+    return;
+  }
+
+  if (!replay.steps || replay.steps.length === 0) {
+    console.warn('[REPLAY] replayAdvanceStepSaga - no steps available');
+    return;
+  }
+
+  const currentStep = replay.steps[replay.cursor];
+  if (!currentStep) {
+    console.warn('[REPLAY] replayAdvanceStepSaga - current step not found at cursor', replay.cursor);
+    return;
+  }
+
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const currentBaseID = mapPlayerIndexToBase(currentStep.currentPlayer);
+
+  console.log('[REPLAY] replayAdvanceStepSaga - current step info:', {
+    cursor: replay.cursor,
+    currentPlayer: currentStep.currentPlayer,
+    totalSteps: replay.steps.length,
+    canAdvance: replay.cursor < replay.steps.length - 1,
+  });
+
+  // Advance to next step
+  if (replay.cursor < replay.steps.length - 1) {
+    const nextStepIndex = replay.cursor + 1;
+    console.log('[REPLAY] replayAdvanceStepSaga - advancing cursor from', replay.cursor, 'to', nextStepIndex);
+    yield put(nextReplayStep());
+    
+    // Get updated replay state after cursor advance
+    yield delay(50); // Small delay to ensure state update
+    const updatedReplay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+    const nextStep = updatedReplay?.steps?.[updatedReplay.cursor];
+    
+    console.log('[REPLAY] replayAdvanceStepSaga - after cursor advance:', {
+      newCursor: updatedReplay?.cursor,
+      nextStepExists: !!nextStep,
+    });
+    
+    if (nextStep) {
+      const baseID = mapPlayerIndexToBase(nextStep.currentPlayer);
+      
+      console.log('[REPLAY] Step Advanced:', {
+        completedStep: replay.cursor,
+        nextStep: nextStepIndex,
+        totalSteps: replay.steps.length,
+        completedStepPlayer: currentStep.currentPlayer,
+        completedStepPlayerColor: bases[currentBaseID].color,
+        nextStepPlayer: nextStep.currentPlayer,
+        nextStepPlayerColor: bases[baseID].color,
+        progress: `${nextStepIndex}/${replay.steps.length}`,
+      });
+      
+      yield delay(200); // Delay for animation
+      console.log('[REPLAY] replayAdvanceStepSaga - calling passTurnTo for next player');
+      yield put(passTurnTo(baseID));
+      
+      // Ensure dice is enabled and trigger roll for next step
+      yield put(enableDie());
+      yield delay(100); // Small delay to ensure state is updated
+      console.log('[REPLAY] replayAdvanceStepSaga - triggering dice roll for next step');
+      yield put(rollDie()); // Trigger dice roll for next step
+    } else {
+      console.error('[REPLAY] replayAdvanceStepSaga - next step not found after cursor advance');
+    }
+  } else {
+    // Finished - auto pause when all steps are replayed
+    console.log('[REPLAY] Replay Completed:', {
+      totalSteps: replay.steps.length,
+      finalStep: replay.cursor,
+      finalStepPlayer: currentStep.currentPlayer,
+      finalStepPlayerColor: bases[currentBaseID].color,
+      status: 'paused',
+    });
+    
+    yield put(pauseReplay());
+  }
+}

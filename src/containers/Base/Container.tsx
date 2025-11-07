@@ -130,6 +130,10 @@ class BaseBare extends React.PureComponent<IProps> {
             // Render 4 horse placeholders (one for each horse in the base)
             base.horseIDs.map((horseID, index) => {
               const horse = this.props.horses[horseID];
+              // Don't render if horse doesn't exist yet
+              if (!horse) {
+                return null;
+              }
               return (
                 <HorsePlaceholder
                   key={index}

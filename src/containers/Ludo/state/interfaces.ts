@@ -155,6 +155,19 @@ export interface IState {
   highlightedCells: Set<string> | null;
   /** Map of cellID to array of horses that can reach it with their move types */
   highlightedCellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> | null;
+  /** Replay state (deterministic simulation from snapshots) */
+  replay?: {
+    steps: Array<{
+      board?: { [key: string]: number[] } | null;
+      dice: number[];
+      currentPlayer: number;
+      playerAction: { oldPosition: number; newPosition: number };
+      kickedPlayer?: { player: number; position: number } | null;
+    }>;
+    cursor: number; // index of current step
+    isActive: boolean;
+    isPaused: boolean;
+  };
 }
 
 /**

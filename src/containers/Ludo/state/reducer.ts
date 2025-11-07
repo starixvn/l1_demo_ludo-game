@@ -26,6 +26,12 @@ const initialState: IState = {
   availableActionsDieValue: null, // No die value initially
   highlightedCells: null, // No cells highlighted initially
   highlightedCellsByHorse: null, // No cell-to-horse mapping initially
+  replay: {
+    steps: [],
+    cursor: 0,
+    isActive: false,
+    isPaused: false,
+  },
 };
 
 /**
@@ -360,6 +366,73 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
             ...state.horses[horseID],
             isJumping: false,
           },
+        },
+      };
+    }
+
+    /**
+     * Replay: set steps and control state
+     */
+    case ActionTypes.SET_REPLAY_STEPS: {
+      const { steps } = action.data! as any;
+      return {
+        ...state,
+        replay: {
+          steps: steps || [],
+          cursor: 0,
+          isActive: false,
+          isPaused: false,
+        },
+      } as IState;
+    }
+    case ActionTypes.START_REPLAY: {
+      return {
+        ...state,
+        replay: {
+          ...(state.replay || { steps: [], cursor: 0, isActive: false, isPaused: false }),
+          isActive: true,
+          isPaused: false,
+          cursor: 0,
+        },
+      };
+    }
+    case ActionTypes.STOP_REPLAY: {
+      return {
+        ...state,
+        replay: {
+          ...(state.replay || { steps: [], cursor: 0, isActive: false, isPaused: false }),
+          isActive: false,
+          isPaused: false,
+          cursor: 0,
+        },
+      };
+    }
+    case ActionTypes.PAUSE_REPLAY: {
+      return {
+        ...state,
+        replay: {
+          ...(state.replay || { steps: [], cursor: 0, isActive: false, isPaused: false }),
+          isPaused: true,
+        },
+      };
+    }
+    case ActionTypes.RESUME_REPLAY: {
+      return {
+        ...state,
+        replay: {
+          ...(state.replay || { steps: [], cursor: 0, isActive: false, isPaused: false }),
+          isPaused: false,
+        },
+      };
+    }
+    case ActionTypes.NEXT_REPLAY_STEP: {
+      const rep = state.replay || { steps: [], cursor: 0, isActive: false, isPaused: false };
+      const nextCursor = Math.min(rep.cursor + 1, Math.max(rep.steps.length - 1, 0));
+      return {
+        ...state,
+        replay: {
+          ...rep,
+          cursor: nextCursor,
         },
       };
     }

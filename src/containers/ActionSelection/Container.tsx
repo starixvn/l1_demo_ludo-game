@@ -130,15 +130,15 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
       this.props;
 
     // Debug logging to help troubleshoot
-    if (process.env.NODE_ENV === "development") {
-      console.log("[ActionSelection] Render check:", {
-        availableActions,
-        availableActionsLength: availableActions?.length,
-        availableActionsDieValue,
-        currentTurn,
-        hasBases: !!bases,
-      });
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   console.log("[ActionSelection] Render check:", {
+    //     availableActions,
+    //     availableActionsLength: availableActions?.length,
+    //     availableActionsDieValue,
+    //     currentTurn,
+    //     hasBases: !!bases,
+    //   });
+    // }
 
     // Don't render if no actions are available
     if (!availableActions || availableActions.length === 0) {

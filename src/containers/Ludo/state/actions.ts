@@ -53,6 +53,14 @@ export enum ActionTypes {
   // Horse Animation Actions
   START_HORSE_JUMP = 'ludo/START_HORSE_JUMP',                   // Start horse jumping animation
   STOP_HORSE_JUMP = 'ludo/STOP_HORSE_JUMP',                     // Stop horse jumping animation
+
+  // Replay Actions
+  START_REPLAY = 'ludo/START_REPLAY',                           // Begin deterministic replay
+  STOP_REPLAY = 'ludo/STOP_REPLAY',                             // Stop deterministic replay
+  PAUSE_REPLAY = 'ludo/PAUSE_REPLAY',                           // Pause deterministic replay
+  RESUME_REPLAY = 'ludo/RESUME_REPLAY',                         // Resume deterministic replay
+  SET_REPLAY_STEPS = 'ludo/SET_REPLAY_STEPS',                   // Provide replay steps (snapshots)
+  NEXT_REPLAY_STEP = 'ludo/NEXT_REPLAY_STEP'                    // Advance to next replay step
 }
 
 /**
@@ -295,6 +303,28 @@ export const clearHighlightedCells = (): IReduxAction<ActionTypes.CLEAR_HIGHLIGH
   type: ActionTypes.CLEAR_HIGHLIGHTED_CELLS,
 });
 
+/** Replay step schema (matches output/game-states-*.json minimal fields) */
+export interface IReplayStep {
+  board?: { [key: string]: number[] } | null;
+  dice: number[];
+  currentPlayer: number; // 0..3 mapping to BaseID
+  playerAction: { oldPosition: number; newPosition: number };
+  kickedPlayer?: { player: number; position: number } | null;
+}
+
+/** Set replay steps parsed from output files */
+export const setReplaySteps = (steps: IReplayStep[]): IReduxAction<ActionTypes.SET_REPLAY_STEPS, { steps: IReplayStep[] }> => ({
+  data: { steps },
+  type: ActionTypes.SET_REPLAY_STEPS,
+});
+
+/** Start/Stop/Pause/Resume replay */
+export const startReplay = (): IReduxAction<ActionTypes.START_REPLAY, void> => ({ type: ActionTypes.START_REPLAY });
+export const stopReplay = (): IReduxAction<ActionTypes.STOP_REPLAY, void> => ({ type: ActionTypes.STOP_REPLAY });
+export const pauseReplay = (): IReduxAction<ActionTypes.PAUSE_REPLAY, void> => ({ type: ActionTypes.PAUSE_REPLAY });
+export const resumeReplay = (): IReduxAction<ActionTypes.RESUME_REPLAY, void> => ({ type: ActionTypes.RESUME_REPLAY });
+export const nextReplayStep = (): IReduxAction<ActionTypes.NEXT_REPLAY_STEP, void> => ({ type: ActionTypes.NEXT_REPLAY_STEP });
+
 /**
  * Start horse jumping animation
  * @param horseID - ID of the horse to animate
@@ -340,4 +370,9 @@ export type Actions =
   | ReturnType<typeof clearHighlightedCells>
   | ReturnType<typeof startHorseJump>
   | ReturnType<typeof stopHorseJump>
-  ;
+  | ReturnType<typeof setReplaySteps>
+  | ReturnType<typeof startReplay>
+  | ReturnType<typeof stopReplay>
+  | ReturnType<typeof pauseReplay>
+  | ReturnType<typeof resumeReplay>
+  | ReturnType<typeof nextReplayStep>;

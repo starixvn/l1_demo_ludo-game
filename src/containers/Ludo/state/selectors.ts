@@ -60,3 +60,26 @@ export const highlightedCellsByHorseSelector = createSelector(
   [ludoStateSelector],
   (state) => state.highlightedCellsByHorse,
 );
+
+export const replaySelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.replay,
+);
+
+/** Reverse index lookup: index(number) -> { cellID, position } */
+export const cellIndexLookupSelector = createSelector(
+  [cellsSelector],
+  (cells) => {
+    const map = new Map<number, { cellID: string; position: string }>();
+    for (const position of Object.keys(cells)) {
+      const byId = (cells as any)[position] as Record<string, { index?: number; cellID: string }>;
+      for (const cellID of Object.keys(byId)) {
+        const cell = byId[cellID] as any;
+        if (typeof cell.index === 'number') {
+          map.set(cell.index, { cellID, position });
+        }
+      }
+    }
+    return map;
+  }
+);
