@@ -666,11 +666,63 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
     details: `Moved horse ${horseID.split('_')[1]} ${stepsToMove} spaces`,
   }));
 
+  // Verify replay target position if replay is active
+  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
+  if (replay?.isActive && !replay.isPaused && replay.cursor < replay.steps.length) {
+    // Get fresh state after movement completes
+    yield delay(50); // Small delay to ensure reducer has updated state
+    const updatedHorses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+    const finalHorse = updatedHorses[horseID];
+    const step = replay.steps[replay.cursor];
+    const { newPosition } = step.playerAction || { newPosition: 0 };
+    
+    const indexMap: ReturnType<typeof cellIndexLookupSelector> = yield select(cellIndexLookupSelector);
+    const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+    
+    // Get the actual index of the cell the horse is on
+    const finalCellData = (cells as any)[finalHorse.position]?.[finalHorse.cellID];
+    const finalIndex = finalCellData?.index;
+    const targetCellInfo = indexMap.get(newPosition);
+    const targetCellData = targetCellInfo ? (cells as any)[targetCellInfo.position]?.[targetCellInfo.cellID] : null;
+    
+    // Check if we reached the target index from replay file
+    if (newPosition !== 0 && finalIndex !== newPosition) {
+      console.warn('[REPLAY] Position mismatch after movement:', {
+        step: replay.cursor,
+        horseID,
+        expectedIndex: newPosition,
+        actualIndex: finalIndex,
+        expectedCell: targetCellInfo ? { cellID: targetCellInfo.cellID, position: targetCellInfo.position, cellType: targetCellData?.cellType, baseID: targetCellData?.baseID } : null,
+        actualCell: { cellID: finalHorse.cellID, position: finalHorse.position, cellType: finalCellData?.cellType, baseID: finalCellData?.baseID },
+        stepsMoved: stepsToMove,
+      });
+      
+      // If target is a homepath cell and we're not there, this indicates a routing issue
+      if (targetCellData?.cellType === CellType.HOMEPATH) {
+        console.error('[REPLAY] CRITICAL: Target is homepath cell but horse ended at different index. Homepath routing may be incorrect.', {
+          targetCellID: targetCellInfo?.cellID,
+          targetBaseID: targetCellData?.baseID,
+          actualCellID: finalHorse.cellID,
+          actualBaseID: finalCellData?.baseID,
+          horseBaseID: finalHorse.baseID,
+        });
+      }
+    } else if (newPosition !== 0 && finalIndex === newPosition) {
+      console.log('[REPLAY] Position verified - horse reached target index:', {
+        step: replay.cursor,
+        horseID,
+        index: newPosition,
+        cellID: finalHorse.cellID,
+        cellType: finalCellData?.cellType,
+        stepsMoved: stepsToMove,
+      });
+    }
+  }
+
   // Complete the move and handle turn progression
   yield put(moveHorseSuccess(bonusChance, horseID, stepsToMove as Rolls));
 
   // Check if replay is active - replay system handles turn progression
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
   if (replay?.isActive && !replay.isPaused) {
     // Replay system will handle turn progression via replayAdvanceStepSaga
     return;
