@@ -310,6 +310,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
                     ? HORSE_SIZE / 2
                     : HORSE_SIZE
                 }
+                isJumping={horses[horseID].isJumping || false} // Whether horse is jumping for animation
                 // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                 key={index}
               />

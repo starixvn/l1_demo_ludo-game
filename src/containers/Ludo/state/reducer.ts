@@ -328,6 +328,42 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
       };
     }
 
+    /**
+     * Start horse jumping animation
+     * Sets the isJumping flag on the specified horse
+     */
+    case ActionTypes.START_HORSE_JUMP: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isJumping: true,
+          },
+        },
+      };
+    }
+
+    /**
+     * Stop horse jumping animation
+     * Clears the isJumping flag on the specified horse
+     */
+    case ActionTypes.STOP_HORSE_JUMP: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isJumping: false,
+          },
+        },
+      };
+    }
+
     default:
       return state;
   }

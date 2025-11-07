@@ -42,6 +42,8 @@ import {
   setPlayers,
   spawnHorse,
   spawnHorseSuccess,
+  startHorseJump,
+  stopHorseJump,
   ActionTypes,
 } from './actions';
 import {
@@ -88,8 +90,8 @@ function * getInitialGameDataSaga() {
   const basesArray = data.bases.map((base) => ({ ...base, spawnable: false }));
   const bases = mapByProperty(basesArray, 'ID');
 
-  // Process horses - assign colors based on their base ownership
-  const horses = data.horses.map((horse) => ({ ...horse, color: bases[horse.baseID].color }));
+  // Process horses - assign colors based on their base ownership and initialize animation state
+  const horses = data.horses.map((horse) => ({ ...horse, color: bases[horse.baseID].color, isJumping: false }));
 
   // Create complete game state object
   const gameData: IState = {
@@ -528,6 +530,9 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
       }
     }
 
+    // Start jumping animation
+    yield put(startHorseJump(horseID));
+
     // Animate: lift horse from current cell
     yield put(liftHorse(cellID, horseID, walkwayPosition));
 
@@ -540,8 +545,11 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
       yield put(placeHorse(nextCell.cellID, horseID, nextCell.position));
     }
 
-    // Animation delay for smooth movement
+    // Animation delay for smooth movement and jumping
     yield delay(LUDO_MOVE_ANIMATION_DELAY);
+
+    // Stop jumping animation after movement completes
+    yield put(stopHorseJump(horseID));
 
     // Update position for next iteration
     cellID = nextCell.cellID;

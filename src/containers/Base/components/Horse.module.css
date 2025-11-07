@@ -2,6 +2,7 @@
  * Horse Component Styles
  *
  * Displays a Unicode chess piece character (Black Knight - ♞) as the horse.
+ * Includes jumping animation for more realistic movement.
  */
 
 /* Main horse container - displays the Unicode character */
@@ -14,4 +15,55 @@
   font-size: 250%;                 /* 10x larger font size for the Unicode character */
   line-height: 1;
   z-index: 6;
+  transition: all 0.15s ease-in-out; /* Smooth transitions for jumping */
+}
+
+/* Jumping animation - makes horse appear to leap over cells like a real horse */
+.Jumping {
+  animation: horseJump 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 10; /* Jump above other elements */
+}
+
+/* Enhanced keyframes for realistic horse jumping animation */
+@keyframes horseJump {
+  0% {
+    transform: scale(1) translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.3));
+    opacity: 1;
+  }
+  15% {
+    transform: scale(1.12) translateY(-2.4px) rotate(-2deg);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+    opacity: 0.95;
+  }
+  30% {
+    transform: scale(1.2) translateY(-6.4px) rotate(1deg);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    opacity: 0.9;
+  }
+  45% {
+    transform: scale(1.16) translateY(-9.6px) rotate(-1deg);
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+    opacity: 0.85;
+  }
+  60% {
+    transform: scale(1.12) translateY(-12px) rotate(0.5deg);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+    opacity: 0.8;
+  }
+  75% {
+    transform: scale(1.08) translateY(-9.6px) rotate(-0.5deg);
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+    opacity: 0.9;
+  }
+  85% {
+    transform: scale(1.04) translateY(-4.8px) rotate(0deg);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1) translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.3));
+    opacity: 1;
+  }
 }

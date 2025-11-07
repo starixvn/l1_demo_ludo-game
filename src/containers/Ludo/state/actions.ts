@@ -49,6 +49,10 @@ export enum ActionTypes {
   // Cell Highlighting Actions
   SET_HIGHLIGHTED_CELLS = 'ludo/SET_HIGHLIGHTED_CELLS',         // Set cells to highlight as reachable
   CLEAR_HIGHLIGHTED_CELLS = 'ludo/CLEAR_HIGHLIGHTED_CELLS',     // Clear cell highlighting
+
+  // Horse Animation Actions
+  START_HORSE_JUMP = 'ludo/START_HORSE_JUMP',                   // Start horse jumping animation
+  STOP_HORSE_JUMP = 'ludo/STOP_HORSE_JUMP',                     // Stop horse jumping animation
 }
 
 /**
@@ -292,6 +296,24 @@ export const clearHighlightedCells = (): IReduxAction<ActionTypes.CLEAR_HIGHLIGH
 });
 
 /**
+ * Start horse jumping animation
+ * @param horseID - ID of the horse to animate
+ */
+export const startHorseJump = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.START_HORSE_JUMP, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.START_HORSE_JUMP,
+});
+
+/**
+ * Stop horse jumping animation
+ * @param horseID - ID of the horse to stop animating
+ */
+export const stopHorseJump = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.STOP_HORSE_JUMP, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.STOP_HORSE_JUMP,
+});
+
+/**
  * Union type of all possible Ludo game actions
  * This type is used by the reducer to ensure type safety when handling actions
  * Each action type in this union corresponds to one of the action creators above
@@ -316,4 +338,6 @@ export type Actions =
   | ReturnType<typeof clearAvailableActions>
   | ReturnType<typeof setHighlightedCells>
   | ReturnType<typeof clearHighlightedCells>
+  | ReturnType<typeof startHorseJump>
+  | ReturnType<typeof stopHorseJump>
   ;

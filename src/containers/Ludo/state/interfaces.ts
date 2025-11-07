@@ -27,6 +27,8 @@ export interface IHorse {
   cellID: ICell['cellID'];
   /** Position on the walkway where this horse is located */
   position: WalkwayPosition;
+  /** Whether this horse is currently jumping (for animation) */
+  isJumping?: boolean;
 }
 
 /**
