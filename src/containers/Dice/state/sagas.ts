@@ -123,19 +123,20 @@ function * rollDieSaga() {
     (horseID) => horses[horseID].isSpawned && !horses[horseID].isRetired
   );
 
-  let dieRoll1: Rolls;
-  let dieRoll2: Rolls;
-
-  if (!hasSpawnedHorses) {
-    // First turn for this base - hardcode a spawnable roll (1-1 double)
-    // This ensures the base can spawn a horse on their first turn
-    dieRoll1 = Rolls.ONE;
-    dieRoll2 = Rolls.ONE;
-  } else {
-    // Not the first turn - generate random die rolls using Mersenne Twister for better randomness
-    const mt = MersenneTwister19937.autoSeed();
-    dieRoll1 = integer(Rolls.ONE, Rolls.SIX)(mt);
-    dieRoll2 = integer(Rolls.ONE, Rolls.SIX)(mt);
+  // Only apply first-turn hardcoding when NOT in replay mode
+  // In replay mode, use the dice values from the replay file (already set above)
+  if (!replay?.isActive || replay.isPaused || replay.cursor >= replay.steps.length) {
+    if (!hasSpawnedHorses) {
+      // First turn for this base - hardcode a spawnable roll (1-1 double)
+      // This ensures the base can spawn a horse on their first turn
+      dieRoll1 = Rolls.ONE;
+      dieRoll2 = Rolls.ONE;
+    } else {
+      // Not the first turn - generate random die rolls using Mersenne Twister for better randomness
+      const mt = MersenneTwister19937.autoSeed();
+      dieRoll1 = integer(Rolls.ONE, Rolls.SIX)(mt);
+      dieRoll2 = integer(Rolls.ONE, Rolls.SIX)(mt);
+    }
   }
 
   // Log the dice roll action
