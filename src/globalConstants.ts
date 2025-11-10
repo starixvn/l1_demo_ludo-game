@@ -9,7 +9,7 @@ export const INNER_BASE_DIMENSION = 4;                        // Inner base dime
 export const HORSE_PLACEHOLDER_DIMENSION = 2;                  // Horse placeholder dimension
 
 // Pixel dimensions
-export const CELL_DIMENSION = 40;                             // Pixels per cell
+export const CELL_DIMENSION = 50;                             // Pixels per cell
 export const BOARD_SIZE = 15;                                 // Cells (increased to accommodate 7 columns in both WEST and EAST walkways)
 export const BOARD_DIMENSION = CELL_DIMENSION * BOARD_SIZE;   // Pixels (680px × 680px)
 

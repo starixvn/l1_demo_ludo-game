@@ -50,6 +50,7 @@ function * watchForRollDie() {
 /**
  * Saga that handles the dice rolling process
  * Generates two random die rolls and logs the action
+ * Hardcodes a spawnable roll (1-1) for the first turn of each base
  */
 function * rollDieSaga() {
   // Start the rolling animation
@@ -58,21 +59,38 @@ function * rollDieSaga() {
   // Wait for animation to complete (1.2 seconds)
   yield delay(DICE_ROLLING_ANIMATION_DURATION);
 
-  // Generate random die rolls using Mersenne Twister for better randomness
-  const mt = MersenneTwister19937.autoSeed();
-  const dieRoll1: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
-  const dieRoll2: Rolls = integer(Rolls.ONE, Rolls.SIX)(mt);
-
-  // Get current player info for logging
+  // Get current player info to check if it's their first turn
   const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-  const playerColor = bases[currentTurn].color;
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const currentTurnBase = bases[currentTurn];
+  const playerColor = currentTurnBase.color;
+
+  // Check if this is the first turn for this base (no horses spawned yet)
+  const hasSpawnedHorses = currentTurnBase.horseIDs.some(
+    (horseID) => horses[horseID].isSpawned && !horses[horseID].isRetired
+  );
+
+  let dieRoll1: Rolls;
+  let dieRoll2: Rolls;
+
+  if (!hasSpawnedHorses) {
+    // First turn for this base - hardcode a spawnable roll (1-1 double)
+    // This ensures the base can spawn a horse on their first turn
+    dieRoll1 = Rolls.ONE;
+    dieRoll2 = Rolls.ONE;
+  } else {
+    // Not the first turn - generate random die rolls using Mersenne Twister for better randomness
+    const mt = MersenneTwister19937.autoSeed();
+    dieRoll1 = integer(Rolls.ONE, Rolls.SIX)(mt);
+    dieRoll2 = integer(Rolls.ONE, Rolls.SIX)(mt);
+  }
 
   // Log the dice roll action
   yield put(addLogEntry({
     player: playerColor,
     action: `Rolled ${dieRoll1}-${dieRoll2}`,
-    details: `Dice roll: ${dieRoll1}-${dieRoll2} (sum: ${dieRoll1 + dieRoll2})`,
+    details: `Dice roll: ${dieRoll1}-${dieRoll2} (sum: ${dieRoll1 + dieRoll2})${!hasSpawnedHorses ? ' [First Turn - Hardcoded]' : ''}`,
   }));
 
   // Dispatch the roll completion action and stop rolling animation
