@@ -134,6 +134,7 @@ class BaseBare extends React.PureComponent<IProps> {
                 <HorsePlaceholder
                   key={index}
                   baseColor={base.color} // Horse color matches base color
+                  horseID={horseID} // Pass horse ID to display number
                   // Hide horse if base is disabled OR horse is already spawned/retired
                   isHorseHidden={
                     !this.props.enabled || horse.isSpawned || horse.isRetired

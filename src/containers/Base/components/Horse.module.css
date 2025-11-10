@@ -67,3 +67,21 @@
     opacity: 1;
   }
 }
+
+/* Horse number display - shows the extracted number from horse ID */
+.HorseNumber {
+  position: absolute;
+  top: 70%;
+  left: 58%;
+  transform: translate(-50%, -50%);
+  font-size: 30%;
+  font-weight: bold;
+  color: white;
+  text-shadow: 
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+  pointer-events: none;
+  z-index: 7;
+}

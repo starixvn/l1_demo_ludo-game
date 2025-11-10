@@ -304,6 +304,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
             cellConfiguration.horseIDs.map((horseID, index) => (
               <Horse
                 baseColor={horses[horseID].color} // Horse color matches its base
+                horseID={horseID} // Pass horse ID to display number
                 // Smaller horses if multiple horses on same cell
                 horseSize={
                   cellConfiguration.horseIDs.length > 1

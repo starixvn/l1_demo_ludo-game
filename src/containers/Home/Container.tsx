@@ -105,6 +105,7 @@ class HomeBare extends React.PureComponent<IProps> {
                     <Horse
                       key={horseID}
                       baseColor={horses[horseID].color} // Horse color matches its base
+                      horseID={horseID} // Pass horse ID to display number
                       // Smaller horses if multiple horses on same cell
                       horseSize={
                         cell.horseIDs.length > 1 ? HORSE_SIZE / 2 : HORSE_SIZE
