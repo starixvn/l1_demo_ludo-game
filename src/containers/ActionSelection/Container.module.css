@@ -88,21 +88,21 @@
 }
 
 .SpawnButton {
-  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  background: linear-gradient(135deg, #4cafaf 0%, #457ba0 100%);
   color: white;
 }
 
 .SpawnButton:hover {
-  background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+  background: linear-gradient(135deg, #40b8b8 0%, #3983b4 100%);
 }
 
 .MoveButton {
-  background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+  background: linear-gradient(135deg, #f372c8 0%, #f053bc 100%);
   color: white;
 }
 
 .MoveButton:hover {
-  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+  background: linear-gradient(135deg, rgb(233, 89, 238) 0%, #e12cf1 100%);
 }
 
 .ActionLabel {
