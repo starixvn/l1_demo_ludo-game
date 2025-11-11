@@ -1,16 +1,14 @@
 /**
  * Dice Container Sagas
  *
- * Redux Sagas that handle asynchronous dice operations and automatic gameplay logic.
- * Manages die rolling, auto-actions, and turn progression based on game rules.
+ * Redux Sagas that handle asynchronous dice operations and gameplay logic.
+ * Manages die rolling and turn progression based on game rules.
  */
 
-import { integer, MersenneTwister19937 } from 'random-js';
 import {
   call,
   delay,
   put,
-  race,
   select,
   take,
   takeLatest,
@@ -18,12 +16,10 @@ import {
 
 import {
   markCurrentBase,
-  moveHorse,
   nextTurn,
   nextReplayStep,
   pauseReplay,
   passTurnTo,
-  spawnHorse,
   setAvailableActions,
   clearAvailableActions,
   IAvailableAction,
@@ -35,8 +31,7 @@ import { getMovableHorses, calculateReachableCells, findBlockingHorse, isCurrent
 import { clearHighlightedCells, setHighlightedCells } from 'containers/Ludo/state/actions';
 import { basesSelector, cellsSelector, horsesSelector, currentTurnSelector, linksSelector, walkwaysSelector, replaySelector } from 'containers/Ludo/state/selectors';
 import { addLogEntry } from 'containers/StepLogs/state/actions';
-import { autoActionsEnabledSelector, autoActionTimeoutSelector } from 'containers/StepLogs/state/selectors';
-import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY, WINNING_MOVES } from 'globalConstants';
+import { DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_DURATION, NO_MOVE_DELAY, WINNING_MOVES } from 'globalConstants';
 
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
@@ -292,134 +287,6 @@ function * canReachHomeFromCell(cellID: string, baseID: BaseID, remainingSteps: 
   return null;
 }
 
-/**
- * Automatically chooses and executes an action when the player doesn't respond in time
- * Prioritizes moves that can reach HOME or HOMEPATH cells
- * NOTE: When replay is active, this function should NOT be called - replayAutoSelectActionSaga handles action selection
- * @param spawnableHorses - Array of horse IDs that can be spawned
- * @param movableHorses - Array of horse IDs that can be moved
- * @param currentTurnBase - The current player's base information
- */
-function * autoChooseAction(spawnableHorses: IHorse['horseID'][], movableHorses: IHorse['horseID'][], currentTurnBase: IBase) {
-  // Check if replay is active - if so, skip random selection (replayAutoSelectActionSaga handles it)
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
-  if (replay?.isActive && !replay.isPaused) {
-    console.log('[REPLAY] autoChooseAction - replay is active, skipping random action selection (replayAutoSelectActionSaga will handle)');
-    return;
-  }
-  
-  const mt = MersenneTwister19937.autoSeed();
-  const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
-
-  // Priority 1: Check if any movable horses can reach HOME
-  const horsesThatCanReachHome: IHorse['horseID'][] = [];
-  const horsesThatCanReachHomePath: IHorse['horseID'][] = [];
-  const otherHorses: IHorse['horseID'][] = [];
-
-  if (movableHorses.length > 0) {
-    for (const horseID of movableHorses) {
-      const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, currentDieRoll);
-      if (result === 'HOME') {
-        horsesThatCanReachHome.push(horseID);
-      } else if (result === 'HOMEPATH') {
-        horsesThatCanReachHomePath.push(horseID);
-      } else {
-        otherHorses.push(horseID);
-      }
-    }
-  }
-
-  // Priority 1: Choose horse that can reach HOME
-  if (horsesThatCanReachHome.length > 0) {
-    const chosenHorseID = horsesThatCanReachHome[integer(0, horsesThatCanReachHome.length - 1)(mt)];
-    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-    const horse = horses[chosenHorseID];
-    
-    yield put(addLogEntry({
-      player: currentTurnBase.color,
-      action: 'Auto-action',
-      details: `Automatically chose to move horse ${chosenHorseID.split('_')[1]} (can reach HOME)`,
-    }));
-    
-    yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
-    return;
-  }
-
-  // Priority 2: Choose horse that can reach HOMEPATH
-  if (horsesThatCanReachHomePath.length > 0) {
-    const chosenHorseID = horsesThatCanReachHomePath[integer(0, horsesThatCanReachHomePath.length - 1)(mt)];
-    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-    const horse = horses[chosenHorseID];
-    
-    yield put(addLogEntry({
-      player: currentTurnBase.color,
-      action: 'Auto-action',
-      details: `Automatically chose to move horse ${chosenHorseID.split('_')[1]} (can reach HOMEPATH)`,
-    }));
-    
-    yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
-    return;
-  }
-
-  // Priority 3: Choose between spawn and move (prefer move if available)
-  const availableActions = [];
-  if (movableHorses.length > 0) availableActions.push('move');
-  if (spawnableHorses.length > 0) availableActions.push('spawn');
-
-  // Prefer move if available, otherwise spawn
-  const chosenAction = availableActions[0] || (availableActions.length > 0 ? availableActions[integer(0, availableActions.length - 1)(mt)] : null);
-
-  if (chosenAction === 'move' && movableHorses.length > 0) {
-    // Double-check that the selected horse is still movable before dispatching
-    const currentMovableHorses: IHorse['horseID'][] = yield call(getMovableHorses, currentDieRoll);
-    if (currentMovableHorses.length > 0) {
-      const chosenHorseID = currentMovableHorses[integer(0, currentMovableHorses.length - 1)(mt)];
-      const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-      const horse = horses[chosenHorseID];
-      
-      yield put(addLogEntry({
-        player: currentTurnBase.color,
-        action: 'Auto-action',
-        details: `Automatically chose to move horse ${chosenHorseID.split('_')[1]}`,
-      }));
-      
-      yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
-      return;
-    }
-  }
-
-  if (chosenAction === 'spawn' && spawnableHorses.length > 0) {
-    // Double-check that there are still spawnable horses
-    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-    const currentSpawnableHorses = bases[currentTurn].horseIDs.filter((horseID) => !horses[horseID].isSpawned && !horses[horseID].isRetired);
-
-    if (currentSpawnableHorses.length > 0) {
-      const chosenHorseID = currentSpawnableHorses[integer(0, currentSpawnableHorses.length - 1)(mt)];
-      
-      yield put(addLogEntry({
-        player: currentTurnBase.color,
-        action: 'Auto-action',
-        details: `Automatically chose to spawn horse ${chosenHorseID.split('_')[1]}`,
-      }));
-      
-      yield put(spawnHorse(currentTurnBase.ID, chosenHorseID));
-      return;
-    }
-  }
-
-  // Fallback: try move if spawn failed
-  if (movableHorses.length > 0) {
-    const currentMovableHorses: IHorse['horseID'][] = yield call(getMovableHorses, currentDieRoll);
-    if (currentMovableHorses.length > 0) {
-      const chosenHorseID = currentMovableHorses[integer(0, currentMovableHorses.length - 1)(mt)];
-      const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-      const horse = horses[chosenHorseID];
-      yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
-    }
-  }
-}
 
 /**
  * Watcher saga that listens for ROLL_DIE_COMPLETE actions
@@ -566,37 +433,17 @@ function * handleRollSpawnableImmediateSpawn(
   currentTurnBase: IBase,
   spawnableHorses: IHorse['horseID'][]
 ): Generator<any, void, any> {
-  // Check if replay is active - if so, show action selection UI so replayAutoSelectActionSaga can pick the action
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   const dieSum: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
-
-  if (replay?.isActive && !replay.isPaused) {
-    // Replay mode - show action selection UI so replayAutoSelectActionSaga can pick the right action
-    console.log('[REPLAY] handleRollSpawnableImmediateSpawn - replay is active, showing action selection UI');
-    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableHorses, [], dieSum as Rolls, currentTurnBase);
-    yield put(setAvailableActions(actions, dieSum as Rolls));
-    yield put(markCurrentBase(true));
-    
-    // Wait for replayAutoSelectActionSaga to select and execute the action
-    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
-    yield put(clearAvailableActions());
-    yield put(markCurrentBase(false));
-  } else if (autoActionsEnabled) {
-    // Auto-actions enabled - immediately spawn
-    yield put(spawnHorse(currentTurnBase.ID, spawnableHorses[0]));
-    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
-  } else {
-    // Auto-actions disabled - show action selection UI
-    const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableHorses, [], dieSum as Rolls, currentTurnBase);
-    yield put(setAvailableActions(actions, dieSum as Rolls));
-    yield put(markCurrentBase(true));
-    
-    // Wait for user to select an action
-    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
-    yield put(clearAvailableActions());
-    yield put(markCurrentBase(false));
-  }
+  
+  // Show action selection UI so replayAutoSelectActionSaga can pick the right action
+  const actions: IAvailableAction[] = yield call(buildAvailableActions, spawnableHorses, [], dieSum as Rolls, currentTurnBase);
+  yield put(setAvailableActions(actions, dieSum as Rolls));
+  yield put(markCurrentBase(true));
+  
+  // Wait for replayAutoSelectActionSaga to select and execute the action
+  yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
+  yield put(clearAvailableActions());
+  yield put(markCurrentBase(false));
 }
 
 /**
@@ -609,25 +456,10 @@ function * handleRollSpawnableWithChoice(
   movableHorses: IHorse['horseID'][],
   currentTurnBase: IBase
 ): Generator<any, void, any> {
-  // Check if replay is active - if so, show action selection UI so replayAutoSelectActionSaga can pick the action
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
   const dieSum: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
-
-  if (replay?.isActive && !replay.isPaused) {
-    // Replay mode - show action selection UI so replayAutoSelectActionSaga can pick the right action
-    console.log('[REPLAY] handleRollSpawnableWithChoice - replay is active, showing action selection UI');
-    yield call(buildAndHandleActions, spawnableHorses, movableHorses, dieSum as Rolls, currentTurnBase, true);
-  } else if (autoActionsEnabled) {
-    // Auto-actions enabled - choose action automatically
-    yield call(autoChooseAction, spawnableHorses, movableHorses, currentTurnBase);
-    
-    // Wait for action to complete
-    yield take([LudoActionTypes.SPAWN_HORSE_SUCCESS, LudoActionTypes.MOVE_HORSE_SUCCESS]);
-  } else {
-    // Auto-actions disabled - show action selection UI
-    yield call(buildAndHandleActions, spawnableHorses, movableHorses, dieSum as Rolls, currentTurnBase, true);
-  }
+  
+  // Show action selection UI so replayAutoSelectActionSaga can pick the right action
+  yield call(buildAndHandleActions, spawnableHorses, movableHorses, dieSum as Rolls, currentTurnBase, true);
 }
 
 /**
@@ -654,10 +486,10 @@ function * handleRollSpawnable(
 }
 
 /**
- * Helper function to enable die, recalculate highlighting, and optionally auto-roll
+ * Helper function to enable die and recalculate highlighting
  * Used for bonus turns after spawnable rolls or successful moves/spawns
  */
-function * enableDieAndRecalculateHighlighting(shouldAutoRoll: boolean = true): Generator<any, void, any> {
+function * enableDieAndRecalculateHighlighting(): Generator<any, void, any> {
   yield put(enableDie());
   
   // Small delay to ensure all state updates are processed
@@ -668,16 +500,6 @@ function * enableDieAndRecalculateHighlighting(shouldAutoRoll: boolean = true): 
   const result: { reachableCells: Set<string>; cellsByHorse: Map<string, Array<{ horseID: any; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
   if (result.reachableCells.size > 0) {
     yield put(setHighlightedCells(result.reachableCells, result.cellsByHorse));
-  }
-  
-  if (shouldAutoRoll) {
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-  if (autoActionsEnabled) {
-    // Small delay before auto-rolling for the bonus turn
-    yield delay(DICE_BONUS_TURN_DELAY);
-    // Automatically roll the dice for the bonus turn
-    yield put(rollDie());
-    }
   }
 }
 
@@ -729,124 +551,6 @@ function * handleBonusTurnAfterSpawnable(): Generator<any, void, any> {
   yield call(enableDieAndRecalculateHighlighting);
 }
 
-/**
- * Automatically moves a single horse (only one option available)
- */
-function * handleSingleHorseMove(horseID: IHorse['horseID'], horses: { [key: string]: IHorse }): Generator<any, void, any> {
-  const horse = horses[horseID];
-  yield put(moveHorse(horseID, horse.position, horse.cellID));
-}
-
-/**
- * Selects and moves a horse with priority (HOME > HOMEPATH > random)
- * NOTE: When replay is active, this function should NOT be called - replayAutoSelectActionSaga handles action selection
- */
-function * selectAndMoveHorseWithPriority(
-  movableHorses: IHorse['horseID'][],
-  dieValue: Rolls,
-  horses: { [key: string]: IHorse },
-  playerColor: string
-): Generator<any, void, any> {
-  // Check if replay is active - if so, skip random selection (replayAutoSelectActionSaga handles it)
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
-  if (replay?.isActive && !replay.isPaused) {
-    console.log('[REPLAY] selectAndMoveHorseWithPriority - replay is active, skipping random horse selection (replayAutoSelectActionSaga will handle)');
-    return;
-  }
-  
-  const mt = MersenneTwister19937.autoSeed();
-
-  // Prioritize horses that can reach HOME or HOMEPATH
-  const horsesThatCanReachHome: IHorse['horseID'][] = [];
-  const horsesThatCanReachHomePath: IHorse['horseID'][] = [];
-
-  for (const horseID of movableHorses) {
-    const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
-    if (result === 'HOME') {
-      horsesThatCanReachHome.push(horseID);
-    } else if (result === 'HOMEPATH') {
-      horsesThatCanReachHomePath.push(horseID);
-    }
-  }
-
-  // Priority 1: Choose horse that can reach HOME
-  let chosenHorseID: IHorse['horseID'];
-  if (horsesThatCanReachHome.length > 0) {
-    chosenHorseID = horsesThatCanReachHome[integer(0, horsesThatCanReachHome.length - 1)(mt)];
-  } else if (horsesThatCanReachHomePath.length > 0) {
-    // Priority 2: Choose horse that can reach HOMEPATH
-    chosenHorseID = horsesThatCanReachHomePath[integer(0, horsesThatCanReachHomePath.length - 1)(mt)];
-  } else {
-    // Priority 3: Random selection
-    chosenHorseID = movableHorses[integer(0, movableHorses.length - 1)(mt)];
-  }
-
-  const horse = horses[chosenHorseID];
-  const details = horsesThatCanReachHome.length > 0
-    ? `Automatically moved horse ${chosenHorseID.split('_')[1]} ${dieValue} spaces (can reach HOME)`
-    : horsesThatCanReachHomePath.length > 0
-    ? `Automatically moved horse ${chosenHorseID.split('_')[1]} ${dieValue} spaces (can reach HOMEPATH)`
-    : `Automatically moved horse ${chosenHorseID.split('_')[1]} ${dieValue} spaces`;
-
-  yield put(addLogEntry({
-    player: playerColor,
-    action: 'Auto-moved horse',
-    details,
-  }));
-
-  yield put(moveHorse(chosenHorseID, horse.position, horse.cellID));
-}
-
-/**
- * Handles when multiple horses can be moved (requires user choice or auto-action)
- * NOTE: When replay is active, replayAutoSelectActionSaga handles action selection
- */
-function * handleMultipleHorsesMove(
-  movableHorses: IHorse['horseID'][],
-  dieValue: Rolls,
-  horses: { [key: string]: IHorse }
-): Generator<any, void, any> {
-  // Check if replay is active - if so, replayAutoSelectActionSaga will handle action selection
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
-  if (replay?.isActive && !replay.isPaused) {
-    console.log('[REPLAY] handleMultipleHorsesMove - replay is active, skipping (replayAutoSelectActionSaga will handle)');
-    // Still show action selection UI so replayAutoSelectActionSaga can pick the right action
-    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-    const currentTurnBase = bases[currentTurn];
-    yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
-    return;
-  }
-  
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-
-  if (autoActionsEnabled) {
-    // Multiple movable horses - wait for user input with timeout
-    const timeoutDuration: ReturnType<typeof autoActionTimeoutSelector> = yield select(autoActionTimeoutSelector);
-    const { timeout } = yield race({
-      userAction: take(LudoActionTypes.MOVE_HORSE_SUCCESS),
-      timeout: delay(timeoutDuration),
-    });
-
-    if (timeout) {
-      // Timeout won - auto select a movable horse (prioritizing HOME/HOMEPATH)
-      const currentMovableHorses: IHorse['horseID'][] = yield call(getMovableHorses, dieValue);
-      if (currentMovableHorses.length > 0) {
-        const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-        const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-        const playerColor = bases[currentTurn].color;
-        yield call(selectAndMoveHorseWithPriority, currentMovableHorses, dieValue, horses, playerColor);
-      }
-    }
-  } else {
-    // Auto-actions disabled - show action selection UI
-    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-    const currentTurnBase = bases[currentTurn];
-    
-    yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
-  }
-}
 
 /**
  * Handles non-spawnable roll with spawned horses available
@@ -857,45 +561,16 @@ function * handleNonSpawnableRoll(
   dieValue: Rolls,
   horses: { [key: string]: IHorse }
 ): Generator<any, void, any> {
-  // Check if replay is active - if so, show action selection UI so replayAutoSelectActionSaga can pick the action
-  const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-
-  if (replay?.isActive && !replay.isPaused) {
-    // Replay mode - show action selection UI so replayAutoSelectActionSaga can pick the right action
-    console.log('[REPLAY] handleNonSpawnableRoll - replay is active, showing action selection UI');
-    if (movableHorses.length > 0) {
-      const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-      const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-      const currentTurnBase = bases[currentTurn];
-      
-      yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
-    } else {
-      // No movable horses at all - pass turn
-      yield call(handleNoValidMoves);
-    }
-  } else if (autoActionsEnabled) {
-    // Auto-actions enabled - auto-move if only one horse option
-    if (spawnedHorseIDs.length === 1) {
-      yield call(handleSingleHorseMove, spawnedHorseIDs[0], horses);
-    } else if (movableHorses.length === 1) {
-      yield call(handleSingleHorseMove, movableHorses[0], horses);
-    } else if (movableHorses.length > 1) {
-      // Multiple options - requires choice
-      yield call(handleMultipleHorsesMove, movableHorses, dieValue, horses);
-    }
+  // Show action selection UI so replayAutoSelectActionSaga can pick the right action
+  if (movableHorses.length > 0) {
+    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+    const currentTurnBase = bases[currentTurn];
+    
+    yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
   } else {
-    // Auto-actions disabled - show action selection UI even for single options
-    if (movableHorses.length > 0) {
-      const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-      const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-      const currentTurnBase = bases[currentTurn];
-      
-      yield call(buildAndHandleActions, [], movableHorses, dieValue, currentTurnBase);
-    } else {
-      // No movable horses at all - pass turn
-      yield call(handleNoValidMoves);
-    }
+    // No movable horses at all - pass turn
+    yield call(handleNoValidMoves);
   }
 }
 
@@ -1060,13 +735,13 @@ function * watchForPassTurnTo() {
 }
 
 /**
- * Saga that handles turn changes - enables die and auto-rolls in auto-play mode
+ * Saga that handles turn changes - enables die
  */
 function * passTurnToSaga() {
-  // Check if replay is paused - don't enable dice or auto-roll if paused
+  // Check if replay is paused - don't enable dice if paused
   const replay: ReturnType<typeof replaySelector> = yield select(replaySelector);
   if (replay?.isActive && replay.isPaused) {
-    console.log('[REPLAY] passTurnToSaga - replay is paused, skipping dice enable and auto-roll');
+    console.log('[REPLAY] passTurnToSaga - replay is paused, skipping dice enable');
     return;
   }
 
@@ -1075,31 +750,10 @@ function * passTurnToSaga() {
   // Small delay to ensure any state updates are processed
   yield delay(DICE_STATE_UPDATE_DELAY);
   
-  // In auto-play mode, automatically roll for the new player only if they have spawned horses
-  const autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector> = yield select(autoActionsEnabledSelector);
-  if (autoActionsEnabled) {
-    // Check if replay is active and not paused - if so, replay system handles rolling
-    if (replay?.isActive && !replay.isPaused) {
-      // Replay system will handle dice rolling via replayAdvanceStepSaga
-      return;
-    }
-    
-    // Check if current player has any spawned horses before auto-rolling
-    const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
-    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-    const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-    
-    // Check if the current player has any horses that are spawned (not in base)
-    const currentTurnBase = bases[currentTurn];
-    const hasSpawnedHorses = currentTurnBase.horseIDs.some((horseID) => {
-      const horse = horses[horseID];
-      return horse.isSpawned && !horse.isRetired;
-    });
-    
-    if (hasSpawnedHorses) {
-    yield delay(DICE_BONUS_TURN_DELAY);
-    yield put(rollDie());
-    }
+  // Replay system handles dice rolling via replayAdvanceStepSaga
+  if (replay?.isActive && !replay.isPaused) {
+    // Replay system will handle dice rolling
+    return;
   }
 }
 
@@ -1132,5 +786,5 @@ export const sagas = [
   watchForRollDieComplete,  // Watches for die roll completions and handles game logic
   watchForSpawnHorseSuccess, // Watches for successful spawns and handles bonus turns
   watchForMoveHorseSuccess,  // Watches for successful moves and handles bonus turns
-  watchForPassTurnTo,       // Watches for turn changes and auto-rolls in auto-play mode
+  watchForPassTurnTo,       // Watches for turn changes
 ];
