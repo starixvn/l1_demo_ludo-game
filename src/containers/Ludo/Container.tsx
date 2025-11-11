@@ -28,7 +28,11 @@ import {
   getInitialGameDataSuccess,
   setPlayers,
 } from "./state/actions"; // Ludo actions
-import { disableDie, invalidateDieRoll } from "containers/Dice/state/actions"; // Dice actions
+import {
+  disableDie,
+  enableDie,
+  invalidateDieRoll,
+} from "containers/Dice/state/actions"; // Dice actions
 import {
   clearLogs,
   setAutoActionsEnabled,
@@ -36,6 +40,7 @@ import {
 import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors"; // StepLogs selectors
 import { BaseID, BoardEntities } from "./state/interfaces"; // Game data types
 import {
+  availableActionsSelector,
   basesSelector,
   currentTurnSelector,
   relationshipsSelector,
@@ -55,6 +60,7 @@ interface IDispatchProps {
   setPlayers: typeof setPlayers; // Configure number of players
   clearLogs: typeof clearLogs; // Clear game logs
   disableDie: typeof disableDie; // Disable die
+  enableDie: typeof enableDie; // Enable die
   invalidateDieRoll: typeof invalidateDieRoll; // Invalidate die roll
   setAutoActionsEnabled: typeof setAutoActionsEnabled; // Set auto-actions enabled state
 }
@@ -68,6 +74,7 @@ interface IStateProps {
   walkways: ReturnType<typeof walkwaysSelector>; // Walkway configurations
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
   autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>; // Whether auto-actions are enabled
+  availableActions: ReturnType<typeof availableActionsSelector>; // Available actions for selection
 }
 
 /** Public props (none in this case) */
@@ -81,6 +88,8 @@ interface IState {
   showPlayerConfiguration: boolean; // Whether to show player setup screen
   showDebugText: boolean; // Whether to show debug text (cell IDs, base IDs, etc.)
   showGameLog: boolean; // Whether to show the game log panel
+  isPaused: boolean; // Whether the game is paused
+  previousAutoActionsEnabled: boolean; // Store auto-actions state before pausing
 }
 
 /**
@@ -92,6 +101,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   relationships: relationshipsSelector, // Get board entity relationships
   walkways: walkwaysSelector, // Get walkway configurations
   autoActionsEnabled: autoActionsEnabledSelector, // Get auto-actions enabled state
+  availableActions: availableActionsSelector, // Get available actions for selection
 });
 
 /**
@@ -105,6 +115,7 @@ const mapDispatchToProps = {
   getInitialGameDataSuccess, // Action to load saved game state
   clearLogs, // Action to clear game logs
   disableDie, // Action to disable die
+  enableDie, // Action to enable die
   invalidateDieRoll, // Action to invalidate die roll
   setAutoActionsEnabled, // Action to set auto-actions enabled state
 };
@@ -119,6 +130,8 @@ class LudoBare extends React.PureComponent<IProps, IState> {
     showPlayerConfiguration: false,
     showDebugText: false, // Hide debug text by default
     showGameLog: false, // Hide game log by default
+    isPaused: false, // Game is not paused by default
+    previousAutoActionsEnabled: false, // Store previous auto-actions state
   };
 
   /**
@@ -212,9 +225,22 @@ class LudoBare extends React.PureComponent<IProps, IState> {
                 this.props.setAutoActionsEnabled(e.target.checked)
               }
               className={styles.Checkbox}
+              disabled={this.state.isPaused}
             />
             <span className={styles.CheckboxLabelText}>Auto Run</span>
           </label>
+          {/* Pause Game toggle - shown only during gameplay */}
+          {!this.state.showPlayerConfiguration && (
+            <label className={styles.CheckboxLabel}>
+              <input
+                type="checkbox"
+                checked={this.state.isPaused}
+                onChange={this.handlePauseGame}
+                className={styles.Checkbox}
+              />
+              <span>Pause Game</span>
+            </label>
+          )}
           <label className={styles.CheckboxLabel}>
             <input
               type="checkbox"
@@ -379,6 +405,48 @@ class LudoBare extends React.PureComponent<IProps, IState> {
 
     // Reload the page
     window.location.reload();
+  };
+
+  /**
+   * Handles pausing/unpausing the game
+   * When paused: disables die and auto-actions, stores previous auto-actions state
+   * When unpaused: enables die and restores previous auto-actions state
+   * Note: Does not enable die if we're in action selection stage to prevent countdown restart
+   */
+  private handlePauseGame = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isPaused = e.target.checked;
+
+    if (isPaused) {
+      // Pause the game
+      // Store current auto-actions state before pausing
+      const previousAutoActionsEnabled = this.props.autoActionsEnabled;
+      this.setState({
+        isPaused: true,
+        previousAutoActionsEnabled,
+      });
+      // Disable die to prevent any dice rolls
+      this.props.disableDie();
+      // Disable auto-actions
+      this.props.setAutoActionsEnabled(false);
+    } else {
+      // Unpause the game
+      // Restore previous auto-actions state
+      this.props.setAutoActionsEnabled(this.state.previousAutoActionsEnabled);
+      // Only enable die if we're NOT in action selection stage
+      // If we're in action selection (availableActions exists), don't enable die
+      // to prevent the countdown timer from restarting
+      if (
+        !this.props.availableActions ||
+        this.props.availableActions.length === 0
+      ) {
+        // No action selection pending - safe to enable die
+        this.props.enableDie();
+      }
+      // If we're in action selection, the die should remain disabled until action is selected
+      this.setState({
+        isPaused: false,
+      });
+    }
   };
 }
 
