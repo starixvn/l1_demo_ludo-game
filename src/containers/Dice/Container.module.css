@@ -1,10 +1,18 @@
 .Container {
   width: 100%;
   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px; /* Space between elements */
+  margin: 20px 0;
+}
+
+.DiceWrapper {
+  display: flex;
   justify-content: center;
   align-items: center;
   gap: 10px; /* Space between two dice */
-  margin: 20px 0;
 }
 
 /* Dice Container - 3D perspective */
@@ -196,4 +204,67 @@
   50% {
     opacity: 0.9;
   }
+}
+
+/* Set Result Container - Button and inputs for setting dice result */
+.SetResultContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.SetResultInputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.SetResultInput {
+  width: 40px;
+  height: 30px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.SetResultInput:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.SetResultInput:disabled {
+  background-color: #f0f0f0;
+  cursor: not-allowed;
+}
+
+.SetResultSeparator {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+}
+
+.SetResultButton {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  background-color: #4a90e2;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.SetResultButton:hover:not(:disabled) {
+  background-color: #357abd;
+}
+
+.SetResultButton:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }

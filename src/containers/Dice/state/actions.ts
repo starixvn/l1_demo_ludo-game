@@ -15,6 +15,7 @@ import { Rolls } from './interfaces';
  */
 export enum ActionTypes {
   ROLL_DIE = 'die/ROLL_DIE',                    // Request to roll the die
+  SET_DIE_RESULT = 'die/SET_DIE_RESULT',         // Set a specific dice result (for testing/debugging)
   ROLL_DIE_COMPLETE = 'die/ROLL_DIE_COMPLETE',   // Die roll completed with result
   ENABLE_DIE = 'die/ENABLE_DIE',                 // Enable die for rolling (player's turn)
   DISABLE_DIE = 'die/DISABLE_DIE',               // Disable die (not player's turn)
@@ -32,6 +33,16 @@ export enum ActionTypes {
  */
 export const rollDie = (): IReduxAction<ActionTypes.ROLL_DIE, void> => ({
   type: ActionTypes.ROLL_DIE,
+});
+
+/**
+ * Set a specific dice result - rolls the dice with predetermined values
+ * @param roll1 - The value for the first die (1-6)
+ * @param roll2 - The value for the second die (1-6)
+ */
+export const setDieResult = (roll1: Rolls, roll2: Rolls): IReduxAction<ActionTypes.SET_DIE_RESULT, { roll1: Rolls; roll2: Rolls }> => ({
+  type: ActionTypes.SET_DIE_RESULT,
+  data: { roll1, roll2 },
 });
 
 /**
@@ -85,6 +96,7 @@ export const stopRolling = (): IReduxAction<ActionTypes.STOP_ROLLING, void> => (
  */
 export type Actions =
   | ReturnType<typeof rollDie>
+  | ReturnType<typeof setDieResult>
   | ReturnType<typeof rollDieComplete>
   | ReturnType<typeof enableDie>
   | ReturnType<typeof disableDie>

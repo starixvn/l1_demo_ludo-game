@@ -80,7 +80,7 @@ class PlayerBare extends React.PureComponent<IProps> {
 
         {/* Dice component - always rendered to preserve layout space */}
         <div className={classnames(styles.DiceWrapper, disabled && styles.DicePlaceholder)}>
-          <Dice baseColor={base.color} />
+          <Dice baseColor={base.color} baseID={baseID} />
         </div>
 
         {/* Container for horses that have reached home (retired) */}

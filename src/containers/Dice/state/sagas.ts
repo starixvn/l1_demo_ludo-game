@@ -37,7 +37,7 @@ import { DICE_BONUS_TURN_DELAY, DICE_STATE_UPDATE_DELAY, DICE_ROLLING_ANIMATION_
 
 import { currentDieRoll1Selector, currentDieRoll2Selector, currentDieRollSumSelector } from './selectors';
 
-import { enableDie, invalidateDieRoll, rollDieComplete, startRolling, stopRolling, ActionTypes } from './actions';
+import { enableDie, invalidateDieRoll, rollDieComplete, setDieResult, startRolling, stopRolling, ActionTypes } from './actions';
 import { Rolls } from './interfaces';
 
 /**
@@ -45,6 +45,13 @@ import { Rolls } from './interfaces';
  */
 function * watchForRollDie() {
   yield takeLatest(ActionTypes.ROLL_DIE, rollDieSaga);
+}
+
+/**
+ * Watcher saga that listens for SET_DIE_RESULT actions and triggers the set die result saga
+ */
+function * watchForSetDieResult() {
+  yield takeLatest(ActionTypes.SET_DIE_RESULT, setDieResultSaga);
 }
 
 /**
@@ -95,6 +102,41 @@ function * rollDieSaga() {
 
   // Dispatch the roll completion action and stop rolling animation
   yield put(rollDieComplete(dieRoll1, dieRoll2));
+  yield put(stopRolling());
+}
+
+/**
+ * Saga that handles setting a specific dice result
+ * Uses predetermined values instead of random rolls
+ */
+function * setDieResultSaga(action: ReturnType<typeof setDieResult>) {
+  if (!action.data) {
+    return;
+  }
+
+  const { roll1, roll2 } = action.data;
+
+  // Start the rolling animation
+  yield put(startRolling());
+
+  // Wait for animation to complete (1.2 seconds)
+  yield delay(DICE_ROLLING_ANIMATION_DURATION);
+
+  // Get current player info for logging
+  const currentTurn: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
+  const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const currentTurnBase = bases[currentTurn];
+  const playerColor = currentTurnBase.color;
+
+  // Log the dice roll action
+  yield put(addLogEntry({
+    player: playerColor,
+    action: `Rolled ${roll1}-${roll2} [Set Result]`,
+    details: `Dice roll: ${roll1}-${roll2} (sum: ${roll1 + roll2}) [Manually Set]`,
+  }));
+
+  // Dispatch the roll completion action and stop rolling animation
+  yield put(rollDieComplete(roll1, roll2));
   yield put(stopRolling());
 }
 
@@ -967,6 +1009,7 @@ function * moveHorseSuccessSaga(action: { type: string; data?: { bonusChance: bo
  */
 export const sagas = [
   watchForRollDie,          // Watches for die roll requests
+  watchForSetDieResult,     // Watches for set die result requests
   watchForRollDieComplete,  // Watches for die roll completions and handles game logic
   watchForSpawnHorseSuccess, // Watches for successful spawns and handles bonus turns
   watchForMoveHorseSuccess,  // Watches for successful moves and handles bonus turns
