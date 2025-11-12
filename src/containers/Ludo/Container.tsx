@@ -16,7 +16,6 @@ import { Player } from "containers/Player/Container"; // Player info panels
 import { StepLogs } from "containers/StepLogs/Container"; // Game action log
 import { Walkway } from "containers/Walkway/Container"; // Game board walkway
 import { ActionSelection } from "containers/ActionSelection/Container"; // Action selection UI
-import { DiceCountdown } from "containers/DiceCountdown/Container"; // Countdown timer for dice roll
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import { loadGameStateFromFile } from "common/utils"; // Game state loading utility
 import { BOARD_SIZE } from "globalConstants"; // Board dimensions
@@ -181,8 +180,6 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             style={getStyleObject(BOARD_SIZE, BOARD_SIZE)} // Size the board
           >
             {this.renderBoardEntities()} {/* Render bases, walkways, homes */}
-            {/* Countdown timer - positioned in center of board (home area) */}
-            <DiceCountdown />
           </div>
 
           {/* Right side players (Base 2 & 4) */}
