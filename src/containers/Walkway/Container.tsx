@@ -182,7 +182,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
       links, // Cell connectivity links
       currentTurn, // Current player turn
       isDieRollAllowed, // Whether dice can be rolled
-      isDieRollValid, // Whether current roll is valid
     } = this.props;
 
     // Calculate odds whenever dice rolling is allowed (includes paused games)

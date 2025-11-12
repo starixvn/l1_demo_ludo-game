@@ -210,8 +210,11 @@ export function calculateCellOdds(
   }
   allCellIDs.add('HOME'); // Add HOME as a possible target
 
+  // Convert Set to Array for iteration (compatible with older TypeScript targets)
+  const allCellIDsArray = Array.from(allCellIDs);
+
   // Initialize probabilities for all cells
-  for (const cellID of allCellIDs) {
+  for (const cellID of allCellIDsArray) {
     probabilityMap.set(cellID, 0);
   }
 
@@ -227,7 +230,7 @@ export function calculateCellOdds(
     const isPair = roll1 === roll2;
 
     // Check each cell to see if it's reachable with this roll
-    for (const cellID of allCellIDs) {
+    for (const cellID of allCellIDsArray) {
       let isReachable = false;
 
       // Check each horse
@@ -267,7 +270,7 @@ export function calculateCellOdds(
 
   // Convert probabilities to betting odds
   const bettingOdds: BettingOdds[] = [];
-  for (const cellID of allCellIDs) {
+  for (const cellID of allCellIDsArray) {
     const probability = probabilityMap.get(cellID) || 0;
     bettingOdds.push({
       cellID,
