@@ -263,6 +263,22 @@ class WalkwayBare extends React.PureComponent<IProps> {
                 globalSeenHorseMoveTypes.add(key);
                 // Only show popover if we haven't already decided to show one for this cell
                 if (!showPopover) {
+                  // For spawn moves, check if there's already a horse of the same color in the spawn cell
+                  // If so, don't show the popover because spawning is not valid
+                  if (moveType === "spawn" && cellType === CellType.SPAWN) {
+                    const horse = horses[horseID];
+                    const hasSameColorHorse = cellConfiguration.horseIDs.some(
+                      (existingHorseID) => {
+                        const existingHorse = horses[existingHorseID];
+                        return existingHorse && existingHorse.baseID === horse.baseID;
+                      }
+                    );
+                    // Don't show popover if same color horse already exists in spawn cell
+                    if (hasSameColorHorse) {
+                      // Mark as seen but don't show popover
+                      continue;
+                    }
+                  }
                   shouldShow = true;
                   // Determine popover text based on move type
                   if (moveType === "spawn") {
