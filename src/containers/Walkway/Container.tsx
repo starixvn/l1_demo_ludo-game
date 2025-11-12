@@ -14,10 +14,7 @@ import { createStructuredSelector } from "reselect"; // Optimized state selectio
 
 import { flatArray } from "common/utils"; // Array flattening utility
 import { Horse } from "containers/Base/components/Horse"; // Horse component for rendering
-import {
-  CellType,
-  IWalkway,
-} from "containers/Ludo/state/interfaces"; // Game data types
+import { CellType, IWalkway } from "containers/Ludo/state/interfaces"; // Game data types
 import {
   basesSelector,
   cellsSelector,
@@ -37,7 +34,10 @@ import {
 } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Position enums and colors
 import { createSelector } from "reselect"; // For creating memoized selectors
-import { isDieRollAllowedSelector, isDieRollValidSelector } from "containers/Dice/state/selectors"; // Dice selectors
+import {
+  isDieRollAllowedSelector,
+  isDieRollValidSelector,
+} from "containers/Dice/state/selectors"; // Dice selectors
 
 import { Cell } from "./components/Cell"; // Cell component
 import { generateCellID } from "./utils"; // Cell ID generation utility
@@ -79,7 +79,6 @@ interface IDispatchProps {
 
 /** Combined component props */
 interface IProps extends IPublicProps, IStateProps, IDispatchProps {}
-
 
 /**
  * Maps Redux state to component props
@@ -269,7 +268,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
                     const hasSameColorHorse = cellConfiguration.horseIDs.some(
                       (existingHorseID) => {
                         const existingHorse = horses[existingHorseID];
-                        return existingHorse && existingHorse.baseID === horse.baseID;
+                        return (
+                          existingHorse && existingHorse.baseID === horse.baseID
+                        );
                       }
                     );
                     // Don't show popover if same color horse already exists in spawn cell
@@ -281,9 +282,9 @@ class WalkwayBare extends React.PureComponent<IProps> {
                   shouldShow = true;
                   // Determine popover text based on move type
                   if (moveType === "spawn") {
-                    popoverText = "Place bet on spawn horse";
+                    popoverText = "Place bet on release horse";
                   } else if (moveType === "kick") {
-                    popoverText = "Place bet on kick blocking horse";
+                    popoverText = "Place bet on kick horse";
                   }
                 }
               }
@@ -305,9 +306,12 @@ class WalkwayBare extends React.PureComponent<IProps> {
       const cellBase = bases[cellConfiguration.baseID];
 
       // Get odds for this cell (if available and possible)
-      const cellOddsObj = cellOdds.find(odds => odds.cellID === cellID);
+      const cellOddsObj = cellOdds.find((odds) => odds.cellID === cellID);
       const cellOddsValue = cellOddsObj ? cellOddsObj.probability : undefined;
-      const cellBettingOdds = cellOddsObj && cellOddsObj.isPossible ? cellOddsObj.oddsRatio : undefined;
+      const cellBettingOdds =
+        cellOddsObj && cellOddsObj.isPossible
+          ? cellOddsObj.oddsRatio
+          : undefined;
 
       // Create Cell component at the correct grid position
       cellComponents[cellConfiguration.row][cellConfiguration.column] = (
@@ -371,9 +375,6 @@ class WalkwayBare extends React.PureComponent<IProps> {
       WalkwayPosition.EAST, // East walkway runs horizontally
       WalkwayPosition.WEST, // West walkway runs horizontally
     ].includes(this.props.walkway.position);
-
-
-
 
   /**
    * Handles horse click events during gameplay

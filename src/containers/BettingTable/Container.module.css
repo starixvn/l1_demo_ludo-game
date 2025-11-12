@@ -1,0 +1,129 @@
+/**
+ * Betting Table Component Styles
+ *
+ * Styles for the betting table grid with red buttons and odds display.
+ */
+
+.Container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: 8px;
+  margin-top: 20px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.Row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.BetButton {
+  flex: 1;
+  min-width: 120px;
+  height: 80px;
+  /* background-color is set via inline style based on current player's color */
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  transition: background-color 0.2s, transform 0.1s, filter 0.2s, box-shadow 0.2s, border 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.BetButton:hover:not(:disabled) {
+  filter: brightness(0.85); /* Darken on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+.BetButton:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.BetButton:disabled {
+  /* background-color is set via inline style based on current player's color */
+  cursor: not-allowed;
+  opacity: 1; /* Full opacity to match other buttons */
+}
+
+.BetLabel {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.BetOdds {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: normal;
+  text-align: center;
+}
+
+.LockIcon {
+  color: #6c757d;
+  font-size: 20px;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.LockIcon::before {
+  content: "🔒";
+  font-size: 18px;
+}
+
+/* Coin icon for betted options - matches Cell BetHorseIcon styling */
+.CoinIcon {
+  position: absolute;
+  transform: translate(-50%, -50%); /* Center on the random position */
+  border-radius: 50%;
+  background-color: rgba(255, 215, 0, 0.95); /* Gold color */
+  color: #000;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(218, 165, 32, 0.8); /* Gold border */
+  animation: coinFadeInOut 1s ease-in-out;
+}
+
+@keyframes coinFadeInOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+  }
+}
+
+/* Active bet button styling */
+.BetButtonActive {
+  box-shadow: 0 0 15px 5px rgba(255, 215, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 215, 0, 0.8);
+}
+

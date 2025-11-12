@@ -16,6 +16,7 @@ import { Player } from "containers/Player/Container"; // Player info panels
 import { StepLogs } from "containers/StepLogs/Container"; // Game action log
 import { Walkway } from "containers/Walkway/Container"; // Game board walkway
 import { ActionSelection } from "containers/ActionSelection/Container"; // Action selection UI
+import { BettingTable } from "containers/BettingTable/Container"; // Betting table
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import { loadGameStateFromFile } from "common/utils"; // Game state loading utility
 import { BOARD_SIZE } from "globalConstants"; // Board dimensions
@@ -200,6 +201,9 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             />
           </div>
         </div>
+
+        {/* Betting Table - displayed below the board */}
+        {!this.state.showPlayerConfiguration && <BettingTable />}
 
         {/* Debug text toggle checkbox - shown at all times */}
         <div className={styles.SidePanel}>
