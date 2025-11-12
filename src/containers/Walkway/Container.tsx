@@ -28,6 +28,7 @@ import {
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
+import { calculateCellOdds } from "containers/utils/oddsCalculator"; // Odds calculator
 import {
   HORSE_SIZE,
   WALKWAY_LENGTH,
@@ -36,6 +37,7 @@ import {
 } from "globalConstants"; // Size constants
 import { BaseColors, WalkwayPosition } from "state/interfaces"; // Position enums and colors
 import { createSelector } from "reselect"; // For creating memoized selectors
+import { isDieRollAllowedSelector, isDieRollValidSelector } from "containers/Dice/state/selectors"; // Dice selectors
 
 import { Cell } from "./components/Cell"; // Cell component
 import { generateCellID } from "./utils"; // Cell ID generation utility
@@ -64,6 +66,8 @@ interface IStateProps {
   highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
   highlightedCellsByHorse: ReturnType<typeof highlightedCellsByHorseSelector>; // Map of cellID to horses that can reach it
   currentTurnBaseColor?: BaseColors; // Color of the current player for highlighting
+  isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>; // Whether dice can be rolled
+  isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether current roll is valid
 }
 
 /**
@@ -95,6 +99,8 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
       currentTurn: ReturnType<typeof currentTurnSelector>
     ) => bases[currentTurn]?.color
   ), // Get current player's base color for highlighting
+  isDieRollAllowed: isDieRollAllowedSelector, // Get whether dice can be rolled
+  isDieRollValid: isDieRollValidSelector, // Get whether current roll is valid
 });
 
 /**
@@ -174,7 +180,16 @@ class WalkwayBare extends React.PureComponent<IProps> {
       bases, // Player base data
       horses, // All horse data
       links, // Cell connectivity links
+      currentTurn, // Current player turn
+      isDieRollAllowed, // Whether dice can be rolled
+      isDieRollValid, // Whether current roll is valid
     } = this.props;
+
+    // Calculate odds whenever dice rolling is allowed (includes paused games)
+    const shouldShowOdds = isDieRollAllowed;
+    const cellOdds = shouldShowOdds
+      ? calculateCellOdds(horses, bases, currentTurn, cellConfigurations, links)
+      : [];
 
     // 2D array to hold cell components organized by row/column
     const cellComponents: any[][] = [[]];
@@ -274,6 +289,11 @@ class WalkwayBare extends React.PureComponent<IProps> {
       // Get the base that this cell belongs to (use cell's baseID, not walkway's baseID)
       const cellBase = bases[cellConfiguration.baseID];
 
+      // Get odds for this cell (if available and possible)
+      const cellOddsObj = cellOdds.find(odds => odds.cellID === cellID);
+      const cellOddsValue = cellOddsObj ? cellOddsObj.probability : undefined;
+      const cellBettingOdds = cellOddsObj && cellOddsObj.isPossible ? cellOddsObj.oddsRatio : undefined;
+
       // Create Cell component at the correct grid position
       cellComponents[cellConfiguration.row][cellConfiguration.column] = (
         <Cell
@@ -298,6 +318,8 @@ class WalkwayBare extends React.PureComponent<IProps> {
           index={cellConfiguration.index} // Index value for debugging
           showPopover={showPopover} // Whether to show popover (only for first cell of each horse/moveType)
           popoverText={popoverText} // Text to display in popover
+          odds={cellOddsValue} // Probability of reaching this cell (0.0 to 1.0)
+          bettingOdds={cellBettingOdds} // Betting odds ratio (1:X format)
         >
           {
             // Render horses that are currently on this cell

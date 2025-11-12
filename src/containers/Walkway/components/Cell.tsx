@@ -49,6 +49,10 @@ interface ICellProps {
   showPopover?: boolean;
   /** Text to display in the popover */
   popoverText?: string;
+  /** Probability of reaching this cell (0.0 to 1.0) - used internally, not displayed */
+  odds?: number;
+  /** Betting odds ratio in format "1:X" where X is total payout - shown only for highlighted cells before dice roll */
+  bettingOdds?: string;
 
 }
 
@@ -271,6 +275,12 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
         {/* Display index for homepath cells */}
         {cellType === CellType.HOMEPATH && homePathIndex !== undefined && (
           <div className={styles.HomePathIndex}>{homePathIndex}</div>
+        )}
+        {/* Display betting odds only for highlighted cells (possible moves) */}
+        {this.props.isHighlighted && this.props.bettingOdds && (
+          <div className={styles.OddsDisplay}>
+            {this.props.bettingOdds}
+          </div>
         )}
         {/* Display circle border for spawn and normal cells */}
         {cellType === CellType.SPAWN && color && (
