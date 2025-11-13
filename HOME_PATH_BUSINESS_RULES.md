@@ -36,12 +36,15 @@ When a horse has multiple next cell options:
 
 - If `cellID === 'HOME'` is available → Always choose HOME (final destination)
 
-**Priority 1: Matching Home Path (Can Jump to Any Cell)**
+**Priority 1: Matching Home Path (Entry vs. Sequential Movement)**
 
-- If multiple home path cells match the horse's `baseID` → Choose the one closest to HOME (furthest along)
-- **Horses can jump directly to any home path cell** (e.g., cell 3 or 4), not just the first one
-- **No sequential requirement** - horses don't need to enter at cell 1 and move sequentially
-- Movement depends on dice result and available paths in the links structure
+- **When NOT in home path**: Horses can jump directly to any home path cell (e.g., cell 3 or 4), not just the first one
+  - If multiple home path cells match the horse's `baseID` → Choose the one closest to HOME (furthest along)
+  - Movement depends on dice result and available paths in the links structure
+- **When ALREADY in home path**: Horses must move sequentially (one step at a time)
+  - Can only move 1 step per turn
+  - **Must roll double dice** to move within home path
+  - Cannot jump ahead to later home path cells - must move to the next sequential cell
 
 **Priority 2: Non-Home-Path Cells**
 
@@ -147,9 +150,10 @@ A horse can enter home path if:
 - [x] Move won't overshoot home (`steps + stepsToMove <= 62`)
 - [x] Target cell is HOMEPATH type
 - [x] Target cell's `baseID` matches horse's `baseID`
-- [x] **Target cell is reachable within the step count** (can jump directly to any home path cell, not just first one)
+- [x] **If NOT in home path**: Target cell is reachable within the step count (can jump directly to any home path cell, not just first one)
+- [x] **If ALREADY in home path**: Can only move 1 step sequentially, and must roll double dice
 - [x] No blocking horses prevent the move
-- [x] Path is available in the links structure (allows jumping to any reachable home path cell)
+- [x] Path is available in the links structure
 
 A horse CANNOT enter home path if:
 

@@ -521,6 +521,62 @@ function * buildAvailableActions(
       console.log(`[buildAvailableActions] Processing horse ${horseID}, steps: ${horse.steps}, cellID: ${horse.cellID}`);
     }
     
+    // Check if horse is on HOME cell itself
+    if (horse.cellID === 'HOME') {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[buildAvailableActions] Skipping ${horseID}: on HOME cell (cannot move)`);
+      }
+      continue; // Skip this horse - cannot move from HOME
+    }
+    
+    // NEW RULE: Check if horse is on a cell that only leads to HOME (cannot move)
+    // Check the links to see if the only next cell is HOME
+    const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+    const nextCells = links[horse.cellID!];
+    if (nextCells && nextCells.length > 0) {
+      // Check if the only next cell is HOME
+      const onlyHome = nextCells.length === 1 && nextCells[0].cellID === 'HOME';
+      if (onlyHome) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[buildAvailableActions] Skipping ${horseID}: on cell (${horse.cellID}) that only leads to HOME`);
+        }
+        continue; // Skip this horse - cannot move from cells that only lead to HOME
+      }
+    }
+    
+    // Also check the specific final home path cells as a safety measure
+    const finalHomePathCells = ['WEST_0_6', 'WEST_1_6', 'EAST_1_0', 'SOUTH_0_0'];
+    if (finalHomePathCells.includes(horse.cellID!)) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[buildAvailableActions] Skipping ${horseID}: on final home path cell (${horse.cellID}) that only leads to HOME`);
+      }
+      continue; // Skip this horse - cannot move from these cells
+    }
+    
+    // NEW RULE: Check if horse is currently in a home path cell
+    const currentCellData = cells[horse.position]?.[horse.cellID];
+    const isHorseInHomePath = currentCellData && 
+      currentCellData.cellType === CellType.HOMEPATH && 
+      currentCellData.baseID === horse.baseID;
+    
+    // If horse is in home path, enforce sequential movement rules:
+    // - Can only move 1 step at a time
+    // - Must roll ANY double dice to move (1:1, 2:2, 3:3, 4:4, 5:5, or 6:6)
+    // - When rolling double dice, can move exactly 1 step (regardless of die value)
+    if (isHorseInHomePath) {
+      if (!isPair) {
+        // Not a double - cannot move in home path
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[buildAvailableActions] Skipping ${horseID}: in home path but did not roll double dice`);
+        }
+        continue; // Skip this horse
+      }
+      
+      // In home path with ANY double dice (1:1, 2:2, 3:3, 4:4, 5:5, 6:6) - can move 1 step using one die
+      // The action creation logic below will handle creating the 1-step action
+      // We don't skip here - let the action creation logic filter appropriately
+    }
+    
     // Special case: Check if horse is on spawn cell with opponent horse
     // If so, create kick action for the opponent on the spawn cell
     if (horse.steps === 0 && horse.cellID && spawnCellID && horse.cellID === spawnCellID) {
@@ -589,12 +645,75 @@ function * buildAvailableActions(
       const horse = horses[horseID];
       
       // Action 1: Move using 1 die
-      // Check if the move is valid (won't overshoot home)
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[buildAvailableActions] Checking 1-die action for ${horseID}: horse.steps (${horse.steps}) + singleDieValue (${singleDieValue}) <= WINNING_MOVES (${WINNING_MOVES}) = ${horse.steps + singleDieValue <= WINNING_MOVES}`);
-      }
-      
-      if (horse.steps + singleDieValue <= WINNING_MOVES) {
+      // NEW RULE: If in home path, can only move 1 step (regardless of die value)
+      // Works for ANY double: 1:1, 2:2, 3:3, 4:4, 5:5, 6:6
+      if (isHorseInHomePath) {
+        // In home path: only allow 1-step moves (regardless of which double was rolled)
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[buildAvailableActions] Horse ${horseID} is in home path, checking 1-step move. horse.steps: ${horse.steps}, WINNING_MOVES: ${WINNING_MOVES}`);
+        }
+        
+        if (horse.steps + 1 <= WINNING_MOVES) {
+          const blockingInfoOneStep: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+            yield call(findBlockingHorse, horseID, 1 as Rolls);
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[buildAvailableActions] Blocking check for ${horseID} with 1 step in home path:`, blockingInfoOneStep);
+          }
+          
+          // Check if we can move: no blocker, or can kick opponent at step 1, or blocker is before step 1
+          const canMove = !blockingInfoOneStep || 
+            (blockingInfoOneStep.stepsBeforeBlocking + 1 === 1 && !blockingInfoOneStep.isSameColor) ||
+            (blockingInfoOneStep.stepsBeforeBlocking + 1 > 1); // Blocker is after step 1, can move to step 1
+          
+          if (canMove) {
+            // Can move 1 step (either no blocker, can kick blocker at step 1, or blocker is after step 1)
+            const resultOneStep: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, 1 as Rolls);
+            let labelOneStep = `Move Horse ${horseID.split('_')[3]} (1 step - 1 die, Home Path)`;
+            let descriptionOneStep = `Move 1 space in home path using one die`;
+            
+            if (resultOneStep === 'HOME') {
+              labelOneStep = `Move Horse ${horseID.split('_')[3]} (1 step - 1 die, Can Reach Home!)`;
+              descriptionOneStep = `Move 1 space in home path - This horse can reach HOME!`;
+            }
+            
+            if (blockingInfoOneStep && blockingInfoOneStep.stepsBeforeBlocking + 1 === 1 && !blockingInfoOneStep.isSameColor) {
+              // Can kick at step 1
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[buildAvailableActions] Creating kick action for ${horseID} in home path`);
+              }
+              actions.push({
+                type: 'kick',
+                horseID,
+                label: `Move Horse ${horseID.split('_')[3]} (1 step - 1 die, Kick Blocking Horse)`,
+                description: `Move 1 space in home path and kick opponent horse using one die`,
+                blockingHorseID: blockingInfoOneStep.blockingHorseID,
+                stepsToUse: 1,
+              });
+            } else {
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[buildAvailableActions] Creating move action for ${horseID} in home path`);
+              }
+              actions.push({
+                type: 'move',
+                horseID,
+                label: labelOneStep,
+                description: descriptionOneStep,
+                stepsToUse: 1,
+              });
+            }
+          } else {
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[buildAvailableActions] Cannot create action for ${horseID} in home path: blocked by same-color horse at step 1`);
+            }
+          }
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[buildAvailableActions] Cannot create action for ${horseID} in home path: would overshoot home (${horse.steps} + 1 > ${WINNING_MOVES})`);
+          }
+        }
+      } else if (horse.steps + singleDieValue <= WINNING_MOVES) {
+        // Not in home path: normal logic
           // Check for blocking to determine if action should be shown
           const blockingInfoOneDie: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
             yield call(findBlockingHorse, horseID, singleDieValue as Rolls);
@@ -739,8 +858,12 @@ function * buildAvailableActions(
       }
       
       // Action 2: Move using 2 dice (sum)
-      // Check if the move is valid (won't overshoot home)
-      if (horse.steps + dieValue <= WINNING_MOVES) {
+      // NEW RULE: If horse is in home path, skip 2-dice action (can only move 1 step)
+      if (isHorseInHomePath) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[buildAvailableActions] Skipping 2-dice action for ${horseID}: in home path (can only move 1 step)`);
+        }
+      } else if (horse.steps + dieValue <= WINNING_MOVES) {
           // Check for blocking to determine if action should be shown
           const blockingInfoTwoDice: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
             yield call(findBlockingHorse, horseID, dieValue);
@@ -878,11 +1001,16 @@ function * buildAvailableActions(
       }
     } else {
       // Not a pair - normal move action
-      if (process.env.NODE_ENV === 'development') {
+      // NEW RULE: If horse is in home path, skip non-pair moves (need double dice)
+      if (isHorseInHomePath) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[buildAvailableActions] Skipping non-pair action for ${horseID}: in home path (need double dice)`);
+        }
+      } else if (process.env.NODE_ENV === 'development') {
         console.log(`[buildAvailableActions] Not a pair for ${horseID}, blockingInfo:`, blockingInfo);
       }
       
-      if (blockingInfo) {
+      if (!isHorseInHomePath && blockingInfo) {
         const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
         
         // Check if we can kick the blocking horse
@@ -927,8 +1055,9 @@ function * buildAvailableActions(
             console.log(`[buildAvailableActions] Skipped non-pair action for ${horseID}: blocked (same color or can't kick, dieValue: ${dieValue}, blockingStep: ${blockingStep})`);
           }
         }
-      } else {
+      } else if (!isHorseInHomePath) {
         // No blocking - normal move action
+        // (Only if not in home path - home path horses need double dice)
         const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
         let label = `Move Horse ${horseID.split('_')[3]}`;
         let description = `Move ${dieValue} spaces`;

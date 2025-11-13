@@ -205,15 +205,62 @@ export function * getMovableHorses(stepsToTake: Rolls) {
   const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const currentTurnBase: ReturnType<typeof currentTurnSelector> = yield select(currentTurnSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+  
+  // Get dice values to check if it's a pair (for home path horses)
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  const isDieRollValid: ReturnType<typeof isDieRollValidSelector> = yield select(isDieRollValidSelector);
+  const isPair = isDieRollValid && roll1 === roll2 && roll1 >= 1 && roll1 <= 6;
 
   // Filter horses that meet all movement criteria
   const movableHorses =
     bases[currentTurnBase].horseIDs
-    .filter((horseID) =>
-      horses[horseID].isSpawned              // Must be on the board
-      && !horses[horseID].isRetired         // Must not be home yet
-      && horses[horseID].steps + stepsToTake <= WINNING_MOVES, // Must not overshoot
-    );
+    .filter((horseID) => {
+      const horse = horses[horseID];
+      
+      // Basic checks
+      if (!horse.isSpawned || horse.isRetired) {
+        return false;
+      }
+      
+      // Check if horse is on HOME cell itself
+      if (horse.cellID === 'HOME') {
+        return false; // Cannot move from HOME
+      }
+      
+      // NEW RULE: Check if horse is on a cell that only leads to HOME (cannot move)
+      // Check the links to see if the only next cell is HOME
+      const nextCells = links[horse.cellID!];
+      if (nextCells && nextCells.length > 0) {
+        // Check if the only next cell is HOME
+        const onlyHome = nextCells.length === 1 && nextCells[0].cellID === 'HOME';
+        if (onlyHome) {
+          return false; // Cannot move from cells that only lead to HOME (moving to HOME retires the horse)
+        }
+      }
+      
+      // Also check the specific final home path cells as a safety measure
+      const finalHomePathCells = ['WEST_0_6', 'WEST_1_6', 'EAST_1_0', 'SOUTH_0_0'];
+      if (finalHomePathCells.includes(horse.cellID!)) {
+        return false; // Cannot move from these cells (only option is HOME, which retires the horse)
+      }
+      
+      // NEW RULE: Check if horse is in home path
+      const currentCellData = cells[horse.position]?.[horse.cellID];
+      const isHorseInHomePath = currentCellData && 
+        currentCellData.cellType === CellType.HOMEPATH && 
+        currentCellData.baseID === horse.baseID;
+      
+      if (isHorseInHomePath) {
+        // In home path: can only move 1 step, and only when double dice is rolled
+        return isPair && (horse.steps + 1 <= WINNING_MOVES);
+      } else {
+        // Not in home path: normal check with full die value
+        return horse.steps + stepsToTake <= WINNING_MOVES;
+      }
+    });
 
   return movableHorses;
 }
@@ -449,10 +496,50 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
   let { cellID, walkwayPosition } = { ...action.data! };
   const { horseID, stepsToUse, blockingHorseID: actionBlockingHorseID } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  const isDouble = roll1 === roll2;
+  
+  // Check if horse is currently in a home path cell
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const horse = horses[horseID];
+  const currentCellData = cells[horse.position]?.[cellID];
+  const isHorseInHomePath = currentCellData && 
+    currentCellData.cellType === CellType.HOMEPATH && 
+    currentCellData.baseID === horse.baseID;
   
   // Determine how many steps to move
   // If stepsToUse is provided (when using one die from a pair), use that instead of the sum
-  const stepsToMove = stepsToUse !== undefined ? stepsToUse : currentDieRoll;
+  let stepsToMove = stepsToUse !== undefined ? stepsToUse : currentDieRoll;
+  
+  // NEW RULE: If horse is already in home path, enforce sequential movement
+  // - Can only move 1 step at a time
+  // - Must roll double dice to move
+  if (isHorseInHomePath) {
+    // Check if double dice was rolled
+    if (!isDouble) {
+      console.warn(`Horse ${horseID} is in home path but did not roll double dice - cannot move`);
+      yield put(moveHorseFailure());
+      yield delay(NO_MOVE_DELAY);
+      yield put(nextTurn());
+      yield put(enableDie());
+      return;
+    }
+    
+    // Enforce sequential movement: only allow 1 step
+    if (stepsToMove > 1) {
+      console.warn(`Horse ${horseID} is in home path - can only move 1 step at a time, but requested ${stepsToMove} steps`);
+      yield put(moveHorseFailure());
+      yield delay(NO_MOVE_DELAY);
+      yield put(nextTurn());
+      yield put(enableDie());
+      return;
+    }
+    
+    // When in home path with double dice, move exactly 1 step
+    stepsToMove = 1;
+  }
   
   // Track if we can kick the blocking horse (if any)
   let canKickBlockingHorse = false;
@@ -542,8 +629,15 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
     }
     
     let nextCell;
+    
+    // Check if horse is currently in a home path cell (at this step of movement)
+    const currentStepCellData = cells[horse.position]?.[cellID];
+    const isCurrentlyInHomePath = currentStepCellData && 
+      currentStepCellData.cellType === CellType.HOMEPATH && 
+      currentStepCellData.baseID === horses[horseID].baseID;
 
     // Special logic for entering home path - allow jumping to ANY matching home path cell
+    // BUT: If already in home path, must move sequentially (only to next cell)
     if (nextCells.length > 1) {
       // Multiple options available
       // Priority 0: Check if HOME is available - it's always the best choice
@@ -551,7 +645,31 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
       if (homeCell) {
         // HOME is always allowed - it's the final destination
         nextCell = homeCell;
+      } else if (isCurrentlyInHomePath) {
+        // NEW RULE: If already in home path, must move sequentially (only to next cell)
+        // Find the next sequential home path cell (not jumping ahead)
+        const nextHomePathCell = nextCells.find(
+          (cell) => {
+            if (cell.cellID === 'HOME') {
+              return false; // HOME is handled above
+            }
+            const cellData = cells[cell.position]?.[cell.cellID];
+            if (!cellData) {
+              return false;
+            }
+            return cellData.cellType === CellType.HOMEPATH
+              && horses[horseID].baseID === cellData.baseID;
+          }
+        );
+        
+        if (nextHomePathCell) {
+          nextCell = nextHomePathCell; // Sequential movement only
+        } else {
+          // No next home path cell available - this shouldn't happen, but use first valid cell
+          nextCell = nextCells[0];
+        }
       } else {
+        // NOT in home path yet - can jump to ANY matching home path cell
         // Priority 1: Find ALL matching home path cells (not just the first one)
         // This allows jumping directly to any home path cell
         const matchingHomePaths = nextCells.filter(
@@ -721,8 +839,7 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
   }
 
   // Get dice values to check for bonus turn
-  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
-  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  // Note: roll1 and roll2 are already declared at the beginning of this function
   
   // Determine if player gets a bonus turn
   const bonusChance = bonusChanceForHomeHorse                          // Reached home
@@ -731,8 +848,9 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
 
   // Log the successful move
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
-  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
-  const playerColor = bases[horses[horseID].baseID].color;
+  // Note: horses is already declared at the beginning of this function, but get fresh state
+  const horsesFresh: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const playerColor = bases[horsesFresh[horseID].baseID].color;
 
   // Log the move action
   yield put(addLogEntry({
@@ -1022,6 +1140,42 @@ function * calculateNormalMoves(
   addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
 ): Generator<any, void, any> {
   const startCellID = horse.cellID!;
+  
+  // NEW RULE: Check if horse is currently in a home path cell
+  const currentCellData = cells[horse.position]?.[startCellID];
+  const isHorseInHomePath = currentCellData && 
+    currentCellData.cellType === CellType.HOMEPATH && 
+    currentCellData.baseID === horse.baseID;
+  
+  // Get dice values to check if it's a pair (required for home path movement)
+  const roll1: ReturnType<typeof currentDieRoll1Selector> = yield select(currentDieRoll1Selector);
+  const roll2: ReturnType<typeof currentDieRoll2Selector> = yield select(currentDieRoll2Selector);
+  const isDieRollValid: ReturnType<typeof isDieRollValidSelector> = yield select(isDieRollValidSelector);
+  const isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector> = yield select(isDieRollAllowedSelector);
+  const isPair = isDieRollValid && roll1 === roll2 && roll1 >= 1 && roll1 <= 6;
+  
+  // Show highlighting before rolling (for betting) OR after rolling double dice
+  const shouldShowHomePathHighlighting = isDieRollAllowed || isPair;
+
+  // If horse is in home path, only highlight next sequential cell (1 step)
+  // Show this BEFORE rolling (for betting) and AFTER rolling double dice
+  if (isHorseInHomePath) {
+    if (shouldShowHomePathHighlighting) {
+      // Only explore 1 step when in home path (can only move 1 step at a time)
+      const steps = 1;
+      if (horse.steps + steps <= WINNING_MOVES) {
+        const blockingResult = yield call(processBlockingLogic, horse.horseID, steps);
+        if (blockingResult.canExplore) {
+          const { maxStepsToExplore, shouldHighlightBlockingCell, blockingInfo } = blockingResult;
+          yield call(exploreReachableCells,
+            horse, startCellID, maxStepsToExplore, shouldHighlightBlockingCell, blockingInfo,
+            cells, links, horses, reachableCells, cellsByHorse, addReachableCell);
+        }
+      }
+    }
+    // If not showing home path highlighting, don't highlight any cells
+    return;
+  }
 
   // Calculate all cells reachable with 2-12 steps (two dice: min 1+1=2, max 6+6=12)
   for (let steps = 1; steps <= 12; steps++) {
@@ -1443,6 +1597,16 @@ function * calculateStep1Moves(
   addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
 ): Generator<any, void, any> {
   const startCellID = horse.cellID!;
+  
+  // NEW RULE: Skip highlighting for horses in home path (handled by calculateNormalMoves)
+  const currentCellData = cells[horse.position]?.[startCellID];
+  const isHorseInHomePath = currentCellData && 
+    currentCellData.cellType === CellType.HOMEPATH && 
+    currentCellData.baseID === horse.baseID;
+  
+  if (isHorseInHomePath) {
+    return; // Home path highlighting is handled by calculateNormalMoves
+  }
   const isOnSpawnCell = horse.steps === 0;
   const shouldShowStep1 = isPair || showPreRollStep1 || isOnSpawnCell;
 
@@ -1526,6 +1690,17 @@ function * calculatePairMoves(
   }
 
   const startCellID = horse.cellID!;
+  
+  // NEW RULE: Skip highlighting for horses in home path (handled by calculateNormalMoves)
+  // In home path, can only move 1 step, which is already handled by calculateNormalMoves
+  const currentCellData = cells[horse.position]?.[startCellID];
+  const isHorseInHomePath = currentCellData && 
+    currentCellData.cellType === CellType.HOMEPATH && 
+    currentCellData.baseID === horse.baseID;
+  
+  if (isHorseInHomePath) {
+    return; // Home path highlighting is handled by calculateNormalMoves (only 1 step)
+  }
 
   // Only show pair value if it's different from step 1 (already handled above)
   if (singleDieValue === 1) {
