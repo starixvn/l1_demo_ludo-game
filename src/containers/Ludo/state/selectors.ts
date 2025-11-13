@@ -60,3 +60,8 @@ export const highlightedCellsByHorseSelector = createSelector(
   [ludoStateSelector],
   (state) => state.highlightedCellsByHorse,
 );
+
+export const hoveredHorseIDSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.hoveredHorseID,
+);

@@ -87,15 +87,18 @@ class PlayerBare extends React.PureComponent<IProps> {
         <div className={styles.RetiredHorses}>
           {
             // Filter and display only retired horses for this player
-            base.horseIDs
-              .filter((horseID) => this.props.horses[horseID].isRetired)
-              .map((horse, index) => (
-                <Horse
-                  baseColor={base.color} // Use player's color
-                  // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
-                  key={index}
-                />
-              ))
+            base.horseIDs && base.horseIDs.length > 0
+              ? base.horseIDs
+                  .filter((horseID) => this.props.horses[horseID] && this.props.horses[horseID].isRetired)
+                  .map((horseID, index) => (
+                    <Horse
+                      baseColor={base.color} // Use player's color
+                      horseID={horseID} // Pass horse ID
+                      // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
+                      key={index}
+                    />
+                  ))
+              : null
           }
         </div>
       </div>

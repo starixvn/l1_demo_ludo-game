@@ -22,6 +22,7 @@ import {
   currentTurnSelector,
   highlightedCellsSelector,
   highlightedCellsByHorseSelector,
+  hoveredHorseIDSelector,
   linksSelector,
 } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
@@ -66,6 +67,7 @@ interface IStateProps {
   highlightedCells: ReturnType<typeof highlightedCellsSelector>; // Cells to highlight
   highlightedCellsByHorse: ReturnType<typeof highlightedCellsByHorseSelector>; // Map of cellID to horses that can reach it
   currentTurnBaseColor?: BaseColors; // Color of the current player for highlighting
+  hoveredHorseID: ReturnType<typeof hoveredHorseIDSelector>; // ID of horse being hovered
   isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>; // Whether dice can be rolled
   isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether current roll is valid
 }
@@ -98,6 +100,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
       currentTurn: ReturnType<typeof currentTurnSelector>
     ) => bases[currentTurn]?.color
   ), // Get current player's base color for highlighting
+  hoveredHorseID: hoveredHorseIDSelector, // Get hovered horse ID
   isDieRollAllowed: isDieRollAllowedSelector, // Get whether dice can be rolled
   isDieRollValid: isDieRollValidSelector, // Get whether current roll is valid
 });
@@ -354,6 +357,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
                 }
                 isJumping={horses[horseID].isJumping || false} // Whether horse is jumping for animation
                 isFlyingToBase={horses[horseID].isFlyingToBase || false} // Whether horse is flying to base (when kicked)
+                isHovered={this.props.hoveredHorseID === horseID} // Whether this horse is being hovered
                 // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                 key={index}
               />

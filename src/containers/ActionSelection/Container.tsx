@@ -13,6 +13,8 @@ import {
   clearAvailableActions,
   IAvailableAction,
   spawnHorse,
+  setHoveredHorse,
+  clearHoveredHorse,
 } from "containers/Ludo/state/actions";
 import { moveHorse } from "containers/Ludo/state/actions";
 import {
@@ -44,6 +46,8 @@ interface IDispatchProps {
   spawnHorse: typeof spawnHorse;
   moveHorse: typeof moveHorse;
   clearAvailableActions: typeof clearAvailableActions;
+  setHoveredHorse: typeof setHoveredHorse;
+  clearHoveredHorse: typeof clearHoveredHorse;
 }
 
 /**
@@ -69,6 +73,8 @@ const mapDispatchToProps = {
   spawnHorse,
   moveHorse,
   clearAvailableActions,
+  setHoveredHorse,
+  clearHoveredHorse,
 };
 
 /**
@@ -186,6 +192,8 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
                       : styles.MoveButton
                   }`}
                   onClick={() => this.handleActionClick(action)}
+                  onMouseEnter={() => this.props.setHoveredHorse(action.horseID)}
+                  onMouseLeave={() => this.props.clearHoveredHorse()}
                 >
                   <div
                     className={styles.ActionLabel}

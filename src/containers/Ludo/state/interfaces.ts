@@ -157,6 +157,8 @@ export interface IState {
   highlightedCells: Set<string> | null;
   /** Map of cellID to array of horses that can reach it with their move types */
   highlightedCellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> | null;
+  /** ID of horse being hovered in action selection (for highlighting) */
+  hoveredHorseID: IHorse['horseID'] | null;
 }
 
 /**

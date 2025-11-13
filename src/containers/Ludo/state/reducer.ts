@@ -26,6 +26,7 @@ const initialState: IState = {
   availableActionsDieValue: null, // No die value initially
   highlightedCells: null, // No cells highlighted initially
   highlightedCellsByHorse: null, // No cell-to-horse mapping initially
+  hoveredHorseID: null, // No horse hovered initially
 };
 
 /**
@@ -59,6 +60,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         relationships, // Define relationships between board entities
         walkways,     // Initialize walkway segments
         currentTurn: currentTurn || state.currentTurn, // Reset current turn or keep existing
+        hoveredHorseID: null, // Reset hovered horse on game initialization
       };
     }
 
@@ -323,6 +325,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         ...state,
         availableActions: null, // Clear available actions
         availableActionsDieValue: null, // Clear die value
+        hoveredHorseID: null, // Clear hovered horse when actions are cleared
       };
     }
 
@@ -346,6 +349,27 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         ...state,
         highlightedCells: null, // Clear highlighted cells
         highlightedCellsByHorse: null, // Clear cell-to-horse mapping
+      };
+    }
+
+    /**
+     * Set which horse is being hovered (for action selection highlighting)
+     */
+    case ActionTypes.SET_HOVERED_HORSE: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        hoveredHorseID: horseID, // Store hovered horse ID
+      };
+    }
+
+    /**
+     * Clear horse hover highlighting
+     */
+    case ActionTypes.CLEAR_HOVERED_HORSE: {
+      return {
+        ...state,
+        hoveredHorseID: null, // Clear hovered horse ID
       };
     }
 

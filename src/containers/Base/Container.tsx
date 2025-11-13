@@ -12,7 +12,7 @@ import { connect } from "react-redux"; // Redux connection
 import { createStructuredSelector } from "reselect"; // Optimized state selection
 
 import { IBase } from "containers/Ludo/state/interfaces"; // Game data types
-import { basesSelector, horsesSelector } from "containers/Ludo/state/selectors"; // State selectors
+import { basesSelector, horsesSelector, hoveredHorseIDSelector } from "containers/Ludo/state/selectors"; // State selectors
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import { BASE_SIZE, INNER_BASE_SIZE } from "globalConstants"; // Size constants
 
@@ -40,6 +40,7 @@ interface IPublicProps {
 interface IStateProps {
   bases: ReturnType<typeof basesSelector>; // All player bases
   horses: ReturnType<typeof horsesSelector>; // All horses in the game
+  hoveredHorseID: ReturnType<typeof hoveredHorseIDSelector>; // ID of horse being hovered
 }
 
 /**
@@ -63,6 +64,7 @@ const mapDispatchToProps = {};
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   bases: basesSelector, // Get all player bases
   horses: horsesSelector, // Get all horses
+  hoveredHorseID: hoveredHorseIDSelector, // Get hovered horse ID
 });
 
 /**
@@ -139,6 +141,7 @@ class BaseBare extends React.PureComponent<IProps> {
                   isHorseHidden={
                     !this.props.enabled || horse.isSpawned || horse.isRetired
                   }
+                  isHovered={this.props.hoveredHorseID === horseID} // Whether this horse is being hovered
                   // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                 />
               );

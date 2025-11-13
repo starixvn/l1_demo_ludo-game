@@ -9,6 +9,7 @@ import {
   highlightedCellsSelector,
   highlightedCellsByHorseSelector,
   currentTurnSelector,
+  hoveredHorseIDSelector,
 } from "containers/Ludo/state/selectors";
 import { getStyleObject } from "containers/utils";
 import { calculateCellOdds } from "containers/utils/oddsCalculator";
@@ -34,6 +35,7 @@ interface IStateProps {
   highlightedCells: ReturnType<typeof highlightedCellsSelector>;
   highlightedCellsByHorse: ReturnType<typeof highlightedCellsByHorseSelector>;
   currentTurn: ReturnType<typeof currentTurnSelector>;
+  hoveredHorseID: ReturnType<typeof hoveredHorseIDSelector>;
   isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
   isDieRollValid: ReturnType<typeof isDieRollValidSelector>;
 }
@@ -58,6 +60,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   highlightedCells: highlightedCellsSelector,
   highlightedCellsByHorse: highlightedCellsByHorseSelector,
   currentTurn: currentTurnSelector,
+  hoveredHorseID: hoveredHorseIDSelector,
   isDieRollAllowed: isDieRollAllowedSelector,
   isDieRollValid: isDieRollValidSelector,
 });
@@ -163,6 +166,7 @@ class HomeBare extends React.PureComponent<IProps> {
                       horseSize={HORSE_SIZE}
                       isJumping={horses[horseID].isJumping || false} // Whether horse is jumping for animation
                       isFlyingToBase={horses[horseID].isFlyingToBase || false} // Whether horse is flying to base (when kicked)
+                      isHovered={this.props.hoveredHorseID === horseID} // Whether this horse is being hovered
                       // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                     />
                   ))

@@ -26,6 +26,8 @@ interface IProps {
   isJumping?: boolean;
   /** Whether the horse is currently flying to base (for kick animation) */
   isFlyingToBase?: boolean;
+  /** Whether the horse is being hovered (for action selection highlighting) */
+  isHovered?: boolean;
   /** Optional horse ID to extract and display the horse number */
   horseID?: string;
   /** Callback function when the horse is clicked (disabled - actions must be chosen from action panel) */
@@ -54,6 +56,7 @@ export class Horse extends React.PureComponent<IProps> {
       horseSize = HORSE_SIZE,
       isJumping = false,
       isFlyingToBase = false,
+      isHovered = false,
       horseID,
     } = this.props;
 
@@ -75,6 +78,8 @@ export class Horse extends React.PureComponent<IProps> {
       className = `${styles.Container} ${styles.FlyingToBase}`;
     } else if (isJumping) {
       className = `${styles.Container} ${styles.Jumping}`;
+    } else if (isHovered) {
+      className = `${styles.Container} ${styles.Hovered}`;
     }
 
     // Extract horse number from ID

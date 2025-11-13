@@ -24,6 +24,8 @@ interface IHorsePlaceholderProps {
   baseColor: BaseColors;
   /** Whether to hide the horse inside the placeholder */
   isHorseHidden: boolean;
+  /** Whether the horse is being hovered (for action selection highlighting) */
+  isHovered?: boolean;
   /** Optional horse ID to pass to the Horse component */
   horseID?: string;
   /** Callback function when the horse/placeholder is clicked (disabled - actions must be chosen from action panel) */
@@ -36,7 +38,7 @@ interface IHorsePlaceholderProps {
  */
 export class HorsePlaceholder extends React.PureComponent<IHorsePlaceholderProps> {
   render() {
-    const { baseColor, isHorseHidden, horseID } = this.props;
+    const { baseColor, isHorseHidden, isHovered = false, horseID } = this.props;
 
     return (
       <div
@@ -51,6 +53,7 @@ export class HorsePlaceholder extends React.PureComponent<IHorsePlaceholderProps
             <Horse
               baseColor={baseColor} // Pass color to horse
               horseID={horseID} // Pass horse ID to extract and display number
+              isHovered={isHovered} // Whether this horse is being hovered
               // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
             />
           )}

@@ -126,3 +126,11 @@
     filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.8));
   }
 }
+
+/* Hovered state - highlights horse when action is hovered */
+.Hovered {
+  filter: drop-shadow(0 0 8px rgba(255, 255, 0, 0.8)) drop-shadow(0 0 12px rgba(255, 255, 0, 0.6));
+  transform: scale(1.2);
+  z-index: 15; /* Above normal horses but below jumping/flying */
+  transition: all 0.2s ease-in-out;
+}

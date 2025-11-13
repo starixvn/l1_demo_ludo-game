@@ -50,6 +50,10 @@ export enum ActionTypes {
   // Cell Highlighting Actions
   SET_HIGHLIGHTED_CELLS = 'ludo/SET_HIGHLIGHTED_CELLS',         // Set cells to highlight as reachable
   CLEAR_HIGHLIGHTED_CELLS = 'ludo/CLEAR_HIGHLIGHTED_CELLS',     // Clear cell highlighting
+  
+  // Horse Hover Highlighting Actions
+  SET_HOVERED_HORSE = 'ludo/SET_HOVERED_HORSE',                 // Set which horse is being hovered (for action selection)
+  CLEAR_HOVERED_HORSE = 'ludo/CLEAR_HOVERED_HORSE',             // Clear horse hover highlighting
 
   // Horse Animation Actions
   START_HORSE_JUMP = 'ludo/START_HORSE_JUMP',                   // Start horse jumping animation
@@ -310,6 +314,24 @@ export const clearHighlightedCells = (): IReduxAction<ActionTypes.CLEAR_HIGHLIGH
 });
 
 /**
+ * Sets which horse is being hovered (for action selection highlighting)
+ * @param horseID - ID of the horse being hovered
+ */
+export const setHoveredHorse = (
+  horseID: IHorse['horseID']
+): IReduxAction<ActionTypes.SET_HOVERED_HORSE, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.SET_HOVERED_HORSE,
+});
+
+/**
+ * Clears horse hover highlighting
+ */
+export const clearHoveredHorse = (): IReduxAction<ActionTypes.CLEAR_HOVERED_HORSE, void> => ({
+  type: ActionTypes.CLEAR_HOVERED_HORSE,
+});
+
+/**
  * Start horse jumping animation
  * @param horseID - ID of the horse to animate
  */
@@ -371,6 +393,8 @@ export type Actions =
   | ReturnType<typeof clearAvailableActions>
   | ReturnType<typeof setHighlightedCells>
   | ReturnType<typeof clearHighlightedCells>
+  | ReturnType<typeof setHoveredHorse>
+  | ReturnType<typeof clearHoveredHorse>
   | ReturnType<typeof startHorseJump>
   | ReturnType<typeof stopHorseJump>
   | ReturnType<typeof startHorseFlying>

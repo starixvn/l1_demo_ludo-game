@@ -102,6 +102,7 @@ function * getInitialGameDataSaga() {
     availableActions: null,             // No action selection initially
     availableActionsDieValue: null,     // No die value for actions initially
     highlightedCells: null,             // No cells highlighted initially
+    hoveredHorseID: null,               // No horse hovered initially
     highlightedCellsByHorse: null,       // No cell-to-horse mapping initially
     currentTurn: DEFAULT_STARTING_BASE, // Start with configured default base
     links: data.links,                  // Movement connectivity between cells
