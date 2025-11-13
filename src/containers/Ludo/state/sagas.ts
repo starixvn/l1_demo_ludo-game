@@ -158,6 +158,10 @@ function * spawnHorseSaga(action: ReturnType<typeof spawnHorse>) {
   // Execute the spawn - move horse from base to spawn cell
   yield put(spawnHorseSuccess(spawnCellForHorse.cellID, horseIDToSpawn, baseID, walkway.position));
 
+  // After spawning, check if there are opponent horses on the spawn cell and kick them
+  // This allows spawning to kick opponent horses that are blocking the spawn cell
+  yield call(performDisqualificationCheck, horseIDToSpawn, walkway.position, spawnCellForHorse.cellID);
+
   // Note: Roll invalidation is handled in spawnHorseSuccessSaga (Dice sagas)
 }
 
@@ -1123,6 +1127,35 @@ function * calculateStep1Moves(
   }
 
   const step1Value = 1;
+
+  // For horses on spawn cell (steps === 0), check if there's an opponent horse on the current spawn cell
+  // If so, the horse should be able to kick that opponent when moving
+  if (isOnSpawnCell) {
+    const cellData = cells[horse.position]?.[startCellID];
+    if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+      // Check if there's an opponent horse on the same spawn cell
+      for (const otherHorseID of cellData.horseIDs) {
+        if (otherHorseID !== horse.horseID) {
+          const otherHorse = horses[otherHorseID];
+          if (otherHorse && otherHorse.baseID !== horse.baseID) {
+            // Found an opponent horse on the same spawn cell - can kick it
+            // Add the spawn cell itself as a kickable cell (horse can stay and kick, or move 1 step and kick)
+            addReachableCell(startCellID, horse.horseID, 'kick');
+            // Also check for step 1 moves that can kick opponents
+            const blockingInfoForStep1 = yield call(findBlockingHorse, horse.horseID, step1Value as Rolls);
+            if (blockingInfoForStep1 && step1Value === (blockingInfoForStep1.stepsBeforeBlocking + 1) && !blockingInfoForStep1.isSameColor) {
+              // Can also kick opponent at step 1
+              addReachableCell(blockingInfoForStep1.blockingCellID, horse.horseID, 'kick');
+            } else {
+              // Show normal step 1 moves
+              yield call(highlightCellsWithSteps, horse, startCellID, step1Value, blockingInfoForStep1, reachableCells, cells, links, horses, cellsByHorse, addReachableCell);
+            }
+            return; // Already handled spawn cell opponent
+          }
+        }
+      }
+    }
+  }
 
   // For horses on spawn cell (steps === 0), this should always be true for step 1
   if (horse.steps + step1Value <= WINNING_MOVES) {
