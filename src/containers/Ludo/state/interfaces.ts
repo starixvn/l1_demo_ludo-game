@@ -29,6 +29,8 @@ export interface IHorse {
   position: WalkwayPosition;
   /** Whether this horse is currently jumping (for animation) */
   isJumping?: boolean;
+  /** Whether this horse is currently flying to base (for kick animation) */
+  isFlyingToBase?: boolean;
 }
 
 /**

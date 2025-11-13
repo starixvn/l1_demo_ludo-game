@@ -161,6 +161,8 @@ class HomeBare extends React.PureComponent<IProps> {
                       horseID={horseID} // Pass horse ID to display number
                       // Always use normal size - never scale down
                       horseSize={HORSE_SIZE}
+                      isJumping={horses[horseID].isJumping || false} // Whether horse is jumping for animation
+                      isFlyingToBase={horses[horseID].isFlyingToBase || false} // Whether horse is flying to base (when kicked)
                       // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                     />
                   ))

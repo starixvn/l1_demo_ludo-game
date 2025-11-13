@@ -107,7 +107,9 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
         action.horseID,
         horse.position,
         horse.cellID,
-        action.blockingHorseID
+        action.blockingHorseID,
+        undefined,
+        action.stepsToUse // Pass stepsToUse if provided (for one-die kicks)
       );
     } else if (action.type === "move_before") {
       // Move before blocking: move only specified steps

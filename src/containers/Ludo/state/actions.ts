@@ -28,6 +28,7 @@ export enum ActionTypes {
   LIFT_HORSE = 'ludo/LIFT_HORSE',                                 // Pick up horse from current position (UI interaction)
   PLACE_HORSE = 'ludo/PLACE_HORSE',                               // Place horse at target position (UI interaction)
   DISQUALIFY_HORSE = 'ludo/DISQUALIFY_HORSE',                     // Send horse back to base (when hit by opponent)
+  COMPLETE_DISQUALIFY_HORSE = 'ludo/COMPLETE_DISQUALIFY_HORSE',   // Complete disqualification after animation
   HOME_HORSE = 'ludo/HOME_HORSE',                                 // Move horse to home position (game completion)
 
   // Turn Management Actions
@@ -53,6 +54,8 @@ export enum ActionTypes {
   // Horse Animation Actions
   START_HORSE_JUMP = 'ludo/START_HORSE_JUMP',                   // Start horse jumping animation
   STOP_HORSE_JUMP = 'ludo/STOP_HORSE_JUMP',                     // Stop horse jumping animation
+  START_HORSE_FLYING = 'ludo/START_HORSE_FLYING',               // Start horse flying to base animation (when kicked)
+  STOP_HORSE_FLYING = 'ludo/STOP_HORSE_FLYING',                 // Stop horse flying animation
 }
 
 /**
@@ -209,6 +212,17 @@ export const disqualifyHorse = (horseID: IHorse['horseID'], walkwayPosition: Wal
 });
 
 /**
+ * Complete horse disqualification after animation (internal use)
+ * @param horseID - ID of the horse to disqualify
+ * @param walkwayPosition - Current position of the horse
+ * @param cellID - ID of the cell where horse is currently located
+ */
+export const completeDisqualifyHorse = (horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']): IReduxAction<ActionTypes.COMPLETE_DISQUALIFY_HORSE, { horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID'] }> => ({
+  data: { horseID, walkwayPosition, cellID },
+  type: ActionTypes.COMPLETE_DISQUALIFY_HORSE,
+});
+
+/**
  * Move a horse to its home position (completing the game for that horse)
  * @param horseID - ID of the horse that reached home
  */
@@ -314,6 +328,24 @@ export const stopHorseJump = (horseID: IHorse['horseID']): IReduxAction<ActionTy
 });
 
 /**
+ * Start horse flying to base animation (when kicked by opponent)
+ * @param horseID - ID of the horse to animate
+ */
+export const startHorseFlying = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.START_HORSE_FLYING, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.START_HORSE_FLYING,
+});
+
+/**
+ * Stop horse flying animation
+ * @param horseID - ID of the horse to stop animating
+ */
+export const stopHorseFlying = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.STOP_HORSE_FLYING, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.STOP_HORSE_FLYING,
+});
+
+/**
  * Union type of all possible Ludo game actions
  * This type is used by the reducer to ensure type safety when handling actions
  * Each action type in this union corresponds to one of the action creators above
@@ -330,6 +362,7 @@ export type Actions =
   | ReturnType<typeof markCurrentBase>
   | ReturnType<typeof moveHorseSuccess>
   | ReturnType<typeof disqualifyHorse>
+  | ReturnType<typeof completeDisqualifyHorse>
   | ReturnType<typeof homeHorse>
   | ReturnType<typeof setPlayers>
   | ReturnType<typeof enableBase>
@@ -340,4 +373,6 @@ export type Actions =
   | ReturnType<typeof clearHighlightedCells>
   | ReturnType<typeof startHorseJump>
   | ReturnType<typeof stopHorseJump>
+  | ReturnType<typeof startHorseFlying>
+  | ReturnType<typeof stopHorseFlying>
   ;

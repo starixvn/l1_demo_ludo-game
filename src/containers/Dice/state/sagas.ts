@@ -510,8 +510,16 @@ function * buildAvailableActions(
   
   // Loop through all movable horses - for each horse, create actions
   // When double dice are rolled, each horse will have 2 actions: one for 1 die, one for 2 dice
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[buildAvailableActions] Processing ${movableHorses.length} movable horses, isPair: ${isPair}, dieValue: ${dieValue}, roll1: ${roll1}, roll2: ${roll2}`);
+  }
+  
   for (const horseID of movableHorses) {
     const horse = horses[horseID];
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[buildAvailableActions] Processing horse ${horseID}, steps: ${horse.steps}, cellID: ${horse.cellID}`);
+    }
     
     // Special case: Check if horse is on spawn cell with opponent horse
     // If so, create kick action for the opponent on the spawn cell
@@ -570,6 +578,10 @@ function * buildAvailableActions(
     // Check for blocking horses (same color or opponent)
     const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
       yield call(findBlockingHorse, horseID, dieValue);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[buildAvailableActions] Blocking check for ${horseID} with dieValue ${dieValue}:`, blockingInfo);
+    }
 
     if (isPair) {
       // Double dice rolled - show 2 actions: one for 1 die, one for 2 dice
@@ -578,6 +590,10 @@ function * buildAvailableActions(
       
       // Action 1: Move using 1 die
       // Check if the move is valid (won't overshoot home)
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[buildAvailableActions] Checking 1-die action for ${horseID}: horse.steps (${horse.steps}) + singleDieValue (${singleDieValue}) <= WINNING_MOVES (${WINNING_MOVES}) = ${horse.steps + singleDieValue <= WINNING_MOVES}`);
+      }
+      
       if (horse.steps + singleDieValue <= WINNING_MOVES) {
           // Check for blocking to determine if action should be shown
           const blockingInfoOneDie: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
@@ -586,6 +602,19 @@ function * buildAvailableActions(
           // Don't show action if it would overshoot an opponent blocker (can't move over opponent)
           if (blockingInfoOneDie) {
             const blockingStep = blockingInfoOneDie.stepsBeforeBlocking + 1;
+            
+            // Debug logging
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[buildAvailableActions] 1-die blocking check for ${horseID}:`, {
+                singleDieValue,
+                blockingStep,
+                stepsBeforeBlocking: blockingInfoOneDie.stepsBeforeBlocking,
+                isSameColor: blockingInfoOneDie.isSameColor,
+                blockingHorseID: blockingInfoOneDie.blockingHorseID,
+                canKick: singleDieValue === blockingStep && !blockingInfoOneDie.isSameColor,
+              });
+            }
+            
             if (singleDieValue > blockingStep && !blockingInfoOneDie.isSameColor) {
               // Would overshoot opponent blocker - don't show this action
               if (process.env.NODE_ENV === 'development') {
@@ -598,31 +627,76 @@ function * buildAvailableActions(
               let descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die`;
               
               if (singleDieValue === blockingStep && !blockingInfoOneDie.isSameColor) {
-                // Can kick opponent
+                // Can kick opponent - create kick action
                 labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Kick Blocking Horse)`;
                 descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} and kick opponent horse using one die`;
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[buildAvailableActions] Creating 1-die kick action for ${horseID}:`, {
+                    blockingHorseID: blockingInfoOneDie.blockingHorseID,
+                    stepsToUse: singleDieValue,
+                  });
+                }
+                
+                actions.push({
+                  type: 'kick',
+                  horseID,
+                  label: labelOneDie,
+                  description: descriptionOneDie,
+                  blockingHorseID: blockingInfoOneDie.blockingHorseID,
+                  stepsToUse: singleDieValue,
+                });
               } else if (singleDieValue < blockingStep) {
                 // Can move before blocker
                 descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die (avoiding blocker)`;
+                
+                if (resultOneDie === 'HOME') {
+                  labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Can Reach Home!)`;
+                  descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die - This horse can reach HOME!`;
+                } else if (resultOneDie === 'HOMEPATH') {
+                  labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Can Enter Home Path)`;
+                  descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die - This horse can enter the home path`;
+                }
+                
+                actions.push({
+                  type: 'move',
+                  horseID,
+                  label: labelOneDie,
+                  description: descriptionOneDie,
+                  stepsToUse: singleDieValue,
+                });
+              } else {
+                // singleDieValue > blockingStep or same color - skip this action
+                // Note: If singleDieValue === blockingStep && isSameColor, we skip it
+                // The move logic will handle blocking same-color horses
               }
-              // Note: If singleDieValue === blockingStep && isSameColor, we still show the action
-              // The move logic will handle blocking same-color horses
               
-              if (resultOneDie === 'HOME') {
-                labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Can Reach Home!)`;
-                descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die - This horse can reach HOME!`;
-              } else if (resultOneDie === 'HOMEPATH') {
-                labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Can Enter Home Path)`;
-                descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die - This horse can enter the home path`;
+              // Only add HOME/HOMEPATH actions if we haven't already added a kick action
+              if (!(singleDieValue === blockingStep && !blockingInfoOneDie.isSameColor)) {
+                if (resultOneDie === 'HOME') {
+                  labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Can Reach Home!)`;
+                  descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die - This horse can reach HOME!`;
+                  
+                  actions.push({
+                    type: 'move',
+                    horseID,
+                    label: labelOneDie,
+                    description: descriptionOneDie,
+                    stepsToUse: singleDieValue,
+                  });
+                } else if (resultOneDie === 'HOMEPATH') {
+                  labelOneDie = `Move Horse ${horseID.split('_')[3]} (${singleDieValue} step${singleDieValue > 1 ? 's' : ''} - 1 die, Can Enter Home Path)`;
+                  descriptionOneDie = `Move ${singleDieValue} space${singleDieValue > 1 ? 's' : ''} using one die - This horse can enter the home path`;
+                  
+                  actions.push({
+                    type: 'move',
+                    horseID,
+                    label: labelOneDie,
+                    description: descriptionOneDie,
+                    stepsToUse: singleDieValue,
+                  });
+                }
               }
-              
-              actions.push({
-                type: 'move',
-                horseID,
-                label: labelOneDie,
-                description: descriptionOneDie,
-                stepsToUse: singleDieValue,
-              });
               
               // Debug log for development
               if (process.env.NODE_ENV === 'development') {
@@ -674,6 +748,19 @@ function * buildAvailableActions(
           // Don't show action if it would overshoot an opponent blocker (can't move over opponent)
           if (blockingInfoTwoDice) {
             const blockingStep = blockingInfoTwoDice.stepsBeforeBlocking + 1;
+            
+            // Debug logging
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[buildAvailableActions] 2-dice blocking check for ${horseID}:`, {
+                dieValue,
+                blockingStep,
+                stepsBeforeBlocking: blockingInfoTwoDice.stepsBeforeBlocking,
+                isSameColor: blockingInfoTwoDice.isSameColor,
+                blockingHorseID: blockingInfoTwoDice.blockingHorseID,
+                canKick: dieValue === blockingStep && !blockingInfoTwoDice.isSameColor,
+              });
+            }
+            
             if (dieValue > blockingStep && !blockingInfoTwoDice.isSameColor) {
               // Would overshoot opponent blocker - don't show this action
               if (process.env.NODE_ENV === 'development') {
@@ -686,30 +773,71 @@ function * buildAvailableActions(
               let description = `Move ${dieValue} spaces using both dice`;
 
               if (dieValue === blockingStep && !blockingInfoTwoDice.isSameColor) {
-                // Can kick opponent
+                // Can kick opponent - create kick action
                 label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Kick Blocking Horse)`;
                 description = `Move ${dieValue} spaces and kick opponent horse using both dice`;
+                
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[buildAvailableActions] Creating 2-dice kick action for ${horseID}:`, {
+                    blockingHorseID: blockingInfoTwoDice.blockingHorseID,
+                  });
+                }
+                
+                actions.push({
+                  type: 'kick',
+                  horseID,
+                  label,
+                  description,
+                  blockingHorseID: blockingInfoTwoDice.blockingHorseID,
+                });
               } else if (dieValue < blockingStep) {
                 // Can move before blocker
                 description = `Move ${dieValue} spaces using both dice (avoiding blocker)`;
+                
+                if (result === 'HOME') {
+                  label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Can Reach Home!)`;
+                  description = `Move ${dieValue} spaces using both dice - This horse can reach HOME!`;
+                } else if (result === 'HOMEPATH') {
+                  label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Can Enter Home Path)`;
+                  description = `Move ${dieValue} spaces using both dice - This horse can enter the home path`;
+                }
+                
+                actions.push({
+                  type: 'move',
+                  horseID,
+                  label,
+                  description,
+                });
+              } else {
+                // dieValue > blockingStep or same color - skip this action
+                // Note: If dieValue === blockingStep && isSameColor, we skip it
+                // The move logic will handle blocking same-color horses
               }
-              // Note: If dieValue === blockingStep && isSameColor, we still show the action
-              // The move logic will handle blocking same-color horses
-
-              if (result === 'HOME') {
-                label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Can Reach Home!)`;
-                description = `Move ${dieValue} spaces using both dice - This horse can reach HOME!`;
-              } else if (result === 'HOMEPATH') {
-                label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Can Enter Home Path)`;
-                description = `Move ${dieValue} spaces using both dice - This horse can enter the home path`;
+              
+              // Only add HOME/HOMEPATH actions if we haven't already added a kick action
+              if (!(dieValue === blockingStep && !blockingInfoTwoDice.isSameColor)) {
+                if (result === 'HOME') {
+                  label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Can Reach Home!)`;
+                  description = `Move ${dieValue} spaces using both dice - This horse can reach HOME!`;
+                  
+                  actions.push({
+                    type: 'move',
+                    horseID,
+                    label,
+                    description,
+                  });
+                } else if (result === 'HOMEPATH') {
+                  label = `Move Horse ${horseID.split('_')[3]} (${dieValue} steps - 2 dice, Can Enter Home Path)`;
+                  description = `Move ${dieValue} spaces using both dice - This horse can enter the home path`;
+                  
+                  actions.push({
+                    type: 'move',
+                    horseID,
+                    label,
+                    description,
+                  });
+                }
               }
-
-              actions.push({
-                type: 'move',
-                horseID,
-                label,
-                description,
-              });
 
               // Debug log for development
               if (process.env.NODE_ENV === 'development') {
@@ -750,9 +878,55 @@ function * buildAvailableActions(
       }
     } else {
       // Not a pair - normal move action
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[buildAvailableActions] Not a pair for ${horseID}, blockingInfo:`, blockingInfo);
+      }
+      
       if (blockingInfo) {
-        // Blocking horse found - no actions available (blocked by sum of both dice)
-        // Don't add any action
+        const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
+        
+        // Check if we can kick the blocking horse
+        if (dieValue === blockingStep && !blockingInfo.isSameColor) {
+          // Can kick opponent - create kick action
+          const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
+          let label = `Move Horse ${horseID.split('_')[3]} (Kick Blocking Horse)`;
+          let description = `Move ${dieValue} spaces and kick opponent horse`;
+
+          if (result === 'HOME') {
+            label = `Move Horse ${horseID.split('_')[3]} (Kick Blocking Horse, Can Reach Home!)`;
+            description = `Move ${dieValue} spaces, kick opponent horse, and reach HOME!`;
+          } else if (result === 'HOMEPATH') {
+            label = `Move Horse ${horseID.split('_')[3]} (Kick Blocking Horse, Can Enter Home Path)`;
+            description = `Move ${dieValue} spaces, kick opponent horse, and enter the home path`;
+          }
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[buildAvailableActions] Creating non-pair kick action for ${horseID}:`, {
+              blockingHorseID: blockingInfo.blockingHorseID,
+              dieValue,
+              blockingStep,
+            });
+          }
+          
+          actions.push({
+            type: 'kick',
+            horseID,
+            label,
+            description,
+            blockingHorseID: blockingInfo.blockingHorseID,
+          });
+        } else if (dieValue > blockingStep && !blockingInfo.isSameColor) {
+          // Would overshoot opponent blocker - don't show this action
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[buildAvailableActions] Skipped non-pair action for ${horseID}: would overshoot opponent blocker (${dieValue} > ${blockingStep})`);
+          }
+        } else {
+          // Blocking horse found but can't kick - no actions available (blocked by sum of both dice)
+          // Don't add any action
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[buildAvailableActions] Skipped non-pair action for ${horseID}: blocked (same color or can't kick, dieValue: ${dieValue}, blockingStep: ${blockingStep})`);
+          }
+        }
       } else {
         // No blocking - normal move action
         const result: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, dieValue);
@@ -778,9 +952,17 @@ function * buildAvailableActions(
   }
 
   // Debug log: Show all actions created
-  if (process.env.NODE_ENV === 'development' && isPair) {
-    console.log(`[buildAvailableActions] Total actions created for pair: ${actions.length}`, actions);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[buildAvailableActions] Total actions created: ${actions.length}`, actions.map(a => ({
+      type: a.type,
+      horseID: a.horseID,
+      label: a.label,
+      blockingHorseID: a.blockingHorseID,
+      stepsToUse: a.stepsToUse,
+    })));
+    const kickActions = actions.filter(a => a.type === 'kick');
     const moveActions = actions.filter(a => a.type === 'move');
+    console.log(`[buildAvailableActions] Kick actions: ${kickActions.length}`, kickActions);
     console.log(`[buildAvailableActions] Move actions: ${moveActions.length}`, moveActions.map(a => ({
       horseID: a.horseID,
       label: a.label,

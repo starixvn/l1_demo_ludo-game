@@ -180,9 +180,29 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
 
     /**
      * Send a horse back to its base (when hit by an opponent's horse)
-     * Resets the horse's progress and removes it from the board
+     * Starts the flying animation - actual removal happens in COMPLETE_DISQUALIFY_HORSE
      */
     case ActionTypes.DISQUALIFY_HORSE: {
+      const { horseID } = action.data!;
+      // Just start the flying animation - don't remove the horse yet
+      // The saga will handle the animation and then dispatch COMPLETE_DISQUALIFY_HORSE
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isFlyingToBase: true, // Start flying animation
+          },
+        },
+      };
+    }
+
+    /**
+     * Complete horse disqualification after animation
+     * Actually removes the horse from the cell and resets its state
+     */
+    case ActionTypes.COMPLETE_DISQUALIFY_HORSE: {
       const { horseID, walkwayPosition, cellID } = action.data!;
 
       const horseIDsInCell = [...state.cells[walkwayPosition][cellID].horseIDs];
@@ -206,6 +226,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
             ...state.horses[horseID],
             isSpawned: false, // Horse is no longer on board
             steps: 0,         // Reset progress
+            isFlyingToBase: false, // Stop flying animation
           },
         },
       };
@@ -359,6 +380,42 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
           [horseID]: {
             ...state.horses[horseID],
             isJumping: false,
+          },
+        },
+      };
+    }
+
+    /**
+     * Start horse flying to base animation (when kicked)
+     * Sets the isFlyingToBase flag on the specified horse
+     */
+    case ActionTypes.START_HORSE_FLYING: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isFlyingToBase: true,
+          },
+        },
+      };
+    }
+
+    /**
+     * Stop horse flying animation
+     * Clears the isFlyingToBase flag on the specified horse
+     */
+    case ActionTypes.STOP_HORSE_FLYING: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isFlyingToBase: false,
           },
         },
       };

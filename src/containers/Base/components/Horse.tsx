@@ -24,6 +24,8 @@ interface IProps {
   horseSize?: number;
   /** Whether the horse is currently jumping (for animation) */
   isJumping?: boolean;
+  /** Whether the horse is currently flying to base (for kick animation) */
+  isFlyingToBase?: boolean;
   /** Optional horse ID to extract and display the horse number */
   horseID?: string;
   /** Callback function when the horse is clicked (disabled - actions must be chosen from action panel) */
@@ -48,7 +50,12 @@ export class Horse extends React.PureComponent<IProps> {
 
   render() {
     // Use default horse size if not specified
-    const { horseSize = HORSE_SIZE, isJumping = false, horseID } = this.props;
+    const {
+      horseSize = HORSE_SIZE,
+      isJumping = false,
+      isFlyingToBase = false,
+      horseID,
+    } = this.props;
 
     const style = getStyleObject(
       horseSize * 0.8,
@@ -62,10 +69,13 @@ export class Horse extends React.PureComponent<IProps> {
       color: style.backgroundColor, // Use the background color as text color for the Unicode character
     };
 
-    // Combine base class with jumping animation class if needed
-    const className = isJumping
-      ? `${styles.Container} ${styles.Jumping}`
-      : styles.Container;
+    // Combine base class with animation classes if needed
+    let className = styles.Container;
+    if (isFlyingToBase) {
+      className = `${styles.Container} ${styles.FlyingToBase}`;
+    } else if (isJumping) {
+      className = `${styles.Container} ${styles.Jumping}`;
+    }
 
     // Extract horse number from ID
     const horseNumber = this.extractHorseNumber(horseID);

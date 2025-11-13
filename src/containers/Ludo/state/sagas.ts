@@ -26,6 +26,7 @@ import { WalkwayPosition } from 'state/interfaces';
 
 import {
   clearHighlightedCells,
+  completeDisqualifyHorse,
   disqualifyHorse,
   enableBase,
   getInitialGameDataSuccess,
@@ -91,7 +92,7 @@ function * getInitialGameDataSaga() {
   const bases = mapByProperty(basesArray, 'ID');
 
   // Process horses - assign colors based on their base ownership and initialize animation state
-  const horses = data.horses.map((horse) => ({ ...horse, color: bases[horse.baseID].color, isJumping: false }));
+  const horses = data.horses.map((horse) => ({ ...horse, color: bases[horse.baseID].color, isJumping: false, isFlyingToBase: false }));
 
   // Create complete game state object
   const gameData: IState = {
@@ -446,44 +447,56 @@ export function * findBlockingHorse(
  */
 function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, void, any> {
   let { cellID, walkwayPosition } = { ...action.data! };
-  const { horseID, stepsToUse } = action.data!;
+  const { horseID, stepsToUse, blockingHorseID: actionBlockingHorseID } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
   
   // Determine how many steps to move
   // If stepsToUse is provided (when using one die from a pair), use that instead of the sum
   const stepsToMove = stepsToUse !== undefined ? stepsToUse : currentDieRoll;
   
-  // Check for blocking horses BEFORE allowing movement
-  // Use the actual steps we're moving, not the full die sum
-  const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
-    yield call(findBlockingHorse, horseID, stepsToMove as Rolls);
-  
   // Track if we can kick the blocking horse (if any)
   let canKickBlockingHorse = false;
   let blockingCellIDToKick: string | null = null;
   
-  // If blocking horse is detected, check if we can kick it
-  // Blocking applies to both same-color and different-color horses
-  // But we can kick opponent horses if stepsToMove exactly equals the blocking step
-  if (blockingInfo) {
-    const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
-    
-    // Check if we can kick this blocking horse
-    // Can kick if: stepsToMove === blockingStep AND blocking horse is opponent (not same color)
-    canKickBlockingHorse = stepsToMove === blockingStep && !blockingInfo.isSameColor;
-    
-    if (!canKickBlockingHorse) {
-      // Cannot kick - block the movement
-      console.warn(`Horse ${horseID} cannot move - blocked by ${blockingInfo.blockingHorseID} (same color: ${blockingInfo.isSameColor}, steps: ${stepsToMove}, blockingStep: ${blockingStep})`);
-      yield put(moveHorseFailure());
-      // Wait for player to see the dice result before passing turn
-      yield delay(NO_MOVE_DELAY);
-      yield put(nextTurn());
-      yield put(enableDie());
-      return;
+  // If blockingHorseID is provided in the action (from a "kick" action), trust it and proceed
+  // Otherwise, check for blocking horses
+  if (actionBlockingHorseID) {
+    // This is a kick action - trust that it's valid and proceed
+    // Find the blocking horse's cell to kick it later
+    const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+    const blockingHorse = horses[actionBlockingHorseID];
+    if (blockingHorse) {
+      canKickBlockingHorse = true;
+      blockingCellIDToKick = blockingHorse.cellID;
     }
-    // If canKickBlockingHorse is true, proceed with movement (will kick the blocking horse)
-    blockingCellIDToKick = blockingInfo.blockingCellID;
+  } else {
+    // No blockingHorseID provided - check for blocking horses normally
+    const blockingInfo: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+      yield call(findBlockingHorse, horseID, stepsToMove as Rolls);
+    
+    // If blocking horse is detected, check if we can kick it
+    // Blocking applies to both same-color and different-color horses
+    // But we can kick opponent horses if stepsToMove exactly equals the blocking step
+    if (blockingInfo) {
+      const blockingStep = blockingInfo.stepsBeforeBlocking + 1;
+      
+      // Check if we can kick this blocking horse
+      // Can kick if: stepsToMove === blockingStep AND blocking horse is opponent (not same color)
+      canKickBlockingHorse = stepsToMove === blockingStep && !blockingInfo.isSameColor;
+      
+      if (!canKickBlockingHorse) {
+        // Cannot kick - block the movement
+        console.warn(`Horse ${horseID} cannot move - blocked by ${blockingInfo.blockingHorseID} (same color: ${blockingInfo.isSameColor}, steps: ${stepsToMove}, blockingStep: ${blockingStep})`);
+        yield put(moveHorseFailure());
+        // Wait for player to see the dice result before passing turn
+        yield delay(NO_MOVE_DELAY);
+        yield put(nextTurn());
+        yield put(enableDie());
+        return;
+      }
+      // If canKickBlockingHorse is true, proceed with movement (will kick the blocking horse)
+      blockingCellIDToKick = blockingInfo.blockingCellID;
+    }
   }
 
   // Validate that this move is possible
@@ -1754,10 +1767,17 @@ function * watchForDisqualifyHorse() {
  * @param action - Contains horseID that was disqualified
  */
 function * disqualifyHorseSaga(action: ReturnType<typeof disqualifyHorse>) {
-  const { horseID } = action.data!;
+  const { horseID, walkwayPosition, cellID } = action.data!;
   const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
   const bases: ReturnType<typeof basesSelector> = yield select(basesSelector);
   const horse = horses[horseID];
+
+  // The reducer has already set isFlyingToBase: true
+  // Wait for flying animation to complete (800ms for smooth animation)
+  yield delay(800);
+
+  // Now actually disqualify the horse (remove from cell and reset state)
+  yield put(completeDisqualifyHorse(horseID, walkwayPosition, cellID));
 
   // Log the disqualification with highlight for importance
   yield put(addLogEntry({

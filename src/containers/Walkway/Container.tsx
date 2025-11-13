@@ -353,6 +353,7 @@ class WalkwayBare extends React.PureComponent<IProps> {
                     : HORSE_SIZE
                 }
                 isJumping={horses[horseID].isJumping || false} // Whether horse is jumping for animation
+                isFlyingToBase={horses[horseID].isFlyingToBase || false} // Whether horse is flying to base (when kicked)
                 // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                 key={index}
               />
