@@ -6,9 +6,17 @@ import {
   cellsSelector,
   horsesSelector,
   linksSelector,
+  highlightedCellsSelector,
+  highlightedCellsByHorseSelector,
+  currentTurnSelector,
 } from "containers/Ludo/state/selectors";
 import { getStyleObject } from "containers/utils";
+import { calculateCellOdds } from "containers/utils/oddsCalculator";
 import { HORSE_SIZE } from "globalConstants";
+import {
+  isDieRollAllowedSelector,
+  isDieRollValidSelector,
+} from "containers/Dice/state/selectors";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
 
@@ -23,6 +31,11 @@ interface IStateProps {
   cells: ReturnType<typeof cellsSelector>;
   horses: ReturnType<typeof horsesSelector>;
   links: ReturnType<typeof linksSelector>;
+  highlightedCells: ReturnType<typeof highlightedCellsSelector>;
+  highlightedCellsByHorse: ReturnType<typeof highlightedCellsByHorseSelector>;
+  currentTurn: ReturnType<typeof currentTurnSelector>;
+  isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
+  isDieRollValid: ReturnType<typeof isDieRollValidSelector>;
 }
 
 interface IPublicProps {
@@ -42,6 +55,11 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   cells: cellsSelector,
   horses: horsesSelector,
   links: linksSelector,
+  highlightedCells: highlightedCellsSelector,
+  highlightedCellsByHorse: highlightedCellsByHorseSelector,
+  currentTurn: currentTurnSelector,
+  isDieRollAllowed: isDieRollAllowedSelector,
+  isDieRollValid: isDieRollValidSelector,
 });
 
 const mapDispatchToProps = {};
@@ -54,7 +72,15 @@ class HomeBare extends React.PureComponent<IProps> {
   // private onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
 
   render() {
-    const { cells, links, bases, horses } = this.props;
+    const { cells, links, bases, horses, highlightedCells, highlightedCellsByHorse, currentTurn, isDieRollAllowed } = this.props;
+    const currentTurnBase = bases[currentTurn];
+    const currentTurnBaseColor = currentTurnBase?.color;
+
+    // Calculate odds whenever dice rolling is allowed (includes paused games)
+    const shouldShowOdds = isDieRollAllowed;
+    const cellOdds = shouldShowOdds
+      ? calculateCellOdds(horses, bases, currentTurn, cells, links)
+      : [];
 
     // Filter cells that have notRenderInWalkway = true
     const homeCells: any[] = [];
@@ -75,6 +101,17 @@ class HomeBare extends React.PureComponent<IProps> {
 
           const cellBase = bases[cell.baseID];
           const cellColor = cellBase?.color;
+          
+          // Check if this cell should be highlighted
+          const isHighlighted = highlightedCells?.has(cell.cellID) || false;
+
+          // Get odds for this cell (if available and possible)
+          const cellOddsObj = cellOdds.find((odds) => odds.cellID === cell.cellID);
+          const cellOddsValue = cellOddsObj ? cellOddsObj.probability : undefined;
+          const cellBettingOdds =
+            cellOddsObj && cellOddsObj.isPossible
+              ? cellOddsObj.oddsRatio
+              : undefined;
 
           return (
             <div
@@ -98,6 +135,10 @@ class HomeBare extends React.PureComponent<IProps> {
                 nextLinkCellIDs={nextLinkCellIDs}
                 showDebugText={this.props.showDebugText}
                 index={cell.index}
+                isHighlighted={isHighlighted}
+                highlightColor={currentTurnBaseColor}
+                odds={cellOddsValue}
+                bettingOdds={cellBettingOdds}
               >
                 {
                   // Render horses that are currently on this cell

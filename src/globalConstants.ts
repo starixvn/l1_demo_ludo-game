@@ -27,7 +27,7 @@ export const INNER_BASE_SIZE = INNER_BASE_DIMENSION;         // Inner base size 
 export const HORSE_PLACEHOLDER_SIZE = HORSE_PLACEHOLDER_DIMENSION; // Horse placeholder size (2)
 
 // Game rules
-export const WINNING_MOVES = 56;
+export const WINNING_MOVES = 62;
 export const DEFAULT_STARTING_BASE = BaseID.BASE_3; // Default base that starts the game (BLUE player)
 export const BASE_COLORS: { [key: string]: string } = {
   [BaseColors.RED]: '#D22E2E',

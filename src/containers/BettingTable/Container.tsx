@@ -178,7 +178,7 @@ function calculateMoveProbability(
     return isMove ? 0.5 : 0.5; // Default if base not found
   }
 
-  const WINNING_MOVES = 56; // Total steps needed to win
+  const WINNING_MOVES = 62; // Total steps needed to win
 
   // Get all horses for current player
   const playerHorses = currentBase.horseIDs

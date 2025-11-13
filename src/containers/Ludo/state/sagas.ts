@@ -218,6 +218,141 @@ export function * getMovableHorses(stepsToTake: Rolls) {
 }
 
 /**
+ * Finds all reachable home path cells within the step count using BFS
+ * This allows jumping directly to any home path cell, not just sequential movement
+ */
+function * findAllReachableHomePathCells(
+  horseID: IHorse['horseID'],
+  startCellID: string,
+  maxSteps: number
+): Generator<any, Array<{ cellID: string; position: WalkwayPosition; steps: number }>, any> {
+  const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
+  const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+  const links: ReturnType<typeof linksSelector> = yield select(linksSelector);
+  
+  const horse = horses[horseID];
+  const reachableHomePaths: Array<{ cellID: string; position: WalkwayPosition; steps: number }> = [];
+  const visited = new Map<string, number>(); // cellID -> minimum steps to reach
+  
+  const queue: Array<{ cellID: string; position: WalkwayPosition; steps: number }> = [
+    { cellID: startCellID, position: horse.position, steps: 0 },
+  ];
+
+  while (queue.length > 0) {
+    const { cellID, position, steps } = queue.shift()!;
+
+    if (steps > maxSteps) {
+      continue; // Exceeded step count
+    }
+
+    // Check if we've already visited this cell with fewer or equal steps
+    const prevSteps = visited.get(cellID);
+    if (prevSteps !== undefined && prevSteps <= steps) {
+      continue; // Already visited with better path
+    }
+    visited.set(cellID, steps);
+
+    // Check if this is a matching home path cell
+    if (cellID !== 'HOME') {
+      const cellData = cells[position]?.[cellID];
+      if (cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === horse.baseID) {
+        // Found a reachable home path cell
+        reachableHomePaths.push({ cellID, position, steps });
+      }
+    }
+
+    // Continue BFS if we haven't reached max steps
+    if (steps < maxSteps) {
+      const nextCells = links[cellID];
+      if (nextCells && nextCells.length > 0) {
+        for (const nextCell of nextCells) {
+          // Skip if already visited with better path
+          const nextPrevSteps = visited.get(nextCell.cellID);
+          if (nextPrevSteps === undefined || nextPrevSteps > steps + 1) {
+            queue.push({ cellID: nextCell.cellID, position: nextCell.position, steps: steps + 1 });
+          }
+        }
+      }
+    }
+  }
+
+  return reachableHomePaths;
+}
+
+/**
+ * Chooses the best home path cell from a list of options
+ * Prioritizes cells that are furthest along (closest to HOME)
+ * Uses BFS to check distance to HOME for each cell
+ */
+function * chooseBestHomePathCell(
+  homePathCells: Array<{ cellID: string; position: WalkwayPosition }>,
+  baseID: string,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>
+): Generator<any, { cellID: string; position: WalkwayPosition }, any> {
+  // If only one option, return it
+  if (homePathCells.length === 1) {
+    return homePathCells[0];
+  }
+
+  // Use BFS to find distance to HOME for each home path cell
+  // Choose the one that's closest to HOME (furthest along the home path)
+  let bestCell = homePathCells[0];
+  let minDistanceToHome = Infinity;
+
+  for (const cell of homePathCells) {
+    // Use BFS to find shortest path to HOME
+    const distance = yield call(findDistanceToHome, cell.cellID, links);
+    if (distance !== null && distance < minDistanceToHome) {
+      minDistanceToHome = distance;
+      bestCell = cell;
+    }
+  }
+
+  return bestCell;
+}
+
+/**
+ * Finds the shortest distance from a cell to HOME using BFS
+ * Returns null if HOME is not reachable
+ */
+function * findDistanceToHome(
+  startCellID: string,
+  links: ReturnType<typeof linksSelector>
+): Generator<any, number | null, any> {
+  const visited = new Set<string>();
+  const queue: Array<{ cellID: string; distance: number }> = [
+    { cellID: startCellID, distance: 0 },
+  ];
+
+  while (queue.length > 0) {
+    const { cellID, distance } = queue.shift()!;
+
+    if (cellID === 'HOME') {
+      return distance;
+    }
+
+    if (visited.has(cellID)) {
+      continue;
+    }
+    visited.add(cellID);
+
+    const nextCells = links[cellID];
+    if (!nextCells || nextCells.length === 0) {
+      continue;
+    }
+
+    for (const nextCell of nextCells) {
+      if (!visited.has(nextCell.cellID)) {
+        queue.push({ cellID: nextCell.cellID, distance: distance + 1 });
+      }
+    }
+  }
+
+  return null; // HOME not reachable
+}
+
+/**
  * Finds blocking horses along a horse's movement path
  * Returns information about the first blocking horse encountered
  * @param horseID - The horse that wants to move
@@ -374,7 +509,11 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
   // Track if horse reached home during movement
   let bonusChanceForHomeHorse = false;
 
-  // Move the horse step-by-step based on steps to move
+  // Use BFS to find all reachable home path cells within the step count
+  // This allows jumping directly to any home path cell, not just sequential movement
+  const reachableHomePathCells = yield call(findAllReachableHomePathCells, horseID, cellID, stepsToMove);
+  
+  // Move the horse step-by-step, but prioritize reaching the best home path cell if available
   for (let i = 0; i < stepsToMove; i++) {
     // Get fresh state for each step (state may change during movement)
     const horses: ReturnType<typeof horsesSelector> = yield select(horsesSelector);
@@ -395,7 +534,7 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
     
     let nextCell;
 
-    // Special logic for entering home path - ONLY allow same-base home path cells
+    // Special logic for entering home path - allow jumping to ANY matching home path cell
     if (nextCells.length > 1) {
       // Multiple options available
       // Priority 0: Check if HOME is available - it's always the best choice
@@ -404,8 +543,9 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
         // HOME is always allowed - it's the final destination
         nextCell = homeCell;
       } else {
-        // Priority 1: Try to find a home path cell that matches this horse's base
-        const matchingHomePath = nextCells.find(
+        // Priority 1: Find ALL matching home path cells (not just the first one)
+        // This allows jumping directly to any home path cell
+        const matchingHomePaths = nextCells.filter(
           (cell) => {
             // Skip HOME cells - they're handled above
             if (cell.cellID === 'HOME') {
@@ -413,7 +553,6 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
             }
             const cellData = cells[cell.position]?.[cell.cellID];
             if (!cellData) {
-              console.warn(`Cell data not found for ${cell.cellID} at position ${cell.position}`);
               return false;
             }
             return cellData.cellType === CellType.HOMEPATH
@@ -421,9 +560,10 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
           }
         );
 
-        if (matchingHomePath) {
-          // Use the matching home path if found - PRIORITIZE this!
-          nextCell = matchingHomePath;
+        if (matchingHomePaths.length > 0) {
+          // Choose the home path cell that's furthest along (closest to HOME)
+          // This allows jumping directly to later home path cells
+          nextCell = yield call(chooseBestHomePathCell, matchingHomePaths, horses[horseID].baseID, cells, links);
         } else {
           // No matching home path found - filter valid cells
           // Filter out any home path cells that don't match this horse's base
@@ -434,7 +574,6 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
             }
             const cellData = cells[cell.position]?.[cell.cellID];
             if (!cellData) {
-              console.warn(`Cell data not found for ${cell.cellID} at position ${cell.position}`);
               return false;
             }
             // Allow: non-home-path cells OR home path cells that match this horse's base
@@ -443,8 +582,7 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
           });
 
           if (validCells.length > 0) {
-            // Among valid cells, prioritize any matching home path cells
-            // (in case the filter didn't catch it earlier)
+            // Among valid cells, prefer any matching home path cells
             const homePathInValid = validCells.find((cell) => {
               if (cell.cellID === 'HOME') {
                 return false; // Already handled
@@ -454,7 +592,20 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
                 && cellData.baseID === horses[horseID].baseID;
             });
             
-            nextCell = homePathInValid || validCells[0]; // Prefer home path, otherwise first valid
+            if (homePathInValid) {
+              // Choose the best home path cell if multiple are available
+              const allHomePaths = validCells.filter((cell) => {
+                if (cell.cellID === 'HOME') return false;
+                const cellData = cells[cell.position]?.[cell.cellID];
+                return cellData?.cellType === CellType.HOMEPATH
+                  && cellData.baseID === horses[horseID].baseID;
+              });
+              nextCell = allHomePaths.length > 0 
+                ? (yield call(chooseBestHomePathCell, allHomePaths, horses[horseID].baseID, cells, links))
+                : validCells[0];
+            } else {
+              nextCell = validCells[0]; // Use first valid non-home-path cell
+            }
           } else {
             // No valid cells found after filtering - this is a configuration error
             // Prefer non-home-path cells, or if all are home paths, fail the move
@@ -784,6 +935,14 @@ export function * calculateReachableCells(): Generator<any, { reachableCells: Se
     if (!existing.some(e => e.horseID === horseID && e.moveType === moveType)) {
       existing.push({ horseID, moveType });
     }
+    // Debug logging for home path cells and HOME
+    if (process.env.NODE_ENV === 'development') {
+      const cellData = cells[Object.keys(cells)[0]]?.[cellID];
+      const isHomePath = cellData?.cellType === CellType.HOMEPATH;
+      if (isHomePath || cellID === 'HOME') {
+        console.log(`[addReachableCell] Added ${cellID} (${isHomePath ? 'HOMEPATH' : 'HOME'}) for horse ${horseID} with moveType ${moveType}`);
+      }
+    }
   };
 
   // Get all horses for the current player
@@ -859,16 +1018,26 @@ function * calculateNormalMoves(
   for (let steps = 1; steps <= 12; steps++) {
     // Check if this move would overshoot home
     if (horse.steps + steps > WINNING_MOVES) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[calculateNormalMoves] Skipping ${steps} steps for horse ${horse.horseID}: would overshoot home (${horse.steps} + ${steps} > ${WINNING_MOVES})`);
+      }
       continue; // Skip moves that overshoot
     }
 
     // Process blocking horse logic and determine exploration parameters
     const blockingResult = yield call(processBlockingLogic, horse.horseID, steps);
     if (!blockingResult.canExplore) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[calculateNormalMoves] Skipping ${steps} steps for horse ${horse.horseID}: cannot explore (blocking or other reason)`);
+      }
       continue; // Cannot move with this step count due to blocking
     }
 
     const { maxStepsToExplore, shouldHighlightBlockingCell, blockingInfo } = blockingResult;
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[calculateNormalMoves] Exploring ${maxStepsToExplore} steps for horse ${horse.horseID} (requested ${steps} steps)`);
+    }
 
     // Use BFS to find all cells reachable in exactly 'maxStepsToExplore' moves
     yield call(exploreReachableCells,
@@ -955,6 +1124,12 @@ function * exploreReachableCells(
 ): Generator<any, void, any> {
   // Track visited cells with their step count to avoid revisiting with more steps
   const visited = new Map<string, number>(); // cellID -> minimum steps to reach
+  
+  // Check if we can reach any home path cells with this step count
+  // If so, we should not explore regular walkway cells beyond the spawn cell
+  const canReachHomePath = yield call(findAllReachableHomePathCells, horse.horseID, startCellID, maxStepsToExplore);
+  const shouldRestrictToHomePath = canReachHomePath.length > 0;
+  
   const queue: Array<{ cellID: string; position: WalkwayPosition; stepsRemaining: number }> = [
     { cellID: startCellID, position: horse.position, stepsRemaining: maxStepsToExplore },
   ];
@@ -964,6 +1139,19 @@ function * exploreReachableCells(
 
     if (stepsRemaining === 0) {
       // We've reached this cell in exactly the right number of steps
+      // Check if this is a home path cell or HOME for debugging
+      if (cellID === 'HOME') {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[exploreReachableCells] Found reachable HOME cell for horse ${horse.horseID} with ${maxStepsToExplore} steps`);
+        }
+      } else {
+        const cellData = cells[position]?.[cellID];
+        if (cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === horse.baseID) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[exploreReachableCells] Found reachable home path cell: ${cellID} for horse ${horse.horseID} with ${maxStepsToExplore} steps`);
+          }
+        }
+      }
       yield call(processReachedCell, cellID, position, shouldHighlightBlockingCell, blockingInfo,
         cells, horses, horse, addReachableCell);
       continue;
@@ -983,6 +1171,29 @@ function * exploreReachableCells(
 
     // Add all valid next cells to queue
     for (const nextCell of nextCells) {
+      // If we can reach home path cells, we need to be more selective about which cells to explore
+      // We should allow:
+      // 1. Home path cells (to enter home path)
+      // 2. HOME (final destination)
+      // 3. Cells that are on the path TO the home path (needed to reach it)
+      // But NOT regular walkway cells that come AFTER the spawn cell (continuing on outer path)
+      if (shouldRestrictToHomePath) {
+        const cellData = cells[nextCell.position]?.[nextCell.cellID];
+        const isHomePath = cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === horse.baseID;
+        const isHome = nextCell.cellID === 'HOME';
+        const isSpawnCell = cellData && cellData.cellType === CellType.SPAWN && cellData.baseID === horse.baseID;
+        
+        // If this is a regular walkway cell (not home path, not HOME, not spawn), check if it's on the path to home path
+        if (!isHomePath && !isHome && !isSpawnCell) {
+          // Check if this cell can lead to a home path cell with remaining steps
+          // If not, it's likely a cell after the spawn cell on the outer walkway - skip it
+          const canLeadToHomePath = yield call(canCellLeadToHomePath, nextCell.cellID, nextCell.position, stepsRemaining - 1, horse, cells, links);
+          if (!canLeadToHomePath) {
+            continue; // Skip cells that don't lead to home path when we can reach home path
+          }
+        }
+      }
+      
       if (yield call(isValidNextCell, nextCell, stepsRemaining, horse, cells, horses, blockingInfo, shouldHighlightBlockingCell)) {
         queue.push({ cellID: nextCell.cellID, position: nextCell.position, stepsRemaining: stepsRemaining - 1 });
       }
@@ -1004,25 +1215,41 @@ function * processReachedCell(
   horse: IHorse,
   addReachableCell: (cellID: string, horseID: string, moveType: 'spawn' | 'kick' | 'move') => void
 ): Generator<any, void, any> {
-  if (cellID !== 'HOME') {
-    const cellData = cells[position]?.[cellID];
-    if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
-      const horseOnCell = horses[cellData.horseIDs[0]];
+  // Handle HOME cells - always highlight if reachable
+  if (cellID === 'HOME') {
+    addReachableCell(cellID, horse.horseID, 'move');
+    return;
+  }
 
-      // Check if this cell has a blocking horse that affects highlighting
-      if (horseOnCell) {
-        // Can only kick opponent horses (different color), not same-color horses
-        const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+  // Handle non-HOME cells
+  const cellData = cells[position]?.[cellID];
+  
+  // Special handling for home path cells: always allow highlighting if reachable
+  // This allows jumping directly to any home path cell, even if there are horses on earlier cells
+  const isHomePathCell = cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === horse.baseID;
+  
+  if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
+    const horseOnCell = horses[cellData.horseIDs[0]];
 
-        if (isOpponentHorse && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
-          // This is the opponent blocking cell we detected and we can kick it - highlight it
-          addReachableCell(cellID, horse.horseID, 'kick');
-          return;
-        } else {
-          // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
-          // This prevents showing cells that are blocked by horses
-          return;
-        }
+    // Check if this cell has a blocking horse that affects highlighting
+    if (horseOnCell) {
+      // Can only kick opponent horses (different color), not same-color horses
+      const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+
+      if (isOpponentHorse && shouldHighlightBlockingCell && blockingInfo && cellID === blockingInfo.blockingCellID && !blockingInfo.isSameColor) {
+        // This is the opponent blocking cell we detected and we can kick it - highlight it
+        addReachableCell(cellID, horse.horseID, 'kick');
+        return;
+      } else if (isHomePathCell) {
+        // For home path cells, allow highlighting even if there's a horse (might be able to jump past it)
+        // The movement logic will handle whether we can actually move there
+        const moveType = isOpponentHorse ? 'kick' : 'move';
+        addReachableCell(cellID, horse.horseID, moveType);
+        return;
+      } else {
+        // Otherwise, blocked (same-color or opponent we can't kick) - don't highlight
+        // This prevents showing cells that are blocked by horses (for non-home-path cells)
+        return;
       }
     }
   }
@@ -1052,9 +1279,11 @@ function * isValidNextCell(
   blockingInfo: any,
   shouldHighlightBlockingCell: boolean
 ): Generator<any, boolean, any> {
-  // Skip HOME cells in intermediate steps (we'll add it at the end if reachable)
-  if (nextCell.cellID === 'HOME' && stepsRemaining > 1) {
-    return false;
+  // Allow exploring HOME cells - they should be highlighted if reachable
+  // HOME can be reached from the last home path cell (e.g., NORTH_6_1), so we need to explore it
+  if (nextCell.cellID === 'HOME') {
+    // Always allow exploring HOME - processReachedCell will handle highlighting it when reached
+    return true;
   }
 
   // For homepath cells, only allow if they match the horse's base
@@ -1064,9 +1293,34 @@ function * isValidNextCell(
       if (cellData.baseID !== horse.baseID) {
         return false; // Skip other players' homepaths
       }
+      // For home path cells, allow exploring even if there's a blocking horse
+      // This allows jumping directly to any home path cell (e.g., cell 5) without going through cells 1-4
+      // The blocking horse check below will still prevent moving to the specific blocked cell,
+      // but won't prevent exploring other home path cells
+      if (cellData.horseIDs && cellData.horseIDs.length > 0) {
+        const horseOnCell = horses[cellData.horseIDs[0]];
+        if (horseOnCell) {
+          const isOpponentHorse = horseOnCell.baseID !== horse.baseID;
+          // Only block if this is the specific blocking cell we detected and we can't kick it
+          if (blockingInfo && nextCell.cellID === blockingInfo.blockingCellID) {
+            if (isOpponentHorse && shouldHighlightBlockingCell && !blockingInfo.isSameColor) {
+              // Can kick this opponent - allow exploring to reach it
+              return true;
+            } else {
+              // Cannot kick (same color or not the detected blocking cell) - block this specific cell
+              return false;
+            }
+          }
+          // If it's a different home path cell with a blocking horse, still allow exploring
+          // (we might be able to jump to other home path cells)
+          return true;
+        }
+      }
+      // No blocking horse on this home path cell - allow exploring
+      return true;
     }
 
-    // Check if next cell has a blocking horse
+    // For non-home-path cells, check if next cell has a blocking horse
     if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
       const horseOnCell = horses[cellData.horseIDs[0]];
 
@@ -1098,6 +1352,67 @@ function * isValidNextCell(
   }
 
   return true;
+}
+
+/**
+ * Checks if a cell can lead to a home path cell with the remaining steps
+ * Used to determine if we should explore a cell when we can reach home path
+ */
+function * canCellLeadToHomePath(
+  cellID: string,
+  position: WalkwayPosition,
+  stepsRemaining: number,
+  horse: IHorse,
+  cells: ReturnType<typeof cellsSelector>,
+  links: ReturnType<typeof linksSelector>
+): Generator<any, boolean, any> {
+  if (stepsRemaining <= 0) {
+    return false;
+  }
+  
+  // Use BFS to check if we can reach any home path cell from this cell
+  const visited = new Set<string>();
+  const queue: Array<{ cellID: string; position: WalkwayPosition; steps: number }> = [
+    { cellID, position, steps: 0 }
+  ];
+  
+  while (queue.length > 0) {
+    const { cellID: currentCellID, position: currentPosition, steps } = queue.shift()!;
+    
+    if (steps > stepsRemaining) {
+      continue; // Exceeded step count
+    }
+    
+    if (visited.has(currentCellID)) {
+      continue;
+    }
+    visited.add(currentCellID);
+    
+    // Check if this is a home path cell
+    const cellData = cells[currentPosition]?.[currentCellID];
+    if (cellData && cellData.cellType === CellType.HOMEPATH && cellData.baseID === horse.baseID) {
+      return true; // Found a reachable home path cell
+    }
+    
+    // Check if this is HOME
+    if (currentCellID === 'HOME') {
+      return true; // HOME is reachable
+    }
+    
+    // Continue BFS
+    if (steps < stepsRemaining) {
+      const nextCells = links[currentCellID];
+      if (nextCells && nextCells.length > 0) {
+        for (const nextCell of nextCells) {
+          if (!visited.has(nextCell.cellID)) {
+            queue.push({ cellID: nextCell.cellID, position: nextCell.position, steps: steps + 1 });
+          }
+        }
+      }
+    }
+  }
+  
+  return false; // Cannot reach home path from this cell
 }
 
 /**
@@ -1268,6 +1583,20 @@ function * passTurnToSaga() {
 
   // Calculate reachable cells for current player
   const result: { reachableCells: Set<string>; cellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> } = yield call(calculateReachableCells);
+
+  // Debug logging
+  if (process.env.NODE_ENV === 'development') {
+    const cells: ReturnType<typeof cellsSelector> = yield select(cellsSelector);
+    console.log(`[passTurnToSaga] Found ${result.reachableCells.size} reachable cells`);
+    const homePathCells = Array.from(result.reachableCells).filter(cellID => {
+      if (cellID === 'HOME') return true;
+      const cellData = Object.values(cells).find((posCells: any) => posCells[cellID]);
+      return cellData?.[cellID]?.cellType === CellType.HOMEPATH;
+    });
+    if (homePathCells.length > 0) {
+      console.log(`[passTurnToSaga] Home path/HOME cells found:`, homePathCells);
+    }
+  }
 
   // Set highlighted cells
   if (result.reachableCells.size > 0) {
