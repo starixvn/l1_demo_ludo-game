@@ -7,4 +7,7 @@
 /* Container for the SVG avatar */
 .Container {
   display: flex; /* Use flexbox for proper alignment and centering */
+  align-items: center; /* Center vertically */
+  justify-content: center; /* Center horizontally */
+  width: 100%; /* Take full width of parent to enable centering */
 }

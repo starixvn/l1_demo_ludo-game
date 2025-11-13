@@ -1,11 +1,13 @@
 .Container {
   width: 100%;
+  min-width: 160px; /* Minimum width to accommodate SetResultContainer (inputs + button "Set Result") */
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   gap: 10px; /* Space between elements */
   margin: 20px 0;
+  box-sizing: border-box; /* Include padding/border in width calculation */
 }
 
 .DiceWrapper {
@@ -213,6 +215,9 @@
   align-items: center;
   gap: 8px;
   margin-top: 10px;
+  width: 100%; /* Take full width of container */
+  max-width: 160px; /* Prevent it from being wider than container */
+  box-sizing: border-box; /* Include padding/border in width calculation */
 }
 
 .SetResultInputs {
