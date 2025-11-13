@@ -156,8 +156,50 @@ function * canReachHome(horseID: IHorse['horseID'], stepsToTake: Rolls): Generat
     return null;
   }
 
+  // Check if the horse would overshoot HOME
+  if (horse.steps + stepsToTake > WINNING_MOVES) {
+    return null; // Cannot reach HOME - would overshoot
+  }
+
+  // Calculate the distance to HOME from the current position
+  // A horse needs exactly WINNING_MOVES (62) steps to reach HOME
+  const stepsRemainingToHome = WINNING_MOVES - horse.steps;
+  
   // Simulate the path the horse would take
   let currentCellID = horse.cellID;
+  
+  // If the horse can reach HOME exactly with the given steps, check if HOME is reachable
+  if (stepsToTake >= stepsRemainingToHome && stepsRemainingToHome > 0) {
+    // Check if HOME is actually reachable in the path
+    // Simulate the path to verify HOME is reachable
+    let stepsTaken = 0;
+    let checkCellID = horse.cellID;
+    
+    for (let step = 0; step < stepsRemainingToHome; step++) {
+      const nextCells = links[checkCellID];
+      if (!nextCells || nextCells.length === 0) {
+        break; // No path available
+      }
+
+      // Check if HOME is directly reachable
+      const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
+      if (homeCell && stepsTaken + 1 === stepsRemainingToHome) {
+        return 'HOME'; // Can reach HOME exactly!
+      }
+
+      // Continue simulation
+      const nextCell = nextCells[0];
+      if (nextCell.cellID === 'HOME') {
+        if (stepsTaken + 1 === stepsRemainingToHome) {
+          return 'HOME'; // Can reach HOME exactly!
+        }
+        break; // Reached HOME but not with exact steps
+      }
+      
+      checkCellID = nextCell.cellID;
+      stepsTaken++;
+    }
+  }
   
   for (let step = 0; step < stepsToTake; step++) {
     const nextCells = links[currentCellID];
@@ -168,7 +210,12 @@ function * canReachHome(horseID: IHorse['horseID'], stepsToTake: Rolls): Generat
     // First, check if any option leads directly to HOME
     const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
     if (homeCell) {
-      return 'HOME'; // Can reach HOME!
+      // Verify that reaching HOME would not exceed WINNING_MOVES
+      const totalStepsAfterMove = horse.steps + step + 1;
+      if (totalStepsAfterMove === WINNING_MOVES) {
+        return 'HOME'; // Can reach HOME exactly!
+      }
+      // HOME is reachable but not with exact steps - continue checking
     }
 
     let nextCell;

@@ -442,57 +442,84 @@ export function * findBlockingHorse(
 
   let currentCellID = currentHorse.cellID;
 
-  // Traverse the path step by step
-  for (let step = 0; step < stepsToTake; step++) {
-    const nextCells = links[currentCellID];
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[findBlockingHorse] Checking path for ${horseID} from ${currentCellID} for ${stepsToTake} steps`);
+  }
+
+  // Use BFS to check ALL possible paths, not just one
+  // This ensures we detect blocking horses on any path, not just the "preferred" path
+  // BUT: Only explore paths through the horse's own home path, not opponent home paths
+  const visited = new Set<string>();
+  const queue: Array<{ cellID: string; step: number }> = [{ cellID: currentCellID, step: 0 }];
+  
+  while (queue.length > 0) {
+    const { cellID, step } = queue.shift()!;
     
+    if (step >= stepsToTake) {
+      continue; // Reached max steps
+    }
+    
+    if (visited.has(cellID)) {
+      continue; // Already visited this cell at this or earlier step
+    }
+    visited.add(cellID);
+    
+    const nextCells = links[cellID];
     if (!nextCells || nextCells.length === 0) {
-      break; // End of path
+      continue; // End of path
     }
 
-    // Find the next cell (prioritize HOME, then home path, then first available)
-    let nextCell;
-    const homeCell = nextCells.find((cell) => cell.cellID === 'HOME');
-    if (homeCell) {
-      nextCell = homeCell;
-    } else {
-      // Find matching home path or use first available
-      const matchingHomePath = nextCells.find((cell) => {
-        if (cell.cellID === 'HOME') return false;
-        const cellData = cells[cell.position]?.[cell.cellID];
-        return cellData?.cellType === CellType.HOMEPATH && cellData.baseID === currentHorse.baseID;
-      });
-      nextCell = matchingHomePath || nextCells[0];
-    }
-
-    if (!nextCell) {
-      break;
-    }
-
-    // Check if next cell has any horses (blocking) BEFORE moving to it
-    if (nextCell.cellID !== 'HOME') {
+    // Check ALL next cells for blocking horses
+    for (const nextCell of nextCells) {
+      if (nextCell.cellID === 'HOME') {
+        // HOME cannot be blocked, skip it
+        continue;
+      }
+      
+      // IMPORTANT: Filter out opponent home paths - only allow own home path
       const cellData = cells[nextCell.position]?.[nextCell.cellID];
-      if (cellData && cellData.horseIDs && cellData.horseIDs.length > 0) {
-        // Found a blocking horse - can be same color or different color
-        const blockingHorseID = cellData.horseIDs[0]; // Get first horse on the cell
-        const blockingHorse = horses[blockingHorseID];
+      if (cellData) {
+        // If this is a home path cell, it must match the horse's baseID
+        if (cellData.cellType === CellType.HOMEPATH && cellData.baseID !== currentHorse.baseID) {
+          // This is an opponent's home path - skip it
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[findBlockingHorse] Skipping opponent home path ${nextCell.cellID} (baseID: ${cellData.baseID}, horse baseID: ${currentHorse.baseID})`);
+          }
+          continue;
+        }
         
-        if (blockingHorse) {
-          // Blocking horse found at this step - can move up to 'step' steps before it
-          // Track whether it's same color or different color
-          const isSameColor = blockingHorse.baseID === currentHorse.baseID;
-          return {
-            blockingHorseID,
-            blockingCellID: nextCell.cellID,
-            stepsBeforeBlocking: step, // Number of steps we can take before hitting the blocker
-            isSameColor, // Whether the blocking horse is the same color
-          };
+        // Check if this cell has any horses (blocking)
+        if (cellData.horseIDs && cellData.horseIDs.length > 0) {
+          // Found a blocking horse - can be same color or different color
+          const blockingHorseID = cellData.horseIDs[0]; // Get first horse on the cell
+          const blockingHorse = horses[blockingHorseID];
+          
+          if (blockingHorse) {
+            // Blocking horse found at step (step + 1)
+            // Track whether it's same color or different color
+            const isSameColor = blockingHorse.baseID === currentHorse.baseID;
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[findBlockingHorse] Found blocking horse ${blockingHorseID} at ${nextCell.cellID} (step ${step + 1}), isSameColor: ${isSameColor}`);
+            }
+            return {
+              blockingHorseID,
+              blockingCellID: nextCell.cellID,
+              stepsBeforeBlocking: step, // Number of steps we can take before hitting the blocker
+              isSameColor, // Whether the blocking horse is the same color
+            };
+          }
         }
       }
+      
+      // Add to queue to continue exploring this path (only if not opponent home path)
+      if (step + 1 < stepsToTake) {
+        queue.push({ cellID: nextCell.cellID, step: step + 1 });
+      }
     }
+  }
 
-    // Move to next cell for next iteration
-    currentCellID = nextCell.cellID;
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[findBlockingHorse] No blocking horse found for ${horseID} from ${currentHorse.cellID} in ${stepsToTake} steps`);
   }
 
   return null; // No blocking horse found
