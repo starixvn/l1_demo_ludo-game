@@ -444,7 +444,7 @@ export function * findBlockingHorse(
  *
  * @param action - Contains horseID, target cellID, and walkway position
  */
-function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
+function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, void, any> {
   let { cellID, walkwayPosition } = { ...action.data! };
   const { horseID, stepsToUse } = action.data!;
   const currentDieRoll: ReturnType<typeof currentDieRollSumSelector> = yield select(currentDieRollSumSelector);
@@ -509,10 +509,6 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>) {
   // Track if horse reached home during movement
   let bonusChanceForHomeHorse = false;
 
-  // Use BFS to find all reachable home path cells within the step count
-  // This allows jumping directly to any home path cell, not just sequential movement
-  const reachableHomePathCells = yield call(findAllReachableHomePathCells, horseID, cellID, stepsToMove);
-  
   // Move the horse step-by-step, but prioritize reaching the best home path cell if available
   for (let i = 0; i < stepsToMove; i++) {
     // Get fresh state for each step (state may change during movement)
