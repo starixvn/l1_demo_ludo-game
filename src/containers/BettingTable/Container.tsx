@@ -68,31 +68,45 @@ enum BettingOption {
 
 /**
  * Calculate odds for a betting option
+ * Returns the odds string and whether the outcome is determined
  */
-function calculateBettingOdds(probability: number): string {
+function calculateBettingOdds(probability: number): {
+  odds: string;
+  isDetermined: boolean;
+} {
+  // Handle edge cases - outcome is already determined
   if (probability <= 0) {
-    return "1:0";
+    // Impossible outcome - betting is closed
+    return { odds: "Closed", isDetermined: true };
   }
   if (probability >= 1) {
-    return "1:∞";
+    // Guaranteed outcome - betting is closed
+    return { odds: "Closed", isDetermined: true };
   }
-  const oddsMultiplier = (1 - probability) / probability;
-  const rounded = Math.round(oddsMultiplier * 100) / 100;
-  return `1:${rounded}`;
+  // Calculate odds with 2% house margin
+  // Formula: odds = (1 - probability) / probability * (1 - houseMargin)
+  // Example: 50% probability → base odds 1:1 → with 2% margin → 1:0.98
+  // If player bets 100, they get 198 back (100 bet + 98 profit)
+  const HOUSE_MARGIN = 0.02; // 2% house margin
+  const baseOdds = (1 - probability) / probability;
+  const oddsWithMargin = baseOdds * (1 - HOUSE_MARGIN);
+  const rounded = Math.round(oddsWithMargin * 100) / 100;
+  return { odds: `1:${rounded}`, isDetermined: false };
 }
 
 /**
  * Calculate probability for Odd/Even
  */
 function calculateOddEvenProbability(
-  roll1: number | null,
-  roll2: number | null,
+  roll1: number,
+  roll2: number,
+  isDieRollValid: boolean,
   isOdd: boolean
 ): number {
-  if (roll1 !== null && roll2 !== null) {
+  if (isDieRollValid) {
     // If dice are already rolled, check if sum is odd/even
     const sum = roll1 + roll2;
-    return (sum % 2 === (isOdd ? 1 : 0)) ? 1.0 : 0.0;
+    return sum % 2 === (isOdd ? 1 : 0) ? 1.0 : 0.0;
   }
   // Before rolling: 50% chance for odd or even
   return 0.5;
@@ -102,11 +116,12 @@ function calculateOddEvenProbability(
  * Calculate probability for Big/Small (sum > 7 or <= 7)
  */
 function calculateBigSmallProbability(
-  roll1: number | null,
-  roll2: number | null,
+  roll1: number,
+  roll2: number,
+  isDieRollValid: boolean,
   isBig: boolean
 ): number {
-  if (roll1 !== null && roll2 !== null) {
+  if (isDieRollValid) {
     const sum = roll1 + roll2;
     return (isBig ? sum > 7 : sum <= 7) ? 1.0 : 0.0;
   }
@@ -140,14 +155,18 @@ class BettingTableBare extends React.PureComponent<IProps, ILocalState> {
     // Clear bets when turn changes or dice is rolled
     if (
       prevProps.currentTurn !== this.props.currentTurn ||
-      (prevProps.isDieRollValid !== this.props.isDieRollValid && this.props.isDieRollValid)
+      (prevProps.isDieRollValid !== this.props.isDieRollValid &&
+        this.props.isDieRollValid)
     ) {
       this.setState({ bets: new Map<BettingOption, IBetCoin[]>() });
       this.nextCoinId = 0; // Reset coin ID counter
     }
   }
 
-  private handleBetClick = (option: BettingOption, event: React.MouseEvent<HTMLButtonElement>) => {
+  private handleBetClick = (
+    option: BettingOption,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
     // Generate random position within the button (10% to 90% to avoid edges)
     const x = Math.random() * 80 + 10; // 10% to 90%
     const y = Math.random() * 80 + 10; // 10% to 90%
@@ -171,29 +190,32 @@ class BettingTableBare extends React.PureComponent<IProps, ILocalState> {
 
   private isOptionLocked = (option: BettingOption): boolean => {
     // Go Stable and No Stable are locked (disabled but show odds)
-    return option === BettingOption.GO_STABLE || option === BettingOption.NO_STABLE;
+
+    // Lock options when outcome is already determined (probability = 0 or 1)
+    const probability = this.getBettingProbability(option);
+    const { isDetermined } = calculateBettingOdds(probability);
+    return isDetermined;
   };
 
-  private getBettingOdds = (option: BettingOption): string => {
-    const { currentDieRoll1, currentDieRoll2 } = this.props;
+  private getBettingProbability = (option: BettingOption): number => {
+    const { currentDieRoll1, currentDieRoll2, isDieRollValid } = this.props;
     const roll1 = currentDieRoll1;
     const roll2 = currentDieRoll2;
 
-    let probability = 0.5; // Default
-
     switch (option) {
       case BettingOption.ODD:
-        probability = calculateOddEvenProbability(roll1, roll2, true);
-        break;
+        return calculateOddEvenProbability(roll1, roll2, isDieRollValid, true);
       case BettingOption.EVEN:
-        probability = calculateOddEvenProbability(roll1, roll2, false);
-        break;
+        return calculateOddEvenProbability(roll1, roll2, isDieRollValid, false);
       case BettingOption.BIG:
-        probability = calculateBigSmallProbability(roll1, roll2, true);
-        break;
+        return calculateBigSmallProbability(roll1, roll2, isDieRollValid, true);
       case BettingOption.SMALL:
-        probability = calculateBigSmallProbability(roll1, roll2, false);
-        break;
+        return calculateBigSmallProbability(
+          roll1,
+          roll2,
+          isDieRollValid,
+          false
+        );
       case BettingOption.MOVE:
       case BettingOption.NO_MOVE:
       case BettingOption.KICK:
@@ -204,13 +226,16 @@ class BettingTableBare extends React.PureComponent<IProps, ILocalState> {
       case BettingOption.NO_STABLE:
         // TODO: Calculate based on game state and available actions
         // For now, use a default probability that gives odds around 1:1.96
-        probability = 0.338; // This gives approximately 1:1.96 odds
-        break;
+        return 0.338; // This gives approximately 1:1.96 odds
       default:
-        probability = 0.5;
+        return 0.5;
     }
+  };
 
-    return calculateBettingOdds(probability);
+  private getBettingOdds = (option: BettingOption): string => {
+    const probability = this.getBettingProbability(option);
+    const { odds } = calculateBettingOdds(probability);
+    return odds;
   };
 
   render() {
@@ -283,7 +308,33 @@ class BettingTableBare extends React.PureComponent<IProps, ILocalState> {
                     </div>
                   ))}
                   <div className={styles.BetLabel}>{option}</div>
-                  <div className={styles.BetOdds}>{odds}</div>
+                  {isLocked ? (
+                    <svg
+                      className={styles.LockIcon}
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M18 11H6C4.89543 11 4 11.8954 4 13V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V13C20 11.8954 19.1046 11 18 11Z"
+                        stroke="#000000"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11"
+                        stroke="#000000"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : (
+                    <div className={styles.BetOdds}>{odds}</div>
+                  )}
                 </button>
               );
             })}
@@ -297,4 +348,3 @@ class BettingTableBare extends React.PureComponent<IProps, ILocalState> {
 export const BettingTable = connect(mapStateToProps)(
   BettingTableBare
 ) as unknown as React.ComponentClass<{}>;
-

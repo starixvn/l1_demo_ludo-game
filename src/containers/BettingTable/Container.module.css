@@ -54,6 +54,7 @@
   /* background-color is set via inline style based on current player's color */
   cursor: not-allowed;
   opacity: 1; /* Full opacity to match other buttons */
+  filter: brightness(0.5); /* Darken the background to show disabled state */
 }
 
 .BetLabel {
@@ -71,17 +72,17 @@
 }
 
 .LockIcon {
-  color: #6c757d;
-  font-size: 20px;
-  opacity: 0.8;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  flex-shrink: 0;
 }
 
-.LockIcon::before {
-  content: "🔒";
-  font-size: 18px;
+.LockIcon path {
+  stroke: #000000; /* Black color for padlock */
 }
 
 /* Coin icon for betted options - matches Cell BetHorseIcon styling */
