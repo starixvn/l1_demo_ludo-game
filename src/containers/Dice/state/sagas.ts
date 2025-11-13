@@ -545,7 +545,7 @@ function * buildAvailableActions(
     }
     
     // Also check the specific final home path cells as a safety measure
-    const finalHomePathCells = ['WEST_0_6', 'WEST_1_6', 'EAST_1_0', 'SOUTH_0_0'];
+    const finalHomePathCells = ['NORTH_0_6', 'WEST_1_6', 'EAST_1_0', 'SOUTH_0_0'];
     if (finalHomePathCells.includes(horse.cellID!)) {
       if (process.env.NODE_ENV === 'development') {
         console.log(`[buildAvailableActions] Skipping ${horseID}: on final home path cell (${horse.cellID}) that only leads to HOME`);
