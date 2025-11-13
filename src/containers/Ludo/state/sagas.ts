@@ -884,9 +884,15 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
   // Get dice values to check for bonus turn
   // Note: roll1 and roll2 are already declared at the beginning of this function
   
+  // Check for captures (but captures don't give bonus turn anymore)
+  yield call(performDisqualificationCheck, action.data!.horseID, walkwayPosition, cellID);
+  
   // Determine if player gets a bonus turn
+  // Bonus turn is granted for:
+  // 1. Reached home
+  // 2. Rolled spawnable combination (1-6, 6-1, or doubles)
+  // Note: Capturing opponent horses does NOT grant bonus turn
   const bonusChance = bonusChanceForHomeHorse                          // Reached home
-  || (yield call(performDisqualificationCheck, action.data!.horseID, walkwayPosition, cellID)) // Captured opponent
   || ((roll1 === Rolls.ONE && roll2 === Rolls.SIX) || (roll1 === Rolls.SIX && roll2 === Rolls.ONE) || roll1 === roll2); // Rolled spawnable combination
 
   // Log the successful move
@@ -917,12 +923,12 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
  *
  * When a horse lands on a normal cell, it checks if there are any opponent horses
  * on that cell. If found, those horses are sent back to their base (disqualified).
- * This gives the player a bonus turn for successful captures.
+ * Note: Capturing opponent horses does NOT grant a bonus turn.
  *
  * @param activeHorseID - The horse that just moved
  * @param walkwayPosition - Position where the horse landed
  * @param cellID - Specific cell where the horse landed
- * @returns true if any horses were captured (player gets bonus turn)
+ * @returns true if any horses were captured (for logging purposes only, not used for bonus turn)
  */
 function * performDisqualificationCheck(activeHorseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']) {
   // No captures possible at home position

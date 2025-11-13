@@ -73,11 +73,19 @@ class DiceBare extends React.PureComponent<IProps, ILocalState> {
 
   componentDidUpdate(prevProps: IProps, prevState: ILocalState) {
     // Auto-apply when values change and inputs are visible
-    if (this.state.showInputs && 
-        (prevState.die1Value !== this.state.die1Value || prevState.die2Value !== this.state.die2Value)) {
+    if (
+      this.state.showInputs &&
+      (prevState.die1Value !== this.state.die1Value ||
+        prevState.die2Value !== this.state.die2Value)
+    ) {
       const { die1Value, die2Value } = this.state;
       // Validate values are between 1 and 6
-      if (die1Value >= 1 && die1Value <= 6 && die2Value >= 1 && die2Value <= 6) {
+      if (
+        die1Value >= 1 &&
+        die1Value <= 6 &&
+        die2Value >= 1 &&
+        die2Value <= 6
+      ) {
         this.props.setDieResult(die1Value as Rolls, die2Value as Rolls);
       }
     }
@@ -115,12 +123,8 @@ class DiceBare extends React.PureComponent<IProps, ILocalState> {
   };
 
   render() {
-    const {
-      baseColor,
-      isDieRollAllowed,
-      isDieRollValid,
-      isRolling,
-    } = this.props;
+    const { baseColor, isDieRollAllowed, isDieRollValid, isRolling } =
+      this.props;
 
     // Dice is only clickable if:
     // 1. Rolling is allowed (isDieRollAllowed)
