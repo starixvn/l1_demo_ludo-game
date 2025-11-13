@@ -381,43 +381,94 @@ function canReachHomePath(
     return false;
   }
 
-  // Simulate movement step by step
-  let currentCellID = horse.cellID;
-  const visited = new Set<string>();
+  // Use BFS to find all reachable cells within the step count
+  // This ensures we check all possible paths, not just one
+  const visited = new Map<string, number>(); // cellID -> minimum steps to reach
+  const queue: Array<{ cellID: string; position: string; steps: number }> = [
+    { cellID: horse.cellID, position: "", steps: 0 },
+  ];
 
-  for (let step = 0; step < stepsToTake; step++) {
-    if (visited.has(currentCellID)) {
-      break; // Avoid infinite loops
+  // Find the position of the starting cell
+  for (const position in cells) {
+    if (cells[position][horse.cellID]) {
+      queue[0].position = position;
+      break;
     }
-    visited.add(currentCellID);
+  }
 
-    const nextCells = links[currentCellID];
-    if (!nextCells || nextCells.length === 0) {
-      return false; // No path available
+  // Track if we've found our own home path - HOME is only valid if reached through our home path
+  let foundOwnHomePath = false;
+
+  while (queue.length > 0) {
+    const { cellID, position, steps } = queue.shift()!;
+
+    if (steps > stepsToTake) {
+      continue; // Exceeded step count
     }
 
-    // Check if any next cell is a home path matching this horse's base
-    for (const nextCell of nextCells) {
-      if (nextCell.cellID === "HOME") {
-        // Can reach home, which means can reach home path
-        return true;
-      }
+    // Check if we've already visited this cell with fewer or equal steps
+    const prevSteps = visited.get(cellID);
+    if (prevSteps !== undefined && prevSteps <= steps) {
+      continue; // Already visited with better path
+    }
+    visited.set(cellID, steps);
 
-      const cellData = cells[nextCell.position]?.[nextCell.cellID];
+    // Check if this is a home path cell matching the horse's base
+    if (cellID !== "HOME") {
+      const cellData = cells[position]?.[cellID];
       if (
         cellData &&
         cellData.cellType === "HOMEPATH" &&
         cellData.baseID === horse.baseID
       ) {
-        return true; // Can reach home path!
+        foundOwnHomePath = true; // Found our own home path
+        return true; // Found a reachable home path cell with same base color!
       }
     }
 
-    // Move to first available cell for simulation
-    currentCellID = nextCells[0].cellID;
+    // Check if this is HOME - only valid if we can reach it through our own home path
+    // We'll check this after exploring, but for now continue exploring
+    if (cellID === "HOME") {
+      // Only return true if we've already found our own home path
+      // This ensures we can only reach HOME through our own home path, not others'
+      if (foundOwnHomePath) {
+        return true; // Can reach HOME through our own home path
+      }
+      // Otherwise, continue exploring to see if we can find our home path
+    }
+
+    // Continue BFS if we haven't reached max steps
+    if (steps < stepsToTake) {
+      const nextCells = links[cellID];
+      if (nextCells && nextCells.length > 0) {
+        for (const nextCell of nextCells) {
+          // Skip other players' home paths - horses can only enter their own home path
+          if (nextCell.cellID !== "HOME") {
+            const nextCellData = cells[nextCell.position]?.[nextCell.cellID];
+            if (
+              nextCellData &&
+              nextCellData.cellType === "HOMEPATH" &&
+              nextCellData.baseID !== horse.baseID
+            ) {
+              continue; // Skip other players' home paths
+            }
+          }
+
+          // Skip if already visited with better path
+          const nextPrevSteps = visited.get(nextCell.cellID);
+          if (nextPrevSteps === undefined || nextPrevSteps > steps + 1) {
+            queue.push({
+              cellID: nextCell.cellID,
+              position: nextCell.position,
+              steps: steps + 1,
+            });
+          }
+        }
+      }
+    }
   }
 
-  return false;
+  return false; // Cannot reach home path with same base color
 }
 
 /**
@@ -462,7 +513,7 @@ function calculateGoStableProbability(
     return isGoStable ? 0.0 : 1.0; // Default: No Stable
   }
 
-  const WINNING_MOVES = 56;
+  const WINNING_MOVES = 62; // Total steps needed to win
 
   // Get all spawned horses for current player
   const spawnedHorses = currentBase.horseIDs

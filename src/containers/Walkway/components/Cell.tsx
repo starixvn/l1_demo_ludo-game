@@ -155,7 +155,7 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
     // Use utility function for hex to rgba conversion
 
     // For SPAWN and NORMAL cells, don't apply background color (we'll show a circle instead)
-    // For HOMEPATH cells, apply background color with 0.5 opacity
+    // For HOMEPATH cells, apply background color with 0.25 opacity
     // For other cells, apply normal background color
     let cellStyle: React.CSSProperties;
     if (cellType === CellType.SPAWN || cellType === CellType.NORMAL) {
@@ -165,7 +165,7 @@ export class Cell extends React.PureComponent<ICellProps, ICellState> {
       const hexColor = getBaseHexColor(color);
       cellStyle = {
         ...baseStyle,
-        backgroundColor: hexToRgba(hexColor, 0.5), // Apply color with 0.5 opacity
+        backgroundColor: hexToRgba(hexColor, 0.25), // Apply color with 0.25 opacity
       };
     } else {
       cellStyle = getStyleObject(CELL_SIZE, CELL_SIZE, color); // Size and color styling

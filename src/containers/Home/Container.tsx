@@ -12,7 +12,7 @@ import {
 } from "containers/Ludo/state/selectors";
 import { getStyleObject } from "containers/utils";
 import { calculateCellOdds } from "containers/utils/oddsCalculator";
-import { HORSE_SIZE } from "globalConstants";
+import { HORSE_SIZE, CELL_DIMENSION, CELL_SIZE } from "globalConstants";
 import {
   isDieRollAllowedSelector,
   isDieRollValidSelector,
@@ -72,7 +72,15 @@ class HomeBare extends React.PureComponent<IProps> {
   // private onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
 
   render() {
-    const { cells, links, bases, horses, highlightedCells, highlightedCellsByHorse, currentTurn, isDieRollAllowed } = this.props;
+    const {
+      cells,
+      links,
+      bases,
+      horses,
+      highlightedCells,
+      currentTurn,
+      isDieRollAllowed,
+    } = this.props;
     const currentTurnBase = bases[currentTurn];
     const currentTurnBaseColor = currentTurnBase?.color;
 
@@ -101,13 +109,17 @@ class HomeBare extends React.PureComponent<IProps> {
 
           const cellBase = bases[cell.baseID];
           const cellColor = cellBase?.color;
-          
+
           // Check if this cell should be highlighted
           const isHighlighted = highlightedCells?.has(cell.cellID) || false;
 
           // Get odds for this cell (if available and possible)
-          const cellOddsObj = cellOdds.find((odds) => odds.cellID === cell.cellID);
-          const cellOddsValue = cellOddsObj ? cellOddsObj.probability : undefined;
+          const cellOddsObj = cellOdds.find(
+            (odds) => odds.cellID === cell.cellID
+          );
+          const cellOddsValue = cellOddsObj
+            ? cellOddsObj.probability
+            : undefined;
           const cellBettingOdds =
             cellOddsObj && cellOddsObj.isPossible
               ? cellOddsObj.oddsRatio
@@ -147,10 +159,8 @@ class HomeBare extends React.PureComponent<IProps> {
                       key={horseID}
                       baseColor={horses[horseID].color} // Horse color matches its base
                       horseID={horseID} // Pass horse ID to display number
-                      // Smaller horses if multiple horses on same cell
-                      horseSize={
-                        cell.horseIDs.length > 1 ? HORSE_SIZE / 2 : HORSE_SIZE
-                      }
+                      // Always use normal size - never scale down
+                      horseSize={HORSE_SIZE}
                       // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                     />
                   ))
@@ -166,12 +176,14 @@ class HomeBare extends React.PureComponent<IProps> {
   private getCellStyle = (cell: any): React.CSSProperties => {
     // Position the cells appropriately within the 1x3 home container
     // YELLOW (NORTH_6_1) at top, RED (SOUTH_0_1) at bottom
+    // Set explicit dimensions to match Cell size (same as walkway cells)
     const basePositioning = {
       position: "absolute" as const,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontSize: "12px",
+      width: `${CELL_SIZE * CELL_DIMENSION}px`, // Match Cell width
+      height: `${CELL_SIZE * CELL_DIMENSION}px`, // Match Cell height
     };
 
     if (cell.cellID === "NORTH_6_1") {
