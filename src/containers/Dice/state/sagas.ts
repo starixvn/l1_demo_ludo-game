@@ -561,20 +561,34 @@ function * buildAvailableActions(
     
     // If horse is in home path, enforce sequential movement rules:
     // - Can only move 1 step at a time
-    // - Must roll ANY double dice to move (1:1, 2:2, 3:3, 4:4, 5:5, or 6:6)
-    // - When rolling double dice, can move exactly 1 step (regardless of die value)
+    // - Can move if:
+    //   1. Roll ANY double dice (1:1, 2:2, 3:3, 4:4, 5:5, or 6:6), OR
+    //   2. Dice sum equals (current home path index + 1)
     if (isHorseInHomePath) {
-      if (!isPair) {
-        // Not a double - cannot move in home path
+      // Calculate home path index from cell's row/column
+      // For NORTH/SOUTH: use row; for EAST/WEST: use column
+      const homePathIndex = horse.position === 'NORTH' || horse.position === 'SOUTH'
+        ? currentCellData.row
+        : currentCellData.column;
+      
+      // Get dice sum
+      const dieSum = roll1 + roll2;
+      const nextHomePathIndex = homePathIndex + 1;
+      
+      // Check if can move: double dice OR dice sum equals next index
+      // Note: isDieRollValid is checked at the beginning of buildAvailableActions
+      const canMoveInHomePath = isPair || (dieSum === nextHomePathIndex);
+      
+      if (!canMoveInHomePath) {
+        // Cannot move in home path
         if (process.env.NODE_ENV === 'development') {
-          console.log(`[buildAvailableActions] Skipping ${horseID}: in home path but did not roll double dice`);
+          console.log(`[buildAvailableActions] Skipping ${horseID}: in home path at index ${homePathIndex}, need double dice or sum=${nextHomePathIndex}, but got sum=${dieSum}, isPair=${isPair}`);
         }
         continue; // Skip this horse
       }
       
-      // In home path with ANY double dice (1:1, 2:2, 3:3, 4:4, 5:5, 6:6) - can move 1 step using one die
+      // In home path with valid roll - can move 1 step
       // The action creation logic below will handle creating the 1-step action
-      // We don't skip here - let the action creation logic filter appropriately
     }
     
     // Special case: Check if horse is on spawn cell with opponent horse
@@ -1001,10 +1015,64 @@ function * buildAvailableActions(
       }
     } else {
       // Not a pair - normal move action
-      // NEW RULE: If horse is in home path, skip non-pair moves (need double dice)
+      // NEW RULE: If horse is in home path, check if dice sum equals next index
       if (isHorseInHomePath) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[buildAvailableActions] Skipping non-pair action for ${horseID}: in home path (need double dice)`);
+        // Calculate home path index
+        const homePathIndex = horse.position === 'NORTH' || horse.position === 'SOUTH'
+          ? currentCellData.row
+          : currentCellData.column;
+        const nextHomePathIndex = homePathIndex + 1;
+        const dieSum = roll1 + roll2;
+        
+        // Check if dice sum equals next index
+        if (dieSum === nextHomePathIndex) {
+          // Can move 1 step with dice sum matching next index
+          if (horse.steps + 1 <= WINNING_MOVES) {
+            const blockingInfoOneStep: { blockingHorseID: IHorse['horseID'], blockingCellID: string, stepsBeforeBlocking: number, isSameColor: boolean } | null = 
+              yield call(findBlockingHorse, horseID, 1 as Rolls);
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[buildAvailableActions] Horse ${horseID} in home path at index ${homePathIndex}, dice sum ${dieSum} equals next index ${nextHomePathIndex}`);
+            }
+            
+            const canMove = !blockingInfoOneStep || 
+              (blockingInfoOneStep.stepsBeforeBlocking + 1 === 1 && !blockingInfoOneStep.isSameColor) ||
+              (blockingInfoOneStep.stepsBeforeBlocking + 1 > 1);
+            
+            if (canMove) {
+              const resultOneStep: 'HOME' | 'HOMEPATH' | null = yield call(canReachHome, horseID, 1 as Rolls);
+              let labelOneStep = `Move Horse ${horseID.split('_')[3]} (1 step, Home Path Index ${nextHomePathIndex})`;
+              let descriptionOneStep = `Move 1 space in home path (dice sum ${dieSum} = index ${nextHomePathIndex})`;
+              
+              if (resultOneStep === 'HOME') {
+                labelOneStep = `Move Horse ${horseID.split('_')[3]} (1 step, Can Reach Home!)`;
+                descriptionOneStep = `Move 1 space in home path - This horse can reach HOME!`;
+              }
+              
+              if (blockingInfoOneStep && blockingInfoOneStep.stepsBeforeBlocking + 1 === 1 && !blockingInfoOneStep.isSameColor) {
+                actions.push({
+                  type: 'kick',
+                  horseID,
+                  label: `Move Horse ${horseID.split('_')[3]} (1 step, Kick Blocking Horse)`,
+                  description: `Move 1 space in home path and kick opponent horse`,
+                  blockingHorseID: blockingInfoOneStep.blockingHorseID,
+                  stepsToUse: 1,
+                });
+              } else {
+                actions.push({
+                  type: 'move',
+                  horseID,
+                  label: labelOneStep,
+                  description: descriptionOneStep,
+                  stepsToUse: 1,
+                });
+              }
+            }
+          }
+        } else {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[buildAvailableActions] Skipping non-pair action for ${horseID}: in home path at index ${homePathIndex}, dice sum ${dieSum} does not equal next index ${nextHomePathIndex}`);
+          }
         }
       } else if (process.env.NODE_ENV === 'development') {
         console.log(`[buildAvailableActions] Not a pair for ${horseID}, blockingInfo:`, blockingInfo);

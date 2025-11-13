@@ -254,8 +254,27 @@ export function * getMovableHorses(stepsToTake: Rolls) {
         currentCellData.baseID === horse.baseID;
       
       if (isHorseInHomePath) {
-        // In home path: can only move 1 step, and only when double dice is rolled
-        return isPair && (horse.steps + 1 <= WINNING_MOVES);
+        // In home path: can move 1 step if:
+        // 1. Roll double dice (any double: 1:1, 2:2, 3:3, 4:4, 5:5, 6:6), OR
+        // 2. Dice sum equals (current home path index + 1)
+        
+        // Calculate home path index from cell's row/column
+        // For NORTH/SOUTH: use row; for EAST/WEST: use column
+        const homePathIndex = horse.position === 'NORTH' || horse.position === 'SOUTH'
+          ? currentCellData.row
+          : currentCellData.column;
+        
+        // Get dice sum
+        const dieSum = roll1 + roll2;
+        const nextHomePathIndex = homePathIndex + 1;
+        
+        // Check if can move: double dice OR dice sum equals next index
+        const canMoveInHomePath = isPair || (dieSum === nextHomePathIndex);
+        
+        if (canMoveInHomePath && horse.steps + 1 <= WINNING_MOVES) {
+          return true;
+        }
+        return false;
       } else {
         // Not in home path: normal check with full die value
         return horse.steps + stepsToTake <= WINNING_MOVES;
@@ -515,11 +534,34 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
   
   // NEW RULE: If horse is already in home path, enforce sequential movement
   // - Can only move 1 step at a time
-  // - Must roll double dice to move
+  // - Can move if:
+  //   1. Roll double dice (any double: 1:1, 2:2, 3:3, 4:4, 5:5, 6:6), OR
+  //   2. Dice sum equals (current home path index + 1)
   if (isHorseInHomePath) {
-    // Check if double dice was rolled
-    if (!isDouble) {
-      console.warn(`Horse ${horseID} is in home path but did not roll double dice - cannot move`);
+    // Calculate home path index from cell's row/column
+    if (!currentCellData) {
+      console.error(`Cell data not found for ${horseID} at ${horse.cellID}`);
+      yield put(moveHorseFailure());
+      yield delay(NO_MOVE_DELAY);
+      yield put(nextTurn());
+      yield put(enableDie());
+      return;
+    }
+    
+    // For NORTH/SOUTH: use row; for EAST/WEST: use column
+    const homePathIndex = horse.position === 'NORTH' || horse.position === 'SOUTH'
+      ? currentCellData.row
+      : currentCellData.column;
+    
+    // Get dice sum
+    const dieSum = roll1 + roll2;
+    const nextHomePathIndex = homePathIndex + 1;
+    
+    // Check if can move: double dice OR dice sum equals next index
+    const canMoveInHomePath = isDouble || (dieSum === nextHomePathIndex);
+    
+    if (!canMoveInHomePath) {
+      console.warn(`Horse ${horseID} is in home path at index ${homePathIndex}, need double dice or sum=${nextHomePathIndex}, but got sum=${dieSum}, isDouble=${isDouble} - cannot move`);
       yield put(moveHorseFailure());
       yield delay(NO_MOVE_DELAY);
       yield put(nextTurn());
@@ -537,7 +579,7 @@ function * moveHorseSaga(action: ReturnType<typeof moveHorse>): Generator<any, v
       return;
     }
     
-    // When in home path with double dice, move exactly 1 step
+    // When in home path with valid roll (double dice OR dice sum equals next index), move exactly 1 step
     stepsToMove = 1;
   }
   
@@ -1154,11 +1196,23 @@ function * calculateNormalMoves(
   const isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector> = yield select(isDieRollAllowedSelector);
   const isPair = isDieRollValid && roll1 === roll2 && roll1 >= 1 && roll1 <= 6;
   
-  // Show highlighting before rolling (for betting) OR after rolling double dice
-  const shouldShowHomePathHighlighting = isDieRollAllowed || isPair;
+  // Calculate home path index for horses in home path
+  let homePathIndex: number | null = null;
+  if (isHorseInHomePath && currentCellData) {
+    // For NORTH/SOUTH: use row; for EAST/WEST: use column
+    homePathIndex = horse.position === 'NORTH' || horse.position === 'SOUTH'
+      ? currentCellData.row
+      : currentCellData.column;
+  }
+  
+  // Show highlighting before rolling (for betting) OR after rolling double dice OR dice sum equals next index
+  const dieSum = roll1 + roll2;
+  const nextHomePathIndex = homePathIndex !== null ? homePathIndex + 1 : null;
+  const diceSumMatchesIndex = isDieRollValid && nextHomePathIndex !== null && dieSum === nextHomePathIndex;
+  const shouldShowHomePathHighlighting = isDieRollAllowed || isPair || diceSumMatchesIndex;
 
   // If horse is in home path, only highlight next sequential cell (1 step)
-  // Show this BEFORE rolling (for betting) and AFTER rolling double dice
+  // Show this BEFORE rolling (for betting), AFTER rolling double dice, OR when dice sum equals next index
   if (isHorseInHomePath) {
     if (shouldShowHomePathHighlighting) {
       // Only explore 1 step when in home path (can only move 1 step at a time)
