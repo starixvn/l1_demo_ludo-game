@@ -243,7 +243,7 @@ export function * getMovableHorses(stepsToTake: Rolls) {
       }
       
       // Also check the specific final home path cells as a safety measure
-      const finalHomePathCells = ['WEST_0_6', 'WEST_1_6', 'EAST_1_0', 'SOUTH_0_0'];
+      const finalHomePathCells = ['NORTH_6_0', 'WEST_1_6', 'EAST_1_0', 'SOUTH_0_0'];
       if (finalHomePathCells.includes(horse.cellID!)) {
         return false; // Cannot move from these cells (only option is HOME, which retires the horse)
       }
