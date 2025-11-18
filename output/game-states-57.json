@@ -1,0 +1,41 @@
+{
+  "board": {
+    "0": [
+      37,
+      0,
+      0,
+      0
+    ],
+    "1": [
+      157,
+      0,
+      0,
+      0
+    ],
+    "2": [
+      261,
+      0,
+      0,
+      0
+    ],
+    "3": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "dice": [
+    5,
+    6
+  ],
+  "currentPlayer": 0,
+  "kickedPlayer": {
+    "player": 3,
+    "position": 37
+  },
+  "playerAction": {
+    "oldPosition": 26,
+    "newPosition": 37
+  }
+}

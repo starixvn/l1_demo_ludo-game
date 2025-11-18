@@ -8,6 +8,8 @@
 .Container {
   display: flex;   /* Use flexbox for layout */
   flex-grow: 1;    /* Expand to fill available space */
+  padding-right: 5px; /* Add 5px to prevent layout shifts */
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* Top placement - elements arranged from top to bottom */
@@ -26,14 +28,30 @@
   pointer-events: none;   /* Disable mouse interactions */
 }
 
-/* Container for retired coins (coins that reached home) */
-.RetiredCoins {
-  display: flex;          /* Use flexbox for coin layout */
-  flex-direction: column; /* Stack coins vertically */
-  align-items: center;    /* Center coins horizontally */
+/* Container for retired horses (horses that reached home) */
+.RetiredHorses {
+  display: flex;          /* Use flexbox for horse layout */
+  flex-direction: column; /* Stack horses vertically */
+  align-items: center;    /* Center horses horizontally */
 }
 
-/* Remove bottom margin from individual retired coins */
-.RetiredCoins > div {
-  margin-bottom: 0; /* Override default coin margin for tight spacing */
+/* Remove bottom margin from individual retired horses */
+.RetiredHorses > div {
+  margin-bottom: 0; /* Override default horse margin for tight spacing */
+}
+
+/* Dice placeholder - hides dice visually but preserves layout space */
+.DicePlaceholder {
+  visibility: hidden; /* Hide dice but keep its space in layout */
+  pointer-events: none; /* Disable interactions */
+}
+
+/* Dice wrapper - ensures consistent height regardless of dice state */
+.DiceWrapper {
+  min-height: 80px; /* Reserve space for dice (40px height + 20px margin top + 20px margin bottom) */
+  min-width: 160px; /* Minimum width to accommodate SetResultContainer and prevent resizing */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box; /* Include padding/border in width calculation */
 }

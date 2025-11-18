@@ -20,7 +20,7 @@ import { ISaga } from './interfaces';
  * Spread operator flattens saga arrays from different containers
  */
 const sagas: ISaga[] = [
-  ...ludoSagas,  // Ludo game logic sagas (coin spawning, movement validation, etc.)
+  ...ludoSagas,  // Ludo game logic sagas (horse spawning, movement validation, etc.)
   ...dieSagas,   // Dice sagas (rolling, auto-actions, turn management)
 ];
 

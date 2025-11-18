@@ -9,7 +9,6 @@ import { ForkEffect } from 'redux-saga/effects';
 
 import { IState as IDiceState } from 'containers/Dice/state/interfaces';
 import { IState as ILudoState } from 'containers/Ludo/state/interfaces';
-import { IState as IContextMenuState } from 'services/contextMenu/interfaces';
 import { IState as IStepLogsState } from 'containers/StepLogs/state/interfaces';
 
 /**
@@ -40,8 +39,7 @@ export enum WalkwayPosition {
  * Contains state slices for all major features of the Ludo game
  */
 export interface IApplicationState {
-  ludo: ILudoState;           // Main Ludo game state (coins, bases, cells)
-  contextMenu: IContextMenuState; // Right-click context menu state
+  ludo: ILudoState;           // Main Ludo game state (horses, bases, cells)
   dice: IDiceState;           // Dice rolling and turn management state
   stepLogs: IStepLogsState;   // Game action logging and auto-play settings
 }

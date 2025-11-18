@@ -8,30 +8,34 @@
 import { BaseColors, WalkwayPosition } from 'state/interfaces';
 
 /**
- * Represents a single game coin/piece that players control
+ * Represents a single game horse/piece that players control
  */
-export interface ICoin {
-  /** Whether this coin has completed the game (reached home) */
+export interface IHorse {
+  /** Whether this horse has completed the game (reached home) */
   isRetired: boolean;
-  /** Whether this coin has been spawned from base onto the board */
+  /** Whether this horse has been spawned from base onto the board */
   isSpawned: boolean;
-  /** Unique identifier for this coin */
-  coinID: string;
-  /** Color of this coin (matches its base color) */
+  /** Unique identifier for this horse */
+  horseID: string;
+  /** Color of this horse (matches its base color) */
   color: BaseColors;
-  /** ID of the base this coin belongs to */
+  /** ID of the base this horse belongs to */
   baseID: IBase['ID'];
-  /** Number of steps this coin has taken along the walkway */
+  /** Number of steps this horse has taken along the walkway */
   steps: number;
-  /** ID of the cell this coin is currently occupying */
+  /** ID of the cell this horse is currently occupying */
   cellID: ICell['cellID'];
-  /** Position on the walkway where this coin is located */
+  /** Position on the walkway where this horse is located */
   position: WalkwayPosition;
+  /** Whether this horse is currently jumping (for animation) */
+  isJumping?: boolean;
+  /** Whether this horse is currently flying to base (for kick animation) */
+  isFlyingToBase?: boolean;
 }
 
 /**
  * Enumeration of possible player bases in the Ludo game
- * Each base represents one player and has 4 coins
+ * Each base represents one player and has 4 horses
  */
 export enum BaseID {
   BASE_1 = 'BASE_1', // Player 1 (typically red)
@@ -41,18 +45,18 @@ export enum BaseID {
 }
 
 /**
- * Represents a player's base/home area where coins start and can be sent back to
+ * Represents a player's base/home area where horses start and can be sent back to
  */
 export interface IBase {
-  /** Array of coin IDs that belong to this base */
-  coinIDs: ICoin['coinID'][];
+  /** Array of horse IDs that belong to this base */
+  horseIDs: IHorse['horseID'][];
   /** Color associated with this base/player */
   color: BaseColors;
   /** Unique identifier for this base */
   ID: BaseID;
   /** ID of the next base in turn order */
   nextTurn: BaseID;
-  /** Whether this base can currently spawn new coins (has rolled a 6) */
+  /** Whether this base can currently spawn new horses (has rolled a 6) */
   spawnable: boolean;
   /** Whether this player has won the game */
   hasWon: boolean;
@@ -61,7 +65,7 @@ export interface IBase {
 }
 
 /**
- * Represents a position on the game walkway/path that coins travel along
+ * Represents a position on the game walkway/path that horses travel along
  */
 export interface IWalkway {
   /** Position coordinate on the walkway */
@@ -77,7 +81,7 @@ export interface IWalkway {
  */
 export enum BoardEntities {
   BASE = 'BASE',      // Starting area for each player
-  WALKWAY = 'WALKWAY', // The path coins travel along
+  WALKWAY = 'WALKWAY', // The path horses travel along
   HOME = 'HOME',      // Final destination area
 }
 
@@ -85,7 +89,7 @@ export enum BoardEntities {
  * Different types of cells that can exist on the game board
  */
 export enum CellType {
-  SPAWN = 'SPAWN',      // Cells where coins spawn from base
+  SPAWN = 'SPAWN',      // Cells where horses spawn from base
   HOMEPATH = 'HOMEPATH', // Cells on the path to home
   NORMAL = 'NORMAL',    // Regular walkway cells
 }
@@ -106,8 +110,12 @@ export interface ICell {
   cellType: CellType;
   /** ID of the base this cell belongs to */
   baseID: IBase['ID'];
-  /** Array of coin IDs currently occupying this cell */
-  coinIDs: ICoin['coinID'][];
+  /** Array of horse IDs currently occupying this cell */
+  horseIDs: IHorse['horseID'][];
+  /** Index value for NORMAL cells (for debugging) */
+  index?: number;
+  /** Whether this cell should not be rendered in the walkway (rendered in Home instead) */
+  notRenderInWalkway?: boolean;
 }
 
 /**
@@ -137,8 +145,8 @@ export interface IState {
   cells: IServerGameData['cells'];
   /** Links between cells for pathfinding */
   links: IServerGameData['links'];
-  /** Dictionary of all coins in the game, keyed by coinID */
-  coins: { [coinID: string]: ICoin };
+  /** Dictionary of all horses in the game, keyed by horseID */
+  horses: { [horseID: string]: IHorse };
   /** ID of the base whose turn it currently is */
   currentTurn: BaseID;
   /** Available actions for the player to choose from (null when no action selection needed) */
@@ -147,20 +155,30 @@ export interface IState {
   availableActionsDieValue: number | null;
   /** Set of cell IDs that should be highlighted as reachable for current player */
   highlightedCells: Set<string> | null;
+  /** Map of cellID to array of horses that can reach it with their move types */
+  highlightedCellsByHorse: Map<string, Array<{ horseID: IHorse['horseID']; moveType: 'spawn' | 'kick' | 'move' }>> | null;
+  /** ID of horse being hovered in action selection (for highlighting) */
+  hoveredHorseID: IHorse['horseID'] | null;
 }
 
 /**
  * Available action option for player selection UI
  */
 export interface IAvailableAction {
-  /** Type of action: 'spawn' or 'move' */
-  type: 'spawn' | 'move';
-  /** ID of the coin this action applies to */
-  coinID: ICoin['coinID'];
+  /** Type of action: 'spawn', 'move', 'kick', or 'move_before' */
+  type: 'spawn' | 'move' | 'kick' | 'move_before';
+  /** ID of the horse this action applies to */
+  horseID: IHorse['horseID'];
   /** Human-readable label for this action */
   label: string;
   /** Optional description/details about this action */
   description?: string;
+  /** For 'kick' and 'move_before' actions: ID of the blocking horse */
+  blockingHorseID?: IHorse['horseID'];
+  /** For 'move_before' action: number of steps to move before blocking horse */
+  stepsBeforeBlocking?: number;
+  /** Optional: steps to use for this move (when using single die instead of sum) */
+  stepsToUse?: number;
 }
 
 /**
@@ -170,8 +188,8 @@ export interface IAvailableAction {
 export interface IServerGameData {
   /** Array of all player bases */
   bases: IBase[];
-  /** Array of all coins in the game */
-  coins: ICoin[];
+  /** Array of all horses in the game */
+  horses: IHorse[];
   /** Array of all walkway segments */
   walkways: IWalkway[];
   /** Array of relationships between board entities */
@@ -187,24 +205,24 @@ export interface IServerGameData {
 }
 
 /**
- * Represents a movement pathway for a coin from one cell to another
- * Used for validating and executing coin movements
+ * Represents a movement pathway for a horse from one cell to another
+ * Used for validating and executing horse movements
  */
 export interface IPathway {
   /** Starting position of the movement */
   from: {
-    /** ID of the cell the coin is moving from */
+    /** ID of the cell the horse is moving from */
     cellID: ICell['cellID'];
-    /** Walkway position the coin is moving from */
+    /** Walkway position the horse is moving from */
     walkwayPosition: WalkwayPosition;
   };
   /** Ending position of the movement */
   to: {
-    /** ID of the cell the coin is moving to */
+    /** ID of the cell the horse is moving to */
     cellID: ICell['cellID'];
-    /** Walkway position the coin is moving to */
+    /** Walkway position the horse is moving to */
     walkwayPosition: WalkwayPosition;
   };
-  /** ID of the coin being moved */
-  coinID: ICoin['coinID'];
+  /** ID of the horse being moved */
+  horseID: IHorse['horseID'];
 }

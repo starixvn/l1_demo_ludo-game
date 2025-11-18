@@ -1,7 +1,7 @@
 /**
  * Base Container Component Styles
  *
- * Styles for the player base containers where coins start the game.
+ * Styles for the player base containers where horses start the game.
  */
 
 /* Outer container - provides centering and positioning */
@@ -12,12 +12,12 @@
   position: relative;      /* Required for absolute positioning of base info */
 }
 
-/* Inner container - holds the coin placeholders in a grid */
+/* Inner container - holds the horse placeholders in a grid */
 .InnerContainer {
-  display: flex;                /* Use flexbox for coin layout */
-  flex-direction: row;          /* Arrange coins in rows */
+  display: flex;                /* Use flexbox for horse layout */
+  flex-direction: row;          /* Arrange horses in rows */
   background-color: #FFFFFF;    /* White background for contrast */
-  flex-wrap: wrap;              /* Allow coins to wrap to new lines */
+  flex-wrap: wrap;              /* Allow horses to wrap to new lines */
   box-shadow: 0px 2px 5px 0px;  /* Subtle shadow for depth */
 }
 
@@ -66,18 +66,18 @@
   margin-bottom: 1px;          /* Small spacing */
 }
 
-/* Coin status display (counts of coins in different states) */
-.CoinStatus {
+/* Horse status display (counts of horses in different states) */
+.HorseStatus {
   font-size: 7px;              /* Very small text */
-  color: #27ae60;              /* Green color for coin counts */
+  color: #27ae60;              /* Green color for horse counts */
   line-height: 1.2;            /* Tight line spacing */
 }
 
-.CoinStatus span {
+.HorseStatus span {
   display: block;              /* Each status on new line */
   margin-bottom: 1px;          /* Spacing between lines */
 }
 
-.CoinStatus span:last-child {
+.HorseStatus span:last-child {
   margin-bottom: 0;            /* No margin on last item */
 }

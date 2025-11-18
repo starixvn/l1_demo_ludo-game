@@ -31,9 +31,9 @@ export const linksSelector = createSelector(
   (state) => state.links,
 );
 
-export const coinsSelector = createSelector(
+export const horsesSelector = createSelector(
   [ludoStateSelector],
-  (state) => state.coins,
+  (state) => state.horses,
 );
 
 export const currentTurnSelector = createSelector(
@@ -54,4 +54,14 @@ export const availableActionsDieValueSelector = createSelector(
 export const highlightedCellsSelector = createSelector(
   [ludoStateSelector],
   (state) => state.highlightedCells,
+);
+
+export const highlightedCellsByHorseSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.highlightedCellsByHorse,
+);
+
+export const hoveredHorseIDSelector = createSelector(
+  [ludoStateSelector],
+  (state) => state.hoveredHorseID,
 );

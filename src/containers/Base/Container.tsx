@@ -1,33 +1,31 @@
 /**
  * Base Container Component
  *
- * Represents a player's starting base where coins begin the game.
- * Shows 4 coin placeholders that can spawn coins when the player rolls a 6.
+ * Represents a player's starting base where horses begin the game.
+ * Shows 4 horse placeholders that can spawn horses when the player rolls a 6.
  * The base becomes "spawnable" when the player rolls a 6 on the die.
  */
 
-import classnames from 'classnames';                             // Utility for conditional CSS classes
-import React from 'react';
-import { connect } from 'react-redux';                    // Redux connection
-import { createStructuredSelector } from 'reselect';      // Optimized state selection
+import classnames from "classnames"; // Utility for conditional CSS classes
+import React from "react";
+import { connect } from "react-redux"; // Redux connection
+import { createStructuredSelector } from "reselect"; // Optimized state selection
 
-import { isDieRollValidSelector } from 'containers/Dice/state/selectors'; // Die roll validation
-import { spawnCoin } from 'containers/Ludo/state/actions'; // Spawn coin action
-import { IBase, ICoin } from 'containers/Ludo/state/interfaces'; // Game data types
-import { basesSelector, coinsSelector } from 'containers/Ludo/state/selectors'; // State selectors
-import { getStyleObject } from 'containers/utils';        // Styling utilities
-import { BASE_SIZE, INNER_BASE_SIZE } from 'globalConstants'; // Size constants
+import { IBase } from "containers/Ludo/state/interfaces"; // Game data types
+import { basesSelector, horsesSelector, hoveredHorseIDSelector } from "containers/Ludo/state/selectors"; // State selectors
+import { getStyleObject } from "containers/utils"; // Styling utilities
+import { BASE_SIZE, INNER_BASE_SIZE } from "globalConstants"; // Size constants
 
-import { CoinPlaceholder } from './components/CoinPlaceholder'; // Coin placeholder component
+import { HorsePlaceholder } from "./components/HorsePlaceholder"; // Horse placeholder component
 
-import styles from './Container.module.css';              // Component styles
+import styles from "./Container.module.css"; // Component styles
 
 /**
  * Public props for the Base component
  */
 interface IPublicProps {
   /** Unique identifier for this base (BASE_1, BASE_2, etc.) */
-  baseID: IBase['ID'];
+  baseID: IBase["ID"];
   /** Whether this base is enabled/active in the current game */
   enabled: boolean;
   /** Whether the player of this base has won the game */
@@ -40,16 +38,16 @@ interface IPublicProps {
  * Props from Redux state
  */
 interface IStateProps {
-  bases: ReturnType<typeof basesSelector>;           // All player bases
-  coins: ReturnType<typeof coinsSelector>;           // All coins in the game
-  isDieRollValid: ReturnType<typeof isDieRollValidSelector>; // Whether die roll can be used
+  bases: ReturnType<typeof basesSelector>; // All player bases
+  horses: ReturnType<typeof horsesSelector>; // All horses in the game
+  hoveredHorseID: ReturnType<typeof hoveredHorseIDSelector>; // ID of horse being hovered
 }
 
 /**
  * Props for Redux dispatch actions
  */
 interface IDispatchProps {
-  spawnCoin: typeof spawnCoin; // Action to spawn a coin from base
+  // No dispatch props needed - horses are not clickable, actions must be chosen from action panel
 }
 
 /** Combined component props */
@@ -58,27 +56,25 @@ interface IProps extends IPublicProps, IDispatchProps, IStateProps {}
 /**
  * Maps Redux dispatch actions to component props
  */
-const mapDispatchToProps = {
-  spawnCoin, // Spawn coin action
-};
+const mapDispatchToProps = {};
 
 /**
  * Maps Redux state to component props using reselect
  */
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
-  bases: basesSelector,                     // Get all player bases
-  coins: coinsSelector,                     // Get all coins
-  isDieRollValid: isDieRollValidSelector,   // Get die roll validity
+  bases: basesSelector, // Get all player bases
+  horses: horsesSelector, // Get all horses
+  hoveredHorseID: hoveredHorseIDSelector, // Get hovered horse ID
 });
 
 /**
  * Base container component class
- * Renders a player's base with coin placeholders that can spawn coins
+ * Renders a player's base with horse placeholders that can spawn horses
  */
 class BaseBare extends React.PureComponent<IProps> {
   /**
    * Renders the base with outer and inner containers
-   * Shows coin placeholders that change appearance based on game state
+   * Shows horse placeholders that change appearance based on game state
    */
   render() {
     const { baseID, bases, enabled, hasWon } = this.props;
@@ -87,15 +83,22 @@ class BaseBare extends React.PureComponent<IProps> {
     // Add special styling when base is spawnable (player rolled a 6)
     const spawnableClass = base.spawnable ? styles.Spawnable : null;
 
-    // Count coins in different states for display
-    const coinsInBase = base.coinIDs.filter(coinID =>
-      this.props.coins[coinID] && !this.props.coins[coinID].isSpawned && !this.props.coins[coinID].isRetired
+    // Count horses in different states for display
+    const horsesInBase = base.horseIDs.filter(
+      (horseID) =>
+        this.props.horses[horseID] &&
+        !this.props.horses[horseID].isSpawned &&
+        !this.props.horses[horseID].isRetired
     ).length;
-    const coinsSpawned = base.coinIDs.filter(coinID =>
-      this.props.coins[coinID] && this.props.coins[coinID].isSpawned && !this.props.coins[coinID].isRetired
+    const horsesSpawned = base.horseIDs.filter(
+      (horseID) =>
+        this.props.horses[horseID] &&
+        this.props.horses[horseID].isSpawned &&
+        !this.props.horses[horseID].isRetired
     ).length;
-    const coinsHome = base.coinIDs.filter(coinID =>
-      this.props.coins[coinID] && this.props.coins[coinID].isRetired
+    const horsesHome = base.horseIDs.filter(
+      (horseID) =>
+        this.props.horses[horseID] && this.props.horses[horseID].isRetired
     ).length;
 
     return (
@@ -106,17 +109,17 @@ class BaseBare extends React.PureComponent<IProps> {
         {/* Base information display */}
         {this.props.showDebugText !== false && (
           <div className={styles.BaseInfo}>
-            <div className={styles.BaseID}>{baseID.replace('_', ' ')}</div>
+            <div className={styles.BaseID}>{baseID.replace("_", " ")}</div>
             <div className={styles.BaseColor}>{base.color}</div>
             <div className={styles.BaseStatus}>
-              {!enabled && 'DISABLED'}
-              {hasWon && 'WINNER!'}
-              {enabled && !hasWon && base.spawnable && 'SPAWN READY'}
+              {!enabled && "DISABLED"}
+              {hasWon && "WINNER!"}
+              {enabled && !hasWon && base.spawnable && "SPAWN READY"}
             </div>
-            <div className={styles.CoinStatus}>
-              {coinsInBase > 0 && <span>In Base: {coinsInBase}</span>}
-              {coinsSpawned > 0 && <span>On Board: {coinsSpawned}</span>}
-              {coinsHome > 0 && <span>Home: {coinsHome}</span>}
+            <div className={styles.HorseStatus}>
+              {horsesInBase > 0 && <span>In Base: {horsesInBase}</span>}
+              {horsesSpawned > 0 && <span>On Board: {horsesSpawned}</span>}
+              {horsesHome > 0 && <span>Home: {horsesHome}</span>}
             </div>
           </div>
         )}
@@ -126,16 +129,20 @@ class BaseBare extends React.PureComponent<IProps> {
           style={getStyleObject(INNER_BASE_SIZE, INNER_BASE_SIZE)} // Inner area sizing
         >
           {
-            // Render 4 coin placeholders (one for each coin in the base)
-            base.coinIDs.map((coinID, index) => {
-              const coin = this.props.coins[coinID];
+            // Render 4 horse placeholders (one for each horse in the base)
+            base.horseIDs.map((horseID, index) => {
+              const horse = this.props.horses[horseID];
               return (
-                <CoinPlaceholder
+                <HorsePlaceholder
                   key={index}
-                  baseColor={base.color} // Coin color matches base color
-                  // Hide coin if base is disabled OR coin is already spawned/retired
-                  isCoinHidden={!this.props.enabled || (coin.isSpawned || coin.isRetired)}
-                  onCoinClicked={() => this.onCoinClicked(base, coin)}
+                  baseColor={base.color} // Horse color matches base color
+                  horseID={horseID} // Pass horse ID to display number
+                  // Hide horse if base is disabled OR horse is already spawned/retired
+                  isHorseHidden={
+                    !this.props.enabled || horse.isSpawned || horse.isRetired
+                  }
+                  isHovered={this.props.hoveredHorseID === horseID} // Whether this horse is being hovered
+                  // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
                 />
               );
             })
@@ -146,19 +153,17 @@ class BaseBare extends React.PureComponent<IProps> {
   }
 
   /**
-   * Handles coin click events for spawning
-   * Only allows spawning if base is spawnable and die roll is valid
+   * Handles horse click events for spawning
+   * DISABLED - Actions must be chosen from action panel
    */
-  private onCoinClicked = (base: IBase, coin: ICoin) => {
-    // Check if player can spawn (rolled 6) and die roll is still valid
-    if (base.spawnable && this.props.isDieRollValid) {
-      this.props.spawnCoin(base.ID, coin.coinID); // Dispatch spawn action
-    }
-  }
+  // private onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
 }
 
 /**
  * Connected Base component with Redux state and actions
  * Exports the component with proper TypeScript typing
  */
-export const Base = connect(mapStateToProps, mapDispatchToProps)(BaseBare) as unknown as React.ComponentClass<IPublicProps>;
+export const Base = connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(BaseBare) as unknown as React.ComponentClass<IPublicProps>;

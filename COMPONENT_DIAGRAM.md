@@ -31,32 +31,32 @@ graph TB
     %% Player Components
     Player1 --> PlayerAvatar1["PlayerAvatar"]
     Player1 --> Dice1["Dice"]
-    Player1 --> RetiredCoins1["Retired Coins<br/>(Coin components)"]
+    Player1 --> RetiredHorses1["Retired Horses<br/>(Horse components)"]
 
     Player2 --> PlayerAvatar2["PlayerAvatar"]
     Player2 --> Dice2["Dice"]
-    Player2 --> RetiredCoins2["Retired Coins"]
+    Player2 --> RetiredHorses2["Retired Horses"]
 
     Player3 --> PlayerAvatar3["PlayerAvatar"]
     Player3 --> Dice3["Dice"]
-    Player3 --> RetiredCoins3["Retired Coins"]
+    Player3 --> RetiredHorses3["Retired Horses"]
 
     Player4 --> PlayerAvatar4["PlayerAvatar"]
     Player4 --> Dice4["Dice"]
-    Player4 --> RetiredCoins4["Retired Coins"]
+    Player4 --> RetiredHorses4["Retired Horses"]
 
     %% Base Components
-    Base1 --> CoinPlaceholder1["CoinPlaceholder (x4)"]
-    Base1 --> CoinsInBase1["Coins in Base<br/>(Coin components)"]
+    Base1 --> HorsePlaceholder1["HorsePlaceholder (x4)"]
+    Base1 --> HorsesInBase1["Horses in Base<br/>(Horse components)"]
 
-    Base2 --> CoinPlaceholder2["CoinPlaceholder (x4)"]
-    Base2 --> CoinsInBase2["Coins in Base"]
+    Base2 --> HorsePlaceholder2["HorsePlaceholder (x4)"]
+    Base2 --> HorsesInBase2["Horses in Base"]
 
-    Base3 --> CoinPlaceholder3["CoinPlaceholder (x4)"]
-    Base3 --> CoinsInBase3["Coins in Base"]
+    Base3 --> HorsePlaceholder3["HorsePlaceholder (x4)"]
+    Base3 --> HorsesInBase3["Horses in Base"]
 
-    Base4 --> CoinPlaceholder4["CoinPlaceholder (x4)"]
-    Base4 --> CoinsInBase4["Coins in Base"]
+    Base4 --> HorsePlaceholder4["HorsePlaceholder (x4)"]
+    Base4 --> HorsesInBase4["Horses in Base"]
 
     %% Walkway Components
     Walkway1 --> Cells1["Cell Components<br/>(Multiple)"]
@@ -64,13 +64,13 @@ graph TB
     Walkway3 --> Cells3["Cell Components<br/>(Multiple)"]
     Walkway4 --> Cells4["Cell Components<br/>(Multiple)"]
 
-    Walkway1 --> CoinsOnWalkway1["Coins on Walkway<br/>(Coin components)"]
-    Walkway2 --> CoinsOnWalkway2["Coins on Walkway"]
-    Walkway3 --> CoinsOnWalkway3["Coins on Walkway"]
-    Walkway4 --> CoinsOnWalkway4["Coins on Walkway"]
+    Walkway1 --> HorsesOnWalkway1["Horses on Walkway<br/>(Horse components)"]
+    Walkway2 --> HorsesOnWalkway2["Horses on Walkway"]
+    Walkway3 --> HorsesOnWalkway3["Horses on Walkway"]
+    Walkway4 --> HorsesOnWalkway4["Horses on Walkway"]
 
     %% Redux State Store
-    ReduxStore["Redux Store"] --> LudoState["Ludo State<br/>(bases, coins, cells,<br/>walkways, links,<br/>currentTurn)"]
+    ReduxStore["Redux Store"] --> LudoState["Ludo State<br/>(bases, horses, cells,<br/>walkways, links,<br/>currentTurn)"]
     ReduxStore --> DiceState["Dice State<br/>(isDieRollAllowed,<br/>isDieRollValid, roll)"]
     ReduxStore --> StepLogsState["StepLogs State<br/>(logs, autoActionsEnabled,<br/>autoActionTimeout)"]
     ReduxStore --> ContextMenuState["ContextMenu State"]
@@ -120,7 +120,7 @@ graph TB
     classDef saga fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
 
     class Ludo,Base1,Base2,Base3,Base4,Walkway1,Walkway2,Walkway3,Walkway4,Player1,Player2,Player3,Player4,Home,StepLogs container
-    class Dice1,Dice2,Dice3,Dice4,PlayerAvatar1,PlayerAvatar2,PlayerAvatar3,PlayerAvatar4,CoinPlaceholder1,CoinPlaceholder2,CoinPlaceholder3,CoinPlaceholder4,Cells1,Cells2,Cells3,Cells4 component
+    class Dice1,Dice2,Dice3,Dice4,PlayerAvatar1,PlayerAvatar2,PlayerAvatar3,PlayerAvatar4,HorsePlaceholder1,HorsePlaceholder2,HorsePlaceholder3,HorsePlaceholder4,Cells1,Cells2,Cells3,Cells4 component
     class LudoState,DiceState,StepLogsState,ContextMenuState state
     class LudoSagas,DiceSagas saga
 ```
@@ -139,25 +139,25 @@ graph TB
 2. **Player Container** (`containers/Player/Container.tsx`)
 
    - Displays player information (4 instances)
-   - Shows player avatar, dice, and retired coins
+   - Shows player avatar, dice, and retired horses
    - Positioned around the game board (top/bottom, left/right)
 
 3. **Base Container** (`containers/Base/Container.tsx`)
 
    - Represents player starting areas (4 instances)
-   - Contains coin placeholders that spawn coins
-   - Shows coins waiting in base
+   - Contains horse placeholders that spawn horses
+   - Shows horses waiting in base
 
 4. **Walkway Container** (`containers/Walkway/Container.tsx`)
 
    - Represents movement paths (4 instances - NORTH, SOUTH, EAST, WEST)
-   - Contains cells that coins move along
-   - Handles coin movement interactions
+   - Contains cells that horses move along
+   - Handles horse movement interactions
 
 5. **Home Container** (`containers/Home/Container.tsx`)
 
-   - Final destination area where coins finish
-   - Shows completed coins
+   - Final destination area where horses finish
+   - Shows completed horses
 
 6. **Dice Container** (`containers/Dice/Container.tsx`)
 
@@ -172,7 +172,7 @@ graph TB
 
 ### Sub-Components
 
-1. **Coin** (`containers/Base/components/Coin.tsx`)
+1. **Horse** (`containers/Base/components/Horse.tsx`)
 
    - Rendered in multiple places:
      - In bases (waiting to spawn)
@@ -180,9 +180,9 @@ graph TB
      - In homes (completed)
      - In player panels (retired)
 
-2. **CoinPlaceholder** (`containers/Base/components/CoinPlaceholder.tsx`)
+2. **HorsePlaceholder** (`containers/Base/components/HorsePlaceholder.tsx`)
 
-   - Empty slots in bases where coins can spawn
+   - Empty slots in bases where horses can spawn
 
 3. **Cell** (`containers/Walkway/components/Cell.tsx`)
 
@@ -197,7 +197,7 @@ graph TB
 ### Ludo State (`containers/Ludo/state/`)
 
 - **bases**: All player bases with configuration
-- **coins**: All coins with positions and states
+- **horses**: All horses with positions and states
 - **cells**: All board cells with types and positions
 - **walkways**: Walkway configurations
 - **links**: Cell connectivity for movement
@@ -232,7 +232,7 @@ graph TB
 - **4 Walkways**: Movement paths (NORTH, SOUTH, EAST, WEST)
 - **4 Dice**: One per active player
 - **Multiple Cells**: Each walkway contains a grid of cells
-- **Multiple Coins**: Each player has 4 coins that move independently
+- **Multiple Horses**: Each player has 4 horses that move independently
 
 ## Component Communication
 

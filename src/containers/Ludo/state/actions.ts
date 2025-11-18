@@ -8,7 +8,7 @@
 import { Rolls } from 'containers/Dice/state/interfaces';
 import { IReduxAction, WalkwayPosition } from 'state/interfaces';
 
-import { IBase, ICell, ICoin, IState, IWalkway, BaseID } from './interfaces';
+import { IBase, ICell, IHorse, IState, IWalkway, BaseID } from './interfaces';
 
 /**
  * Action Types for Ludo Game State Management
@@ -19,16 +19,17 @@ export enum ActionTypes {
   GET_INITIAL_GAME_DATA = 'ludo/GET_INITIAL_GAME_DATA',           // Request to load initial game state
   GET_INITIAL_GAME_DATA_SUCCESS = 'ludo/GET_INITIAL_GAME_DATA_SUCCESS', // Game data loaded successfully
 
-  // Coin Movement Actions
-  SPAWN_COIN = 'ludo/SPAWN_COIN',                               // Move coin from base to starting position (requires rolling 6)
-  SPAWN_COIN_SUCCESS = 'ludo/SPAWN_COIN_SUCCESS',               // Coin successfully spawned on board
-  MOVE_COIN = 'ludo/MOVE_COIN',                                 // Move coin along the walkway
-  MOVE_COIN_SUCCESS = 'ludo/MOVE_COIN_SUCCESS',                 // Coin movement completed successfully
-  MOVE_COIN_FAILURE = 'ludo/MOVE_COIN_FAILURE',                 // Coin movement failed (invalid move)
-  LIFT_COIN = 'ludo/LIFT_COIN',                                 // Pick up coin from current position (UI interaction)
-  PLACE_COIN = 'ludo/PLACE_COIN',                               // Place coin at target position (UI interaction)
-  DISQUALIFY_COIN = 'ludo/DISQUALIFY_COIN',                     // Send coin back to base (when hit by opponent)
-  HOME_COIN = 'ludo/HOME_COIN',                                 // Move coin to home position (game completion)
+  // Horse Movement Actions
+  SPAWN_HORSE = 'ludo/SPAWN_HORSE',                               // Move horse from base to starting position (requires rolling 6)
+  SPAWN_HORSE_SUCCESS = 'ludo/SPAWN_HORSE_SUCCESS',               // Horse successfully spawned on board
+  MOVE_HORSE = 'ludo/MOVE_HORSE',                                 // Move horse along the walkway
+  MOVE_HORSE_SUCCESS = 'ludo/MOVE_HORSE_SUCCESS',                 // Horse movement completed successfully
+  MOVE_HORSE_FAILURE = 'ludo/MOVE_HORSE_FAILURE',                 // Horse movement failed (invalid move)
+  LIFT_HORSE = 'ludo/LIFT_HORSE',                                 // Pick up horse from current position (UI interaction)
+  PLACE_HORSE = 'ludo/PLACE_HORSE',                               // Place horse at target position (UI interaction)
+  DISQUALIFY_HORSE = 'ludo/DISQUALIFY_HORSE',                     // Send horse back to base (when hit by opponent)
+  COMPLETE_DISQUALIFY_HORSE = 'ludo/COMPLETE_DISQUALIFY_HORSE',   // Complete disqualification after animation
+  HOME_HORSE = 'ludo/HOME_HORSE',                                 // Move horse to home position (game completion)
 
   // Turn Management Actions
   NEXT_TURN = 'ludo/NEXT_TURN',                                 // Advance to next player's turn
@@ -49,6 +50,16 @@ export enum ActionTypes {
   // Cell Highlighting Actions
   SET_HIGHLIGHTED_CELLS = 'ludo/SET_HIGHLIGHTED_CELLS',         // Set cells to highlight as reachable
   CLEAR_HIGHLIGHTED_CELLS = 'ludo/CLEAR_HIGHLIGHTED_CELLS',     // Clear cell highlighting
+  
+  // Horse Hover Highlighting Actions
+  SET_HOVERED_HORSE = 'ludo/SET_HOVERED_HORSE',                 // Set which horse is being hovered (for action selection)
+  CLEAR_HOVERED_HORSE = 'ludo/CLEAR_HOVERED_HORSE',             // Clear horse hover highlighting
+
+  // Horse Animation Actions
+  START_HORSE_JUMP = 'ludo/START_HORSE_JUMP',                   // Start horse jumping animation
+  STOP_HORSE_JUMP = 'ludo/STOP_HORSE_JUMP',                     // Stop horse jumping animation
+  START_HORSE_FLYING = 'ludo/START_HORSE_FLYING',               // Start horse flying to base animation (when kicked)
+  STOP_HORSE_FLYING = 'ludo/STOP_HORSE_FLYING',                 // Stop horse flying animation
 }
 
 /**
@@ -74,64 +85,71 @@ export const getInitialGameDataSuccess = (gameData: IState): IReduxAction<Action
 });
 
 /**
- * Attempt to spawn a coin from the base onto the starting position
+ * Attempt to spawn a horse from the base onto the starting position
  * This requires the player to have rolled a 6 on the die
  * @param baseID - ID of the player's base
- * @param coinID - ID of the coin to spawn
+ * @param horseID - ID of the horse to spawn
  */
-export const spawnCoin = (baseID: IBase['ID'], coinID: ICoin['coinID']): IReduxAction<ActionTypes.SPAWN_COIN, { baseID: IBase['ID'], coinID: ICoin['coinID'] }> => ({
-  data: { baseID, coinID },
-  type: ActionTypes.SPAWN_COIN,
+export const spawnHorse = (baseID: IBase['ID'], horseID: IHorse['horseID']): IReduxAction<ActionTypes.SPAWN_HORSE, { baseID: IBase['ID'], horseID: IHorse['horseID'] }> => ({
+  data: { baseID, horseID },
+  type: ActionTypes.SPAWN_HORSE,
 });
 
 /**
- * Action dispatched when a coin has been successfully spawned
- * @param cellID - ID of the cell where coin was placed
- * @param coinID - ID of the spawned coin
- * @param baseID - ID of the base the coin came from
- * @param position - Position on the walkway where coin was placed
+ * Action dispatched when a horse has been successfully spawned
+ * @param cellID - ID of the cell where horse was placed
+ * @param horseID - ID of the spawned horse
+ * @param baseID - ID of the base the horse came from
+ * @param position - Position on the walkway where horse was placed
  */
-export const spawnCoinSuccess = (
+export const spawnHorseSuccess = (
   cellID: ICell['cellID'],
-  coinID: ICoin['coinID'],
+  horseID: IHorse['horseID'],
   baseID: IBase['ID'],
   position: IWalkway['position'],
-): IReduxAction<ActionTypes.SPAWN_COIN_SUCCESS, { cellID: ICell['cellID'], coinID: ICoin['coinID'], position: IWalkway['position'] }> => ({
-  data: { cellID, coinID, position },
-  type: ActionTypes.SPAWN_COIN_SUCCESS,
+): IReduxAction<ActionTypes.SPAWN_HORSE_SUCCESS, { cellID: ICell['cellID'], horseID: IHorse['horseID'], position: IWalkway['position'] }> => ({
+  data: { cellID, horseID, position },
+  type: ActionTypes.SPAWN_HORSE_SUCCESS,
 });
 
 /**
- * Attempt to move a coin to a new position on the walkway
- * @param coinID - ID of the coin to move
+ * Attempt to move a horse to a new position on the walkway
+ * @param horseID - ID of the horse to move
  * @param walkwayPosition - Target position on the walkway
  * @param cellID - ID of the target cell
  */
-export const moveCoin = (coinID: ICoin['coinID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']): IReduxAction<ActionTypes.MOVE_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; }> => ({
-  data: { cellID, coinID, walkwayPosition },
-  type: ActionTypes.MOVE_COIN,
+export const moveHorse = (
+  horseID: IHorse['horseID'], 
+  walkwayPosition: WalkwayPosition, 
+  cellID: ICell['cellID'],
+  blockingHorseID?: IHorse['horseID'],
+  stepsBeforeBlocking?: number,
+  stepsToUse?: number
+): IReduxAction<ActionTypes.MOVE_HORSE, { horseID: IHorse['horseID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; blockingHorseID?: IHorse['horseID']; stepsBeforeBlocking?: number; stepsToUse?: number }> => ({
+  data: { cellID, horseID, walkwayPosition, blockingHorseID, stepsBeforeBlocking, stepsToUse },
+  type: ActionTypes.MOVE_HORSE,
 });
 
 /**
- * Place a coin at a specific position (UI interaction)
- * @param cellID - ID of the cell where coin will be placed
- * @param coinID - ID of the coin to place
- * @param walkwayPosition - Position on walkway where coin will be placed
+ * Place a horse at a specific position (UI interaction)
+ * @param cellID - ID of the cell where horse will be placed
+ * @param horseID - ID of the horse to place
+ * @param walkwayPosition - Position on walkway where horse will be placed
  */
-export const placeCoin = (cellID: ICell['cellID'], coinID: ICoin['coinID'], walkwayPosition: WalkwayPosition): IReduxAction<ActionTypes.PLACE_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; }> => ({
-  data: { cellID, coinID, walkwayPosition },
-  type: ActionTypes.PLACE_COIN,
+export const placeHorse = (cellID: ICell['cellID'], horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition): IReduxAction<ActionTypes.PLACE_HORSE, { horseID: IHorse['horseID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; }> => ({
+  data: { cellID, horseID, walkwayPosition },
+  type: ActionTypes.PLACE_HORSE,
 });
 
 /**
- * Lift/pick up a coin from its current position (UI interaction)
- * @param cellID - ID of the cell where coin is currently located
- * @param coinID - ID of the coin to lift
- * @param walkwayPosition - Current position of the coin on walkway
+ * Lift/pick up a horse from its current position (UI interaction)
+ * @param cellID - ID of the cell where horse is currently located
+ * @param horseID - ID of the horse to lift
+ * @param walkwayPosition - Current position of the horse on walkway
  */
-export const liftCoin = (cellID: ICell['cellID'], coinID: ICoin['coinID'], walkwayPosition: WalkwayPosition): IReduxAction<ActionTypes.LIFT_COIN, { coinID: ICoin['coinID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; }> => ({
-  data: { cellID, coinID, walkwayPosition },
-  type: ActionTypes.LIFT_COIN,
+export const liftHorse = (cellID: ICell['cellID'], horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition): IReduxAction<ActionTypes.LIFT_HORSE, { horseID: IHorse['horseID']; walkwayPosition: WalkwayPosition; cellID: ICell['cellID']; }> => ({
+  data: { cellID, horseID, walkwayPosition },
+  type: ActionTypes.LIFT_HORSE,
 });
 
 /**
@@ -152,7 +170,7 @@ export const passTurnTo = (baseID: IBase['ID']): IReduxAction<ActionTypes.PASS_T
 
 /**
  * Mark which player's base is currently active/spawnable
- * @param spawnable - Whether the current base can spawn new coins
+ * @param spawnable - Whether the current base can spawn new horses
  */
 export const markCurrentBase = (spawnable: boolean): IReduxAction<ActionTypes.MARK_CURRENT_BASE, { spawnable: boolean }> => ({
   data: { spawnable },
@@ -169,41 +187,52 @@ export const markWinner = (baseID: BaseID): IReduxAction<ActionTypes.MARK_WINNER
 });
 
 /**
- * Action dispatched when a coin movement has been completed successfully
+ * Action dispatched when a horse movement has been completed successfully
  * @param bonusChance - Whether the player gets an extra turn
- * @param coinID - ID of the coin that was moved
+ * @param horseID - ID of the horse that was moved
  * @param currentDieRoll - The die roll value that caused this move
  */
-export const moveCoinSuccess = (bonusChance: boolean, coinID: ICoin['coinID'], currentDieRoll: Rolls): IReduxAction<ActionTypes.MOVE_COIN_SUCCESS, { bonusChance: boolean, coinID: ICoin['coinID'], currentDieRoll: Rolls }> => ({
-  data: { bonusChance, currentDieRoll, coinID },
-  type: ActionTypes.MOVE_COIN_SUCCESS,
+export const moveHorseSuccess = (bonusChance: boolean, horseID: IHorse['horseID'], currentDieRoll: Rolls): IReduxAction<ActionTypes.MOVE_HORSE_SUCCESS, { bonusChance: boolean, horseID: IHorse['horseID'], currentDieRoll: Rolls }> => ({
+  data: { bonusChance, currentDieRoll, horseID },
+  type: ActionTypes.MOVE_HORSE_SUCCESS,
 });
 
 /**
- * Action dispatched when a coin movement attempt fails
+ * Action dispatched when a horse movement attempt fails
  */
-export const moveCoinFailure = (): IReduxAction<ActionTypes.MOVE_COIN_FAILURE, void> => ({
-  type: ActionTypes.MOVE_COIN_FAILURE,
+export const moveHorseFailure = (): IReduxAction<ActionTypes.MOVE_HORSE_FAILURE, void> => ({
+  type: ActionTypes.MOVE_HORSE_FAILURE,
 });
 
 /**
- * Send a coin back to its base (when hit by an opponent's coin)
- * @param coinID - ID of the coin to disqualify
- * @param walkwayPosition - Current position of the coin
- * @param cellID - ID of the cell where coin is currently located
+ * Send a horse back to its base (when hit by an opponent's horse)
+ * @param horseID - ID of the horse to disqualify
+ * @param walkwayPosition - Current position of the horse
+ * @param cellID - ID of the cell where horse is currently located
  */
-export const disqualifyCoin = (coinID: ICoin['coinID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']): IReduxAction<ActionTypes.DISQUALIFY_COIN, { coinID: ICoin['coinID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID'] }> => ({
-  data: { coinID, walkwayPosition, cellID },
-  type: ActionTypes.DISQUALIFY_COIN,
+export const disqualifyHorse = (horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']): IReduxAction<ActionTypes.DISQUALIFY_HORSE, { horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID'] }> => ({
+  data: { horseID, walkwayPosition, cellID },
+  type: ActionTypes.DISQUALIFY_HORSE,
 });
 
 /**
- * Move a coin to its home position (completing the game for that coin)
- * @param coinID - ID of the coin that reached home
+ * Complete horse disqualification after animation (internal use)
+ * @param horseID - ID of the horse to disqualify
+ * @param walkwayPosition - Current position of the horse
+ * @param cellID - ID of the cell where horse is currently located
  */
-export const homeCoin = (coinID: ICoin['coinID']): IReduxAction<ActionTypes.HOME_COIN, { coinID: ICoin['coinID'] }> => ({
-  data: { coinID },
-  type: ActionTypes.HOME_COIN,
+export const completeDisqualifyHorse = (horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID']): IReduxAction<ActionTypes.COMPLETE_DISQUALIFY_HORSE, { horseID: IHorse['horseID'], walkwayPosition: WalkwayPosition, cellID: ICell['cellID'] }> => ({
+  data: { horseID, walkwayPosition, cellID },
+  type: ActionTypes.COMPLETE_DISQUALIFY_HORSE,
+});
+
+/**
+ * Move a horse to its home position (completing the game for that horse)
+ * @param horseID - ID of the horse that reached home
+ */
+export const homeHorse = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.HOME_HORSE, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.HOME_HORSE,
 });
 
 /**
@@ -228,14 +257,20 @@ export const enableBase = (baseID: BaseID): IReduxAction<ActionTypes.ENABLE_BASE
  * Available action option for player selection UI
  */
 export interface IAvailableAction {
-  /** Type of action: 'spawn' or 'move' */
-  type: 'spawn' | 'move';
-  /** ID of the coin this action applies to */
-  coinID: ICoin['coinID'];
+  /** Type of action: 'spawn', 'move', 'kick', or 'move_before' */
+  type: 'spawn' | 'move' | 'kick' | 'move_before';
+  /** ID of the horse this action applies to */
+  horseID: IHorse['horseID'];
   /** Human-readable label for this action */
   label: string;
   /** Optional description/details about this action */
   description?: string;
+  /** For 'kick' and 'move_before' actions: ID of the blocking horse */
+  blockingHorseID?: IHorse['horseID'];
+  /** For 'move_before' action: number of steps to move before blocking horse */
+  stepsBeforeBlocking?: number;
+  /** Optional: steps to use for this move (when using single die instead of sum) */
+  stepsToUse?: number;
 }
 
 /**
@@ -261,11 +296,13 @@ export const clearAvailableActions = (): IReduxAction<ActionTypes.CLEAR_AVAILABL
 /**
  * Sets which cells should be highlighted as reachable for the current player
  * @param cellIDs - Set of cell IDs to highlight
+ * @param cellsByHorse - Map of cellID to array of horses that can reach it with their move types
  */
 export const setHighlightedCells = (
-  cellIDs: Set<string>
-): IReduxAction<ActionTypes.SET_HIGHLIGHTED_CELLS, { cellIDs: Set<string> }> => ({
-  data: { cellIDs },
+  cellIDs: Set<string>,
+  cellsByHorse?: Map<string, Array<{ horseID: string; moveType: 'spawn' | 'kick' | 'move' }>>
+): IReduxAction<ActionTypes.SET_HIGHLIGHTED_CELLS, { cellIDs: Set<string>; cellsByHorse?: Map<string, Array<{ horseID: string; moveType: 'spawn' | 'kick' | 'move' }>> }> => ({
+  data: { cellIDs, cellsByHorse },
   type: ActionTypes.SET_HIGHLIGHTED_CELLS,
 });
 
@@ -277,23 +314,78 @@ export const clearHighlightedCells = (): IReduxAction<ActionTypes.CLEAR_HIGHLIGH
 });
 
 /**
+ * Sets which horse is being hovered (for action selection highlighting)
+ * @param horseID - ID of the horse being hovered
+ */
+export const setHoveredHorse = (
+  horseID: IHorse['horseID']
+): IReduxAction<ActionTypes.SET_HOVERED_HORSE, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.SET_HOVERED_HORSE,
+});
+
+/**
+ * Clears horse hover highlighting
+ */
+export const clearHoveredHorse = (): IReduxAction<ActionTypes.CLEAR_HOVERED_HORSE, void> => ({
+  type: ActionTypes.CLEAR_HOVERED_HORSE,
+});
+
+/**
+ * Start horse jumping animation
+ * @param horseID - ID of the horse to animate
+ */
+export const startHorseJump = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.START_HORSE_JUMP, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.START_HORSE_JUMP,
+});
+
+/**
+ * Stop horse jumping animation
+ * @param horseID - ID of the horse to stop animating
+ */
+export const stopHorseJump = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.STOP_HORSE_JUMP, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.STOP_HORSE_JUMP,
+});
+
+/**
+ * Start horse flying to base animation (when kicked by opponent)
+ * @param horseID - ID of the horse to animate
+ */
+export const startHorseFlying = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.START_HORSE_FLYING, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.START_HORSE_FLYING,
+});
+
+/**
+ * Stop horse flying animation
+ * @param horseID - ID of the horse to stop animating
+ */
+export const stopHorseFlying = (horseID: IHorse['horseID']): IReduxAction<ActionTypes.STOP_HORSE_FLYING, { horseID: IHorse['horseID'] }> => ({
+  data: { horseID },
+  type: ActionTypes.STOP_HORSE_FLYING,
+});
+
+/**
  * Union type of all possible Ludo game actions
  * This type is used by the reducer to ensure type safety when handling actions
  * Each action type in this union corresponds to one of the action creators above
  */
 export type Actions =
   | ReturnType<typeof getInitialGameDataSuccess>
-  | ReturnType<typeof spawnCoin>
-  | ReturnType<typeof spawnCoinSuccess>
-  | ReturnType<typeof moveCoin>
-  | ReturnType<typeof liftCoin>
-  | ReturnType<typeof placeCoin>
+  | ReturnType<typeof spawnHorse>
+  | ReturnType<typeof spawnHorseSuccess>
+  | ReturnType<typeof moveHorse>
+  | ReturnType<typeof liftHorse>
+  | ReturnType<typeof placeHorse>
   | ReturnType<typeof nextTurn>
   | ReturnType<typeof passTurnTo>
   | ReturnType<typeof markCurrentBase>
-  | ReturnType<typeof moveCoinSuccess>
-  | ReturnType<typeof disqualifyCoin>
-  | ReturnType<typeof homeCoin>
+  | ReturnType<typeof moveHorseSuccess>
+  | ReturnType<typeof disqualifyHorse>
+  | ReturnType<typeof completeDisqualifyHorse>
+  | ReturnType<typeof homeHorse>
   | ReturnType<typeof setPlayers>
   | ReturnType<typeof enableBase>
   | ReturnType<typeof markWinner>
@@ -301,4 +393,10 @@ export type Actions =
   | ReturnType<typeof clearAvailableActions>
   | ReturnType<typeof setHighlightedCells>
   | ReturnType<typeof clearHighlightedCells>
+  | ReturnType<typeof setHoveredHorse>
+  | ReturnType<typeof clearHoveredHorse>
+  | ReturnType<typeof startHorseJump>
+  | ReturnType<typeof stopHorseJump>
+  | ReturnType<typeof startHorseFlying>
+  | ReturnType<typeof stopHorseFlying>
   ;

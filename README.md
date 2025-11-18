@@ -14,29 +14,29 @@ Here is a link to try it out - [Demo](https://ludo.avinashv.dev)
 
 # How I went about developing this game
 
-  - The game board consists of a couple of building blocks, namely BASES (4 Count), Walkways (4 Count) and a HOME. These can be arranged in order to build the visual representation needed. For example :
+- The game board consists of a couple of building blocks, namely BASES (4 Count), Walkways (4 Count) and a HOME. These can be arranged in order to build the visual representation needed. For example :
   [BASE1, WALKWAY_NORTH, BASE2],
   [WALKWAY_WEST, HOME, WALKWAY_EAST],
   [BASE3, WALKWAY_SOUTH, BASE4]
-  - Each Walkway has 18 cells, either 6 x 3 or 3 x 6, depending on orientation
-  - Each cell would have an ID
-  - Cell can be of type - NORMAL, SPAWN and HOMEPATH
-  - In dev build, there is a context menu that can be opened for each of the cell. This context menu was created and used to mark cells and to link them. This is how coins "know" which cell to go to next.
-  - After generating the data needed for the game visuals, the data is put into a json file which the application fetches upon start. This data is supposed to come from BE, the application should work the same if this JSON was replaced by BE in future.
-  - Each Coin, Base and Cell have properties with which Game rules have been implemented.
-  - The Die uses MersenneTwister19937's seeded algorithm for rolls.
-  - The game state is managed completely by Redux, so with redux-persist, it will be super easy to "save" the game (to IndexedDB or similar)
-  - A Coin is declared HOMECOIN when it has completed 56 Steps (Total number of steps needed for a coin to "RETIRE")
-  - More of the minute strategies in the code itself, happy browsing :)
+- Each Walkway has 18 cells, either 6 x 3 or 3 x 6, depending on orientation
+- Each cell would have an ID
+- Cell can be of type - NORMAL, SPAWN and HOMEPATH
+- Cell connections and movement paths are defined in the initialGameData.json file. This defines how horses "know" which cell to go to next.
+- After generating the data needed for the game visuals, the data is put into a json file which the application fetches upon start. This data is supposed to come from BE, the application should work the same if this JSON was replaced by BE in future.
+- Each Horse, Base and Cell have properties with which Game rules have been implemented.
+- The Die uses MersenneTwister19937's seeded algorithm for rolls.
+- The game state is managed completely by Redux, so with redux-persist, it will be super easy to "save" the game (to IndexedDB or similar)
+- A Horse is declared HOMEHORSE when it has completed 56 Steps (Total number of steps needed for a horse to "RETIRE")
+- More of the minute strategies in the code itself, happy browsing :)
 
 ### Tech
 
 Ludo uses the following tech stack
 
-* [React]
-* [Redux]
-* [Typescript]
-* [Webpack]
+- [React]
+- [Redux]
+- [Typescript]
+- [Webpack]
 
 ### Installation
 
@@ -52,15 +52,13 @@ $ yarn build
 
 ### Todos
 
- - Add Animation to Die Roll
- - Mark Players winner as they finish the game
- - Write a BE and make it a Multiplayer Game !
- - Find some time to write tests
+- Add Animation to Die Roll
+- Mark Players winner as they finish the game
+- Write a BE and make it a Multiplayer Game !
+- Find some time to write tests
 
-License
-----
+## License
 
 MIT
-
 
 **Free Software, Hell Yeah!**

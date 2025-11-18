@@ -1,93 +1,216 @@
 import React from "react";
 
 import { IRelationship } from "containers/Ludo/state/interfaces";
-import { basesSelector } from "containers/Ludo/state/selectors";
-import { getBaseHexColor, getStyleObject } from "containers/utils";
-import { CELL_DIMENSION, HOME_SIZE } from "globalConstants";
+import {
+  basesSelector,
+  cellsSelector,
+  horsesSelector,
+  linksSelector,
+  highlightedCellsSelector,
+  highlightedCellsByHorseSelector,
+  currentTurnSelector,
+  hoveredHorseIDSelector,
+} from "containers/Ludo/state/selectors";
+import { getStyleObject } from "containers/utils";
+import { calculateCellOdds } from "containers/utils/oddsCalculator";
+import { HORSE_SIZE, CELL_DIMENSION, CELL_SIZE } from "globalConstants";
+import {
+  isDieRollAllowedSelector,
+  isDieRollValidSelector,
+} from "containers/Dice/state/selectors";
 import { connect } from "react-redux";
 import { createStructuredSelector } from "reselect";
-import { BaseColors } from "state/interfaces";
+
+import { Horse } from "containers/Base/components/Horse";
+import { Cell } from "containers/Walkway/components/Cell";
+import { WalkwayPosition } from "state/interfaces";
 
 import styles from "./Container.module.css";
 
 interface IStateProps {
   bases: ReturnType<typeof basesSelector>;
+  cells: ReturnType<typeof cellsSelector>;
+  horses: ReturnType<typeof horsesSelector>;
+  links: ReturnType<typeof linksSelector>;
+  highlightedCells: ReturnType<typeof highlightedCellsSelector>;
+  highlightedCellsByHorse: ReturnType<typeof highlightedCellsByHorseSelector>;
+  currentTurn: ReturnType<typeof currentTurnSelector>;
+  hoveredHorseID: ReturnType<typeof hoveredHorseIDSelector>;
+  isDieRollAllowed: ReturnType<typeof isDieRollAllowedSelector>;
+  isDieRollValid: ReturnType<typeof isDieRollValidSelector>;
 }
 
 interface IPublicProps {
   baseIDs: IRelationship["baseIDs"];
+  /** Whether to show debug text (cell IDs, base IDs, etc.) */
+  showDebugText?: boolean;
 }
 
-interface IProps extends IStateProps, IPublicProps {}
+interface IDispatchProps {
+  // No dispatch props needed - horses are not clickable, actions must be chosen from action panel
+}
+
+interface IProps extends IStateProps, IPublicProps, IDispatchProps {}
 
 const mapStateToProps = createStructuredSelector<any, IStateProps>({
   bases: basesSelector,
+  cells: cellsSelector,
+  horses: horsesSelector,
+  links: linksSelector,
+  highlightedCells: highlightedCellsSelector,
+  highlightedCellsByHorse: highlightedCellsByHorseSelector,
+  currentTurn: currentTurnSelector,
+  hoveredHorseID: hoveredHorseIDSelector,
+  isDieRollAllowed: isDieRollAllowedSelector,
+  isDieRollValid: isDieRollValidSelector,
 });
 
+const mapDispatchToProps = {};
+
 class HomeBare extends React.PureComponent<IProps> {
+  /**
+   * Handles horse click events during gameplay
+   * DISABLED - Actions must be chosen from action panel
+   */
+  // private onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
+
   render() {
-    const { baseIDs, bases } = this.props;
+    const {
+      cells,
+      links,
+      bases,
+      horses,
+      highlightedCells,
+      currentTurn,
+      isDieRollAllowed,
+    } = this.props;
+    const currentTurnBase = bases[currentTurn];
+    const currentTurnBaseColor = currentTurnBase?.color;
+
+    // Calculate odds whenever dice rolling is allowed (includes paused games)
+    const shouldShowOdds = isDieRollAllowed;
+    const cellOdds = shouldShowOdds
+      ? calculateCellOdds(horses, bases, currentTurn, cells, links)
+      : [];
+
+    // Filter cells that have notRenderInWalkway = true
+    const homeCells: any[] = [];
+    Object.values(cells).forEach((positionCells: any) => {
+      Object.values(positionCells).forEach((cell: any) => {
+        if (cell.notRenderInWalkway) {
+          homeCells.push(cell);
+        }
+      });
+    });
+
     return (
-      <div
-        className={styles.Container}
-        style={getStyleObject(HOME_SIZE, HOME_SIZE)}
-      >
-        {baseIDs!.map((baseID, index) => {
-          const base = bases[baseID];
+      <div className={styles.Container} style={getStyleObject(1, 3)}>
+        {homeCells.map((cell: any, index: number) => {
+          // Get next link cell IDs for this cell
+          const cellLinks = links[cell.cellID] || [];
+          const nextLinkCellIDs = cellLinks.map((link: any) => link.cellID);
+
+          const cellBase = bases[cell.baseID];
+          const cellColor = cellBase?.color;
+
+          // Check if this cell should be highlighted
+          const isHighlighted = highlightedCells?.has(cell.cellID) || false;
+
+          // Get odds for this cell (if available and possible)
+          const cellOddsObj = cellOdds.find(
+            (odds) => odds.cellID === cell.cellID
+          );
+          const cellOddsValue = cellOddsObj
+            ? cellOddsObj.probability
+            : undefined;
+          const cellBettingOdds =
+            cellOddsObj && cellOddsObj.isPossible
+              ? cellOddsObj.oddsRatio
+              : undefined;
+
           return (
             <div
-              key={index}
-              className={styles.HomeContainer}
-              style={this.getCSS(HOME_SIZE, base.color, index)}
-            />
+              key={cell.cellID}
+              className={styles.HomeCell}
+              style={this.getCellStyle(cell)}
+            >
+              <Cell
+                row={cell.cellID === "NORTH_6_1" ? 6 : 0} // NORTH_6_1 should show index 6
+                column={cell.cellID === "SOUTH_0_1" ? 0 : 0} // SOUTH_0_1 should show index 6 (7-1-0=6)
+                walkwayPosition={
+                  cell.cellID === "NORTH_6_1"
+                    ? WalkwayPosition.NORTH
+                    : cell.cellID === "SOUTH_0_1"
+                    ? WalkwayPosition.SOUTH
+                    : WalkwayPosition.NORTH
+                }
+                baseID={cell.baseID}
+                cellType={cell.cellType}
+                color={cellColor}
+                nextLinkCellIDs={nextLinkCellIDs}
+                showDebugText={this.props.showDebugText}
+                index={cell.index}
+                isHighlighted={isHighlighted}
+                highlightColor={currentTurnBaseColor}
+                odds={cellOddsValue}
+                bettingOdds={cellBettingOdds}
+              >
+                {
+                  // Render horses that are currently on this cell
+                  cell.horseIDs.map((horseID: string, index: number) => (
+                    <Horse
+                      key={horseID}
+                      baseColor={horses[horseID].color} // Horse color matches its base
+                      horseID={horseID} // Pass horse ID to display number
+                      // Always use normal size - never scale down
+                      horseSize={HORSE_SIZE}
+                      isJumping={horses[horseID].isJumping || false} // Whether horse is jumping for animation
+                      isFlyingToBase={horses[horseID].isFlyingToBase || false} // Whether horse is flying to base (when kicked)
+                      isHovered={this.props.hoveredHorseID === horseID} // Whether this horse is being hovered
+                      // onHorseClicked removed - horses are not clickable, actions must be chosen from action panel
+                    />
+                  ))
+                }
+              </Cell>
+            </div>
           );
         })}
       </div>
     );
   }
 
-  private getCSS = (
-    cellSize: number,
-    baseColor: BaseColors,
-    index: number
-  ): React.CSSProperties => {
-    const size = cellSize * CELL_DIMENSION;
-    const colorHex = getBaseHexColor(baseColor!);
-
-    const cssProperties = {
-      borderColor: `${colorHex} transparent transparent transparent`,
-      borderWidth: `${size / 2}px ${size / 2}px 0 ${size / 2}px`,
+  private getCellStyle = (cell: any): React.CSSProperties => {
+    // Position the cells appropriately within the 1x3 home container
+    // YELLOW (NORTH_6_1) at top, RED (SOUTH_0_1) at bottom
+    // Set explicit dimensions to match Cell size (same as walkway cells)
+    const basePositioning = {
+      position: "absolute" as const,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: `${CELL_SIZE * CELL_DIMENSION}px`, // Match Cell width
+      height: `${CELL_SIZE * CELL_DIMENSION}px`, // Match Cell height
     };
 
-    switch (index) {
-      case 0:
-        return cssProperties;
-      case 1:
-        return {
-          ...cssProperties,
-          left: `${size / 4}px`,
-          top: `${size / 4}px`,
-          transform: "rotate(90deg)",
-        };
-      case 2:
-        return {
-          ...cssProperties,
-          top: `${size / 2}px`,
-          transform: "rotate(180deg)",
-        };
-      case 3:
-        return {
-          ...cssProperties,
-          right: `${size / 4}px`,
-          top: `${size / 4}px`,
-          transform: "rotate(-90deg)",
-        };
-      default:
-        return {};
+    if (cell.cellID === "NORTH_6_1") {
+      return {
+        ...basePositioning,
+        top: 0,
+        left: 0,
+      };
+    } else if (cell.cellID === "SOUTH_0_1") {
+      return {
+        ...basePositioning,
+        bottom: 0,
+        left: 0,
+      };
     }
+
+    return basePositioning;
   };
 }
 
-export const Home = connect(mapStateToProps)(
-  HomeBare
-) as unknown as React.ComponentClass<IPublicProps>;
+export const Home = connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(HomeBare) as unknown as React.ComponentClass<IPublicProps>;

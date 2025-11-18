@@ -1,0 +1,21 @@
+/**
+ * Horse Placeholder Component Styles
+ *
+ * Provides styling for the horse placeholder container and background circle.
+ */
+
+/* Container styles - centers the horse placeholder */
+.Container {
+  display: flex;           /* Use flexbox for centering */
+  align-items: center;     /* Center vertically */
+  justify-content: center; /* Center horizontally */
+}
+
+/* Circle background for the horse placeholder */
+.Circle {
+  box-shadow: inset 0px 2px 5px 0px; /* Inner shadow for depth effect */
+  border-radius: 50%;                /* Makes the background circular */
+  display: flex;                     /* Use flexbox for centering horse inside */
+  align-items: center;               /* Center horse vertically */
+  justify-content: center;           /* Center horse horizontally */
+}

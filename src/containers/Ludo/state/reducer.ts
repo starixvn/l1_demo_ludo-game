@@ -6,10 +6,9 @@
  * Each case corresponds to a specific game event or user interaction.
  */
 
-import { WINNING_MOVES } from 'globalConstants';
-
 import { Actions, ActionTypes } from './actions';
-import { BaseID, IState } from './interfaces';
+import { IState } from './interfaces';
+import { DEFAULT_STARTING_BASE, WINNING_MOVES } from 'globalConstants';
 
 /**
  * Initial state for the Ludo game
@@ -18,14 +17,16 @@ import { BaseID, IState } from './interfaces';
 const initialState: IState = {
   bases: {},        // Will contain all player bases
   cells: {},        // Will contain all board cells organized by position
-  coins: {},        // Will contain all game coins
-  currentTurn: BaseID.BASE_3, // Default starting turn (can be configured)
+  horses: {},        // Will contain all game horses
+  currentTurn: DEFAULT_STARTING_BASE, // Default starting turn (can be configured)
   links: {},        // Will contain cell connectivity information
   relationships: [], // Will contain relationships between board entities
   walkways: {},     // Will contain all walkway segments
   availableActions: null, // No actions available initially
   availableActionsDieValue: null, // No die value initially
   highlightedCells: null, // No cells highlighted initially
+  highlightedCellsByHorse: null, // No cell-to-horse mapping initially
+  hoveredHorseID: null, // No horse hovered initially
 };
 
 /**
@@ -38,13 +39,13 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
   switch (action.type) {
     /**
      * Initialize the game with data from the server
-     * Sets up all bases, cells, coins, and board relationships
+     * Sets up all bases, cells, horses, and board relationships
      */
     case ActionTypes.GET_INITIAL_GAME_DATA_SUCCESS: {
       const {
         bases,
         cells,
-        coins,
+        horses,
         relationships,
         walkways,
         links,
@@ -54,20 +55,21 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         ...state,
         bases,        // Initialize all player bases
         cells,        // Set up the game board cells
-        coins,        // Initialize all coins in their starting positions
+        horses,        // Initialize all horses in their starting positions
         links,        // Set up cell connectivity for movement validation
         relationships, // Define relationships between board entities
         walkways,     // Initialize walkway segments
         currentTurn: currentTurn || state.currentTurn, // Reset current turn or keep existing
+        hoveredHorseID: null, // Reset hovered horse on game initialization
       };
     }
 
     /**
-     * Successfully spawn a coin from base onto the board
-     * Updates both the coin's state and the cell it occupies
+     * Successfully spawn a horse from base onto the board
+     * Updates both the horse's state and the cell it occupies
      */
-    case ActionTypes.SPAWN_COIN_SUCCESS: {
-      const { cellID, coinID, position } = action.data!;
+    case ActionTypes.SPAWN_HORSE_SUCCESS: {
+      const { cellID, horseID, position } = action.data!;
       return {
         ...state,
         cells: {
@@ -76,34 +78,34 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
             ...state.cells[position],
             [cellID]: {
               ...state.cells[position][cellID],
-              coinIDs: [
-                ...state.cells[position][cellID].coinIDs, // Add coin to cell's coin list
-                coinID,
+              horseIDs: [
+                ...state.cells[position][cellID].horseIDs, // Add horse to cell's horse list
+                horseID,
               ],
             },
           },
         },
-        coins: {
-          ...state.coins,
-          [coinID]: {
-            ...state.coins[coinID],
-            cellID,       // Update coin's current cell
-            isSpawned: true, // Mark coin as spawned
-            position,     // Update coin's walkway position
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            cellID,       // Update horse's current cell
+            isSpawned: true, // Mark horse as spawned
+            position,     // Update horse's walkway position
           },
         },
       };
     }
 
     /**
-     * Remove a coin from its current cell (when player picks it up to move)
-     * This is part of the UI interaction for coin movement
+     * Remove a horse from its current cell (when player picks it up to move)
+     * This is part of the UI interaction for horse movement
      */
-    case ActionTypes.LIFT_COIN: {
-      const { cellID, coinID, walkwayPosition } = action.data!;
-      const coinIDsInCell = [...state.cells[walkwayPosition][cellID].coinIDs];
-      const index = coinIDsInCell.findIndex((coinIDInCell) => coinIDInCell === coinID);
-      coinIDsInCell.splice(index, 1); // Remove the coin from the cell
+    case ActionTypes.LIFT_HORSE: {
+      const { cellID, horseID, walkwayPosition } = action.data!;
+      const horseIDsInCell = [...state.cells[walkwayPosition][cellID].horseIDs];
+      const index = horseIDsInCell.findIndex((horseIDInCell) => horseIDInCell === horseID);
+      horseIDsInCell.splice(index, 1); // Remove the horse from the cell
       return {
         ...state,
         cells: {
@@ -112,7 +114,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
             ...state.cells[walkwayPosition],
             [cellID]: {
               ...state.cells[walkwayPosition][cellID],
-              coinIDs: coinIDsInCell, // Update cell with coin removed
+              horseIDs: horseIDsInCell, // Update cell with horse removed
             },
           },
         },
@@ -120,11 +122,11 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
     }
 
     /**
-     * Place a coin at a new cell position (completes the coin movement)
-     * Updates both the coin's position and the cell it now occupies
+     * Place a horse at a new cell position (completes the horse movement)
+     * Updates both the horse's position and the cell it now occupies
      */
-    case ActionTypes.PLACE_COIN: {
-      const { cellID, coinID, walkwayPosition } = action.data!;
+    case ActionTypes.PLACE_HORSE: {
+      const { cellID, horseID, walkwayPosition } = action.data!;
       return {
         ...state,
         cells: {
@@ -133,19 +135,19 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
             ...state.cells[walkwayPosition],
             [cellID]: {
               ...state.cells[walkwayPosition][cellID],
-              coinIDs: [
-                ...state.cells[walkwayPosition][cellID].coinIDs, // Add coin to new cell
-                coinID,
+              horseIDs: [
+                ...state.cells[walkwayPosition][cellID].horseIDs, // Add horse to new cell
+                horseID,
               ],
             },
           },
         },
-        coins: {
-          ...state.coins,
-          [coinID]: {
-            ...state.coins[coinID],
-            cellID,              // Update coin's cell
-            position: walkwayPosition, // Update coin's position
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            cellID,              // Update horse's cell
+            position: walkwayPosition, // Update horse's position
           },
         },
       };
@@ -179,15 +181,35 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
     }
 
     /**
-     * Send a coin back to its base (when hit by an opponent's coin)
-     * Resets the coin's progress and removes it from the board
+     * Send a horse back to its base (when hit by an opponent's horse)
+     * Starts the flying animation - actual removal happens in COMPLETE_DISQUALIFY_HORSE
      */
-    case ActionTypes.DISQUALIFY_COIN: {
-      const { coinID, walkwayPosition, cellID } = action.data!;
+    case ActionTypes.DISQUALIFY_HORSE: {
+      const { horseID } = action.data!;
+      // Just start the flying animation - don't remove the horse yet
+      // The saga will handle the animation and then dispatch COMPLETE_DISQUALIFY_HORSE
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isFlyingToBase: true, // Start flying animation
+          },
+        },
+      };
+    }
 
-      const coinIDsInCell = [...state.cells[walkwayPosition][cellID].coinIDs];
-      const coinIndexToDelete = coinIDsInCell.findIndex((coinIDInCell) => coinIDInCell === coinID);
-      coinIDsInCell.splice(coinIndexToDelete, 1); // Remove coin from cell
+    /**
+     * Complete horse disqualification after animation
+     * Actually removes the horse from the cell and resets its state
+     */
+    case ActionTypes.COMPLETE_DISQUALIFY_HORSE: {
+      const { horseID, walkwayPosition, cellID } = action.data!;
+
+      const horseIDsInCell = [...state.cells[walkwayPosition][cellID].horseIDs];
+      const horseIndexToDelete = horseIDsInCell.findIndex((horseIDInCell) => horseIDInCell === horseID);
+      horseIDsInCell.splice(horseIndexToDelete, 1); // Remove horse from cell
       return {
         ...state,
         cells: {
@@ -196,34 +218,35 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
             ...state.cells[walkwayPosition],
             [cellID]: {
               ...state.cells[walkwayPosition][cellID],
-              coinIDs: coinIDsInCell, // Update cell without disqualified coin
+              horseIDs: horseIDsInCell, // Update cell without disqualified horse
             },
           },
         },
-        coins: {
-          ...state.coins,
-          [coinID]: {
-            ...state.coins[coinID],
-            isSpawned: false, // Coin is no longer on board
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isSpawned: false, // Horse is no longer on board
             steps: 0,         // Reset progress
+            isFlyingToBase: false, // Stop flying animation
           },
         },
       };
     }
 
     /**
-     * Mark a coin as having reached home (completed the game)
-     * Sets the coin as retired and gives it the winning number of steps
+     * Mark a horse as having reached home (completed the game)
+     * Sets the horse as retired and gives it the winning number of steps
      */
-    case ActionTypes.HOME_COIN: {
-      const { coinID } = action.data!;
+    case ActionTypes.HOME_HORSE: {
+      const { horseID } = action.data!;
       return {
         ...state,
-        coins: {
-          ...state.coins,
-          [coinID]: {
-            ...state.coins[coinID],
-            isRetired: true,     // Coin has finished the game
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isRetired: true,     // Horse has finished the game
             steps: WINNING_MOVES, // Set to winning step count
           },
         },
@@ -231,18 +254,18 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
     }
 
     /**
-     * Update a coin's step count after a successful move
-     * Adds the die roll value to the coin's total steps taken
+     * Update a horse's step count after a successful move
+     * Adds the die roll value to the horse's total steps taken
      */
-    case ActionTypes.MOVE_COIN_SUCCESS: {
-      const { currentDieRoll, coinID } = action.data!;
+    case ActionTypes.MOVE_HORSE_SUCCESS: {
+      const { currentDieRoll, horseID } = action.data!;
       return {
         ...state,
-        coins: {
-          ...state.coins,
-          [coinID]: {
-            ...state.coins[coinID],
-            steps: state.coins[coinID].steps + currentDieRoll, // Add die roll to steps
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            steps: state.horses[horseID].steps + currentDieRoll, // Add die roll to steps
           },
         },
       };
@@ -302,6 +325,7 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
         ...state,
         availableActions: null, // Clear available actions
         availableActionsDieValue: null, // Clear die value
+        hoveredHorseID: null, // Clear hovered horse when actions are cleared
       };
     }
 
@@ -309,10 +333,11 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
      * Set highlighted cells for showing reachable destinations
      */
     case ActionTypes.SET_HIGHLIGHTED_CELLS: {
-      const { cellIDs } = action.data!;
+      const { cellIDs, cellsByHorse } = action.data!;
       return {
         ...state,
         highlightedCells: cellIDs, // Store set of highlighted cell IDs
+        highlightedCellsByHorse: cellsByHorse || null, // Store cell-to-horse mapping
       };
     }
 
@@ -323,6 +348,100 @@ export const reducer = (state: IState = initialState, action: Actions): IState =
       return {
         ...state,
         highlightedCells: null, // Clear highlighted cells
+        highlightedCellsByHorse: null, // Clear cell-to-horse mapping
+      };
+    }
+
+    /**
+     * Set which horse is being hovered (for action selection highlighting)
+     */
+    case ActionTypes.SET_HOVERED_HORSE: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        hoveredHorseID: horseID, // Store hovered horse ID
+      };
+    }
+
+    /**
+     * Clear horse hover highlighting
+     */
+    case ActionTypes.CLEAR_HOVERED_HORSE: {
+      return {
+        ...state,
+        hoveredHorseID: null, // Clear hovered horse ID
+      };
+    }
+
+    /**
+     * Start horse jumping animation
+     * Sets the isJumping flag on the specified horse
+     */
+    case ActionTypes.START_HORSE_JUMP: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isJumping: true,
+          },
+        },
+      };
+    }
+
+    /**
+     * Stop horse jumping animation
+     * Clears the isJumping flag on the specified horse
+     */
+    case ActionTypes.STOP_HORSE_JUMP: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isJumping: false,
+          },
+        },
+      };
+    }
+
+    /**
+     * Start horse flying to base animation (when kicked)
+     * Sets the isFlyingToBase flag on the specified horse
+     */
+    case ActionTypes.START_HORSE_FLYING: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isFlyingToBase: true,
+          },
+        },
+      };
+    }
+
+    /**
+     * Stop horse flying animation
+     * Clears the isFlyingToBase flag on the specified horse
+     */
+    case ActionTypes.STOP_HORSE_FLYING: {
+      const { horseID } = action.data!;
+      return {
+        ...state,
+        horses: {
+          ...state.horses,
+          [horseID]: {
+            ...state.horses[horseID],
+            isFlyingToBase: false,
+          },
+        },
       };
     }
 

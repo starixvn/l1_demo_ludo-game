@@ -1,23 +1,23 @@
 /**
  * Cell Component Styles
  *
- * Styles for individual board cells that can contain coins.
+ * Styles for individual board cells that can contain horses.
  */
 
 /* Main cell container */
 .Container {
   box-shadow: inset 0 0 1px;     /* Inner border for cell definition */
   background-size: contain;     /* Scale background images to fit */
-  display: flex;                /* Use flexbox for coin layout */
-  flex-wrap: wrap;              /* Allow coins to wrap to new lines */
-  align-items: center;          /* Center coins vertically */
-  justify-content: space-around; /* Distribute coins evenly */
+  display: flex;                /* Use flexbox for horse layout */
+  flex-wrap: wrap;              /* Allow horses to wrap to new lines */
+  align-items: center;          /* Center horses vertically */
+  justify-content: space-around; /* Distribute horses evenly */
   position: relative;           /* Required for absolute positioning of cell ID */
 }
 
-/* Special styling when multiple coins are in the same cell */
-.MultipleCoins > div {
-  margin-bottom: 0; /* Remove bottom margin from coins when multiple are present */
+/* Special styling when multiple horses are in the same cell */
+.MultipleHorses > div {
+  margin-bottom: 0; /* Remove bottom margin from horses when multiple are present */
 }
 
 /* Cell information display for debugging/development */
@@ -52,7 +52,20 @@
   border-radius: 2px;          /* Rounded corners */
   font-family: monospace;      /* Monospace font for consistent spacing */
   display: block;              /* Ensure block display */
-  margin-bottom: 1px;          /* Space between base ID and next links */
+  margin-bottom: 1px;          /* Space between base ID and index */
+}
+
+/* Index display for NORMAL cells */
+.Index {
+  font-size: 6px;              /* Small text for index */
+  font-weight: normal;         /* Normal weight */
+  color: #990000;              /* Red color to distinguish index */
+  background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
+  padding: 1px 2px;            /* Small padding around text */
+  border-radius: 2px;          /* Rounded corners */
+  font-family: monospace;      /* Monospace font for consistent spacing */
+  display: block;              /* Ensure block display */
+  margin-bottom: 1px;          /* Space between index and next links */
 }
 
 /* Next link cell IDs display */
@@ -81,7 +94,7 @@
   color: #fff;                  /* White text color */
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* Text shadow for readability */
   pointer-events: none;        /* Don't interfere with click events */
-                 /* Above coins but below debug info */
+                 /* Above horses but below debug info */
   
 }
 
@@ -98,7 +111,7 @@
   border-style: solid;           /* Solid border */
   background-color: transparent; /* No background fill */
   pointer-events: none;        /* Don't interfere with click events */
-  z-index: 3;                  /* Above background but below coins */
+  z-index: 3;                  /* Above background but below horses */
 }
 
 /* Normal cell circle border indicator */
@@ -114,20 +127,131 @@
   border-style: solid;           /* Solid border */
   background-color: transparent; /* No background fill */
   pointer-events: none;        /* Don't interfere with click events */
-  z-index: 3;                  /* Above background but below coins */
+  z-index: 3;                  /* Above background but below horses */
 }
 
 /* Highlighted cell styling - shows reachable destinations */
-.Highlighted {
-  box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.8), inset 0 0 10px 2px rgba(255, 215, 0, 0.4) !important;
-  animation: highlightPulse 1.5s ease-in-out infinite;
-}
-
+/* Note: Highlighting is now done via inline styles using the current player's base color */
+/* This CSS animation is kept for the pulse effect */
 @keyframes highlightPulse {
   0%, 100% {
-    box-shadow: 0 0 10px 3px rgba(255, 215, 0, 0.8), inset 0 0 10px 2px rgba(255, 215, 0, 0.4);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 15px 5px rgba(255, 215, 0, 1), inset 0 0 15px 3px rgba(255, 215, 0, 0.6);
+    opacity: 0.9;
   }
+}
+
+/* Popover for highlighted cells */
+.Popover {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  /* Background color is set via inline styles to use base color with 0.8 opacity */
+  color: #000;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: popoverFadeIn 0.2s ease-in-out;
+}
+
+.Popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  /* Border color matches the popover background (set via CSS variable) */
+  border-top: 6px solid var(--popover-arrow-color, rgba(0, 0, 0, 0.8));
+}
+
+/* Popover positioned at bottom (for yellow spawn cells) */
+.PopoverBottom {
+  bottom: auto;
+  top: 100%;
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+.PopoverBottom::after {
+  top: auto;
+  bottom: 100%;
+  border-top: none;
+  border-bottom: 6px solid var(--popover-arrow-color, rgba(0, 0, 0, 0.8));
+}
+
+@keyframes popoverFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Bet horse/dollar icon when bet is placed */
+.BetHorseIcon {
+  position: absolute;
+  transform: translate(-50%, -50%); /* Center on the random position */
+  border-radius: 50%;
+  background-color: rgba(255, 215, 0, 0.95); /* Gold color */
+  color: #000;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(218, 165, 32, 0.8); /* Gold border */
+  animation: betHorseFadeInOut 1s ease-in-out;
+}
+
+@keyframes betHorseFadeInOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3) rotate(0deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2) rotate(180deg);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(360deg);
+  }
+}
+
+/* Odds display - shows betting odds only for highlighted cells (valid moves) before dice roll */
+.OddsDisplay {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #ffeb3b; /* Yellow color for betting odds */
+  background-color: rgba(255, 107, 0, 0.9); /* Orange background for betting odds */
+  padding: 2px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 15;
+  min-width: 24px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }

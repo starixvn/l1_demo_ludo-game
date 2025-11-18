@@ -16,7 +16,7 @@ export interface ILogEntry {
   timestamp: number;
   /** Color/name of the player who performed the action */
   player: string;
-  /** Brief description of the action (e.g., "Rolled 6", "Moved coin") */
+  /** Brief description of the action (e.g., "Rolled 6", "Moved horse") */
   action: string;
   /** Optional detailed information about the action */
   details?: string;

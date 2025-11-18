@@ -1,0 +1,136 @@
+/**
+ * Horse Component Styles
+ *
+ * Displays a Unicode chess piece character (Black Knight - ♞) as the horse.
+ * Includes jumping animation for more realistic movement.
+ */
+
+/* Main horse container - displays the Unicode character */
+.Container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 10%;              /* Spacing between horses */
+  font-size: 250%;                 /* 10x larger font size for the Unicode character */
+  line-height: 1;
+  z-index: 6;
+  transition: all 0.15s ease-in-out; /* Smooth transitions for jumping */
+}
+
+/* Jumping animation - makes horse appear to leap over cells like a real horse */
+.Jumping {
+  animation: horseJump 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 10; /* Jump above other elements */
+}
+
+/* Enhanced keyframes for realistic horse jumping animation */
+@keyframes horseJump {
+  0% {
+    transform: scale(1) translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.3));
+    opacity: 1;
+  }
+  15% {
+    transform: scale(1.12) translateY(-2.4px) rotate(-2deg);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+    opacity: 0.95;
+  }
+  30% {
+    transform: scale(1.2) translateY(-6.4px) rotate(1deg);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    opacity: 0.9;
+  }
+  45% {
+    transform: scale(1.16) translateY(-9.6px) rotate(-1deg);
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+    opacity: 0.85;
+  }
+  60% {
+    transform: scale(1.12) translateY(-12px) rotate(0.5deg);
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+    opacity: 0.8;
+  }
+  75% {
+    transform: scale(1.08) translateY(-9.6px) rotate(-0.5deg);
+    filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6));
+    opacity: 0.9;
+  }
+  85% {
+    transform: scale(1.04) translateY(-4.8px) rotate(0deg);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1) translateY(0px) rotate(0deg);
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.3));
+    opacity: 1;
+  }
+}
+
+/* Horse number display - shows the extracted number from horse ID */
+.HorseNumber {
+  position: absolute;
+  top: 70%;
+  left: 60%;
+  transform: translate(-50%, -50%);
+  font-size: 30%;
+  font-weight: bold;
+  color: white;
+  text-shadow: 
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+  pointer-events: none;
+  z-index: 7;
+}
+
+/* Flying animation - makes horse fly to base when kicked */
+.FlyingToBase {
+  animation: flyToBase 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  z-index: 20; /* Fly above all other elements */
+  position: relative;
+}
+
+/* Enhanced keyframes for horse flying to base animation */
+@keyframes flyToBase {
+  0% {
+    transform: scale(1) translate(0, 0) rotate(0deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.3));
+  }
+  20% {
+    transform: scale(1.1) translate(0, -20px) rotate(-5deg);
+    opacity: 0.95;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  }
+  40% {
+    transform: scale(1.2) translate(-50px, -80px) rotate(-15deg);
+    opacity: 0.85;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
+  }
+  60% {
+    transform: scale(1.1) translate(-100px, -150px) rotate(-25deg);
+    opacity: 0.7;
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+  }
+  80% {
+    transform: scale(0.8) translate(-150px, -200px) rotate(-35deg);
+    opacity: 0.4;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7));
+  }
+  100% {
+    transform: scale(0.3) translate(-200px, -250px) rotate(-45deg);
+    opacity: 0;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.8));
+  }
+}
+
+/* Hovered state - highlights horse when action is hovered */
+.Hovered {
+  filter: drop-shadow(0 0 8px rgba(255, 255, 0, 0.8)) drop-shadow(0 0 12px rgba(255, 255, 0, 0.6));
+  transform: scale(1.2);
+  z-index: 15; /* Above normal horses but below jumping/flying */
+  transition: all 0.2s ease-in-out;
+}

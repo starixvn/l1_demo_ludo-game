@@ -9,3 +9,8 @@
   border-style: solid;
   position: absolute;
 }
+
+.HomeCell {
+  position: relative;
+  box-sizing: border-box;
+}

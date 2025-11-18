@@ -16,18 +16,23 @@ import { Player } from "containers/Player/Container"; // Player info panels
 import { StepLogs } from "containers/StepLogs/Container"; // Game action log
 import { Walkway } from "containers/Walkway/Container"; // Game board walkway
 import { ActionSelection } from "containers/ActionSelection/Container"; // Action selection UI
+import { BettingTable } from "containers/BettingTable/Container"; // Betting table
 import { getStyleObject } from "containers/utils"; // Styling utilities
 import { loadGameStateFromFile } from "common/utils"; // Game state loading utility
 import { BOARD_SIZE } from "globalConstants"; // Board dimensions
-import { ContextMenu } from "services/contextMenu/Container"; // Right-click menu
 
 import {
+  clearAvailableActions,
   clearHighlightedCells,
   getInitialGameData,
   getInitialGameDataSuccess,
   setPlayers,
 } from "./state/actions"; // Ludo actions
-import { disableDie, invalidateDieRoll } from "containers/Dice/state/actions"; // Dice actions
+import {
+  disableDie,
+  enableDie,
+  invalidateDieRoll,
+} from "containers/Dice/state/actions"; // Dice actions
 import {
   clearLogs,
   setAutoActionsEnabled,
@@ -35,6 +40,7 @@ import {
 import { autoActionsEnabledSelector } from "containers/StepLogs/state/selectors"; // StepLogs selectors
 import { BaseID, BoardEntities } from "./state/interfaces"; // Game data types
 import {
+  availableActionsSelector,
   basesSelector,
   currentTurnSelector,
   relationshipsSelector,
@@ -47,12 +53,14 @@ import styles from "./Container.module.css"; // Component styles
  * Props dispatched to Redux actions
  */
 interface IDispatchProps {
+  clearAvailableActions: typeof clearAvailableActions; // Clear available actions UI
   clearHighlightedCells: typeof clearHighlightedCells; // Clear highlighted cells
   getInitialGameData: typeof getInitialGameData; // Initialize game data
   getInitialGameDataSuccess: typeof getInitialGameDataSuccess; // Load saved game state
   setPlayers: typeof setPlayers; // Configure number of players
   clearLogs: typeof clearLogs; // Clear game logs
   disableDie: typeof disableDie; // Disable die
+  enableDie: typeof enableDie; // Enable die
   invalidateDieRoll: typeof invalidateDieRoll; // Invalidate die roll
   setAutoActionsEnabled: typeof setAutoActionsEnabled; // Set auto-actions enabled state
 }
@@ -66,6 +74,7 @@ interface IStateProps {
   walkways: ReturnType<typeof walkwaysSelector>; // Walkway configurations
   currentTurn: ReturnType<typeof currentTurnSelector>; // Whose turn it is
   autoActionsEnabled: ReturnType<typeof autoActionsEnabledSelector>; // Whether auto-actions are enabled
+  availableActions: ReturnType<typeof availableActionsSelector>; // Available actions for selection
 }
 
 /** Public props (none in this case) */
@@ -79,6 +88,8 @@ interface IState {
   showPlayerConfiguration: boolean; // Whether to show player setup screen
   showDebugText: boolean; // Whether to show debug text (cell IDs, base IDs, etc.)
   showGameLog: boolean; // Whether to show the game log panel
+  isPaused: boolean; // Whether the game is paused
+  previousAutoActionsEnabled: boolean; // Store auto-actions state before pausing
 }
 
 /**
@@ -90,18 +101,21 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   relationships: relationshipsSelector, // Get board entity relationships
   walkways: walkwaysSelector, // Get walkway configurations
   autoActionsEnabled: autoActionsEnabledSelector, // Get auto-actions enabled state
+  availableActions: availableActionsSelector, // Get available actions for selection
 });
 
 /**
  * Maps Redux dispatch actions to component props
  */
 const mapDispatchToProps = {
+  clearAvailableActions, // Action to clear available actions UI
   clearHighlightedCells, // Action to clear highlighted cells
   setPlayers, // Action to set number of players
   getInitialGameData, // Action to load initial game data
   getInitialGameDataSuccess, // Action to load saved game state
   clearLogs, // Action to clear game logs
   disableDie, // Action to disable die
+  enableDie, // Action to enable die
   invalidateDieRoll, // Action to invalidate die roll
   setAutoActionsEnabled, // Action to set auto-actions enabled state
 };
@@ -113,23 +127,31 @@ const mapDispatchToProps = {
 class LudoBare extends React.PureComponent<IProps, IState> {
   /** Initial state shows player configuration screen */
   state: IState = {
-    showPlayerConfiguration: true,
+    showPlayerConfiguration: false,
     showDebugText: false, // Hide debug text by default
-    showGameLog: true, // Show game log by default
+    showGameLog: false, // Hide game log by default
+    isPaused: false, // Game is not paused by default
+    previousAutoActionsEnabled: false, // Store previous auto-actions state
   };
 
   /**
    * Load initial game data when component mounts
+   * Automatically start the game with 4 players after page loads
    */
   componentDidMount() {
     this.props.getInitialGameData();
+    // Auto-start game with 4 players after initial data is loaded
+    // Use a small delay to ensure game data is loaded first
+    setTimeout(() => {
+      this.startGame(4);
+    }, 100);
   }
 
   /**
    * Renders the complete Ludo game interface
    */
   render() {
-    const { currentTurn } = this.props;
+    const { currentTurn, bases } = this.props;
 
     return (
       <div className={styles.Container}>
@@ -140,12 +162,16 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <Player
               baseID={BaseID.BASE_1} // Red player
               placement="top" // Position at top of container
-              disabled={currentTurn !== BaseID.BASE_1} // Disable if not their turn
+              disabled={
+                currentTurn !== BaseID.BASE_1 || !bases[BaseID.BASE_1]?.enabled
+              } // Disable if not their turn or base not enabled
             />
             <Player
               baseID={BaseID.BASE_3} // Yellow player
               placement="bottom" // Position at bottom of container
-              disabled={currentTurn !== BaseID.BASE_3} // Disable if not their turn
+              disabled={
+                currentTurn !== BaseID.BASE_3 || !bases[BaseID.BASE_3]?.enabled
+              } // Disable if not their turn or base not enabled
             />
           </div>
 
@@ -162,15 +188,22 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <Player
               baseID={BaseID.BASE_2} // Blue player
               placement="top"
-              disabled={currentTurn !== BaseID.BASE_2}
+              disabled={
+                currentTurn !== BaseID.BASE_2 || !bases[BaseID.BASE_2]?.enabled
+              }
             />
             <Player
               baseID={BaseID.BASE_4} // Green player
               placement="bottom"
-              disabled={currentTurn !== BaseID.BASE_4}
+              disabled={
+                currentTurn !== BaseID.BASE_4 || !bases[BaseID.BASE_4]?.enabled
+              }
             />
           </div>
         </div>
+
+        {/* Betting Table - displayed below the board */}
+        {!this.state.showPlayerConfiguration && <BettingTable />}
 
         {/* Debug text toggle checkbox - shown at all times */}
         <div className={styles.SidePanel}>
@@ -179,7 +212,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
             <button
               className={styles.ResetButton}
               onClick={this.handleResetGame}
-              title="Reset the game to the beginning and choose players again"
+              title="Reload the page to start fresh"
             >
               Reset Game
             </button>
@@ -193,9 +226,22 @@ class LudoBare extends React.PureComponent<IProps, IState> {
                 this.props.setAutoActionsEnabled(e.target.checked)
               }
               className={styles.Checkbox}
+              disabled={this.state.isPaused}
             />
-            <span>Auto Run</span>
+            <span className={styles.CheckboxLabelText}>Auto Run</span>
           </label>
+          {/* Pause Game toggle - shown only during gameplay */}
+          {!this.state.showPlayerConfiguration && (
+            <label className={styles.CheckboxLabel}>
+              <input
+                type="checkbox"
+                checked={this.state.isPaused}
+                onChange={this.handlePauseGame}
+                className={styles.Checkbox}
+              />
+              <span>Pause Game</span>
+            </label>
+          )}
           <label className={styles.CheckboxLabel}>
             <input
               type="checkbox"
@@ -248,9 +294,6 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           </div>
         ) : null}
 
-        {/* Development-only context menu */}
-        {process.env.NODE_ENV === "development" ? <ContextMenu /> : null}
-
         {/* Action Selection UI - shows available actions after dice roll */}
         <ActionSelection />
       </div>
@@ -283,6 +326,7 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           return (
             <Home
               baseIDs={relationship.baseIDs} // Which bases this home belongs to
+              showDebugText={this.state.showDebugText} // Whether to show debug text
               key={index}
             />
           );
@@ -327,6 +371,8 @@ class LudoBare extends React.PureComponent<IProps, IState> {
           availableActions: null,
           availableActionsDieValue: null,
           highlightedCells: null,
+          highlightedCellsByHorse: null,
+          hoveredHorseID: null,
         });
 
         // Hide the configuration screen since we're loading an existing game
@@ -347,40 +393,62 @@ class LudoBare extends React.PureComponent<IProps, IState> {
   };
 
   /**
-   * Resets the game to the beginning
-   * Reloads initial game data, clears logs, resets dice, and shows player configuration screen
+   * Reloads the current page to start fresh
    */
   private handleResetGame = () => {
-    // Confirm with user before resetting
+    // Confirm with user before reloading
     if (
       !window.confirm(
-        "Are you sure you want to reset the game? All progress will be lost."
+        "Are you sure you want to reload the page? All progress will be lost."
       )
     ) {
       return;
     }
 
-    // Clear all game logs
-    this.props.clearLogs();
+    // Reload the page
+    window.location.reload();
+  };
 
-    // Clear highlighted cells
-    this.props.clearHighlightedCells();
+  /**
+   * Handles pausing/unpausing the game
+   * When paused: disables die and auto-actions, stores previous auto-actions state
+   * When unpaused: enables die and restores previous auto-actions state
+   * Note: Does not enable die if we're in action selection stage to prevent countdown restart
+   */
+  private handlePauseGame = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const isPaused = e.target.checked;
 
-    // Disable and invalidate die
-    this.props.disableDie();
-    this.props.invalidateDieRoll();
-
-    // Disable auto-actions (will be set when starting new game)
-    this.props.setAutoActionsEnabled(false);
-
-    // Reload initial game data from JSON file
-    this.props.getInitialGameData();
-
-    // Show player configuration screen again
-    this.setState({
-      showPlayerConfiguration: true,
-      showGameLog: true, // Reset game log visibility to default
-    });
+    if (isPaused) {
+      // Pause the game
+      // Store current auto-actions state before pausing
+      const previousAutoActionsEnabled = this.props.autoActionsEnabled;
+      this.setState({
+        isPaused: true,
+        previousAutoActionsEnabled,
+      });
+      // Disable die to prevent any dice rolls
+      this.props.disableDie();
+      // Disable auto-actions
+      this.props.setAutoActionsEnabled(false);
+    } else {
+      // Unpause the game
+      // Restore previous auto-actions state
+      this.props.setAutoActionsEnabled(this.state.previousAutoActionsEnabled);
+      // Only enable die if we're NOT in action selection stage
+      // If we're in action selection (availableActions exists), don't enable die
+      // to prevent the countdown timer from restarting
+      if (
+        !this.props.availableActions ||
+        this.props.availableActions.length === 0
+      ) {
+        // No action selection pending - safe to enable die
+        this.props.enableDie();
+      }
+      // If we're in action selection, the die should remain disabled until action is selected
+      this.setState({
+        isPaused: false,
+      });
+    }
   };
 }
 

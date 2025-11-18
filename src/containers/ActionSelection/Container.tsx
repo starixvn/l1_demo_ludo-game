@@ -1,26 +1,32 @@
 /**
  * Action Selection Container Component
  *
- * Displays available actions (spawn/move coins) for the player to choose from after rolling dice.
+ * Displays available actions (spawn/move horses) for the player to choose from after rolling dice.
  * Shows buttons for each available action with descriptions.
  */
 
-import React from 'react';
-import { connect } from 'react-redux';
-import { createStructuredSelector } from 'reselect';
+import React from "react";
+import { connect } from "react-redux";
+import { createStructuredSelector } from "reselect";
 
-import { clearAvailableActions, IAvailableAction, spawnCoin } from 'containers/Ludo/state/actions';
-import { moveCoin } from 'containers/Ludo/state/actions';
+import {
+  clearAvailableActions,
+  IAvailableAction,
+  spawnHorse,
+  setHoveredHorse,
+  clearHoveredHorse,
+} from "containers/Ludo/state/actions";
+import { moveHorse } from "containers/Ludo/state/actions";
 import {
   availableActionsSelector,
   availableActionsDieValueSelector,
   basesSelector,
-  coinsSelector,
+  horsesSelector,
   currentTurnSelector,
-} from 'containers/Ludo/state/selectors';
-import { getBaseHexColor } from 'containers/utils';
+} from "containers/Ludo/state/selectors";
+import { getBaseHexColor } from "containers/utils";
 
-import styles from './Container.module.css';
+import styles from "./Container.module.css";
 
 /**
  * Props from Redux state
@@ -29,7 +35,7 @@ interface IStateProps {
   availableActions: ReturnType<typeof availableActionsSelector>;
   availableActionsDieValue: ReturnType<typeof availableActionsDieValueSelector>;
   bases: ReturnType<typeof basesSelector>;
-  coins: ReturnType<typeof coinsSelector>;
+  horses: ReturnType<typeof horsesSelector>;
   currentTurn: ReturnType<typeof currentTurnSelector>;
 }
 
@@ -37,9 +43,11 @@ interface IStateProps {
  * Props for Redux dispatch actions
  */
 interface IDispatchProps {
-  spawnCoin: typeof spawnCoin;
-  moveCoin: typeof moveCoin;
+  spawnHorse: typeof spawnHorse;
+  moveHorse: typeof moveHorse;
   clearAvailableActions: typeof clearAvailableActions;
+  setHoveredHorse: typeof setHoveredHorse;
+  clearHoveredHorse: typeof clearHoveredHorse;
 }
 
 /**
@@ -54,7 +62,7 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
   availableActions: availableActionsSelector,
   availableActionsDieValue: availableActionsDieValueSelector,
   bases: basesSelector,
-  coins: coinsSelector,
+  horses: horsesSelector,
   currentTurn: currentTurnSelector,
 });
 
@@ -62,9 +70,11 @@ const mapStateToProps = createStructuredSelector<any, IStateProps>({
  * Maps Redux dispatch actions to component props
  */
 const mapDispatchToProps = {
-  spawnCoin,
-  moveCoin,
+  spawnHorse,
+  moveHorse,
   clearAvailableActions,
+  setHoveredHorse,
+  clearHoveredHorse,
 };
 
 /**
@@ -76,18 +86,47 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
    * Handles when user clicks on an action button
    */
   private handleActionClick = (action: IAvailableAction) => {
-    const { coins, currentTurn, bases } = this.props;
+    const { horses, currentTurn, bases } = this.props;
 
     // Clear the action selection UI
     this.props.clearAvailableActions();
 
-    if (action.type === 'spawn') {
-      // Spawn the coin
-      this.props.spawnCoin(bases[currentTurn].ID, action.coinID);
-    } else if (action.type === 'move') {
-      // Move the coin
-      const coin = coins[action.coinID];
-      this.props.moveCoin(action.coinID, coin.position, coin.cellID);
+    if (action.type === "spawn") {
+      // Spawn the horse
+      this.props.spawnHorse(bases[currentTurn].ID, action.horseID);
+    } else if (action.type === "move") {
+      // Move the horse
+      const horse = horses[action.horseID];
+      // If stepsToUse is provided (when using one die from a pair), pass it to moveHorse
+      this.props.moveHorse(
+        action.horseID,
+        horse.position,
+        horse.cellID,
+        undefined,
+        undefined,
+        action.stepsToUse
+      );
+    } else if (action.type === "kick") {
+      // Kick action: move horse and disqualify blocking horse
+      const horse = horses[action.horseID];
+      this.props.moveHorse(
+        action.horseID,
+        horse.position,
+        horse.cellID,
+        action.blockingHorseID,
+        undefined,
+        action.stepsToUse // Pass stepsToUse if provided (for one-die kicks)
+      );
+    } else if (action.type === "move_before") {
+      // Move before blocking: move only specified steps
+      const horse = horses[action.horseID];
+      this.props.moveHorse(
+        action.horseID,
+        horse.position,
+        horse.cellID,
+        undefined,
+        action.stepsBeforeBlocking
+      );
     }
   };
 
@@ -95,11 +134,12 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
    * Renders the action selection panel
    */
   render() {
-    const { availableActions, availableActionsDieValue, bases, currentTurn } = this.props;
+    const { availableActions, availableActionsDieValue, bases, currentTurn } =
+      this.props;
 
     // Debug logging to help troubleshoot
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[ActionSelection] Render check:', {
+    if (process.env.NODE_ENV === "development") {
+      console.log("[ActionSelection] Render check:", {
         availableActions,
         availableActionsLength: availableActions?.length,
         availableActionsDieValue,
@@ -115,7 +155,8 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
 
     const currentBase = bases[currentTurn];
 
-    if (!currentBase) {
+    // Don't render if current base doesn't exist or game hasn't started (base not enabled)
+    if (!currentBase || !currentBase.enabled) {
       return null;
     }
 
@@ -124,28 +165,37 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
         <div className={styles.Container}>
           <div className={styles.Header}>
             <h3 className={styles.Title}>
-              {currentBase.color} Player - Choose Your Action
+              {currentBase.color} Player - Choose settlement action
             </h3>
             <div className={styles.DieValue}>
-              Rolled: <span className={styles.DieNumber}>{availableActionsDieValue}</span>
+              Rolled:{" "}
+              <span className={styles.DieNumber}>
+                {availableActionsDieValue}
+              </span>
             </div>
           </div>
           <div className={styles.ActionsList}>
             {availableActions.map((action, index) => {
-              const coin = this.props.coins[action.coinID];
-              const coinBase = coin ? this.props.bases[coin.baseID] : null;
+              const horse = this.props.horses[action.horseID];
+              const horseBase = horse ? this.props.bases[horse.baseID] : null;
               // Get the base color for the current turn (the base performing the action)
-              const baseColor = currentBase.color ? getBaseHexColor(currentBase.color) : null;
-              
+              const baseColor = currentBase.color
+                ? getBaseHexColor(currentBase.color)
+                : null;
+
               return (
                 <button
-                  key={`${action.type}-${action.coinID}-${index}`}
+                  key={`${action.type}-${action.horseID}-${index}`}
                   className={`${styles.ActionButton} ${
-                    action.type === 'spawn' ? styles.SpawnButton : styles.MoveButton
+                    action.type === "spawn"
+                      ? styles.SpawnButton
+                      : styles.MoveButton
                   }`}
                   onClick={() => this.handleActionClick(action)}
+                  onMouseEnter={() => this.props.setHoveredHorse(action.horseID)}
+                  onMouseLeave={() => this.props.clearHoveredHorse()}
                 >
-                  <div 
+                  <div
                     className={styles.ActionLabel}
                     style={baseColor ? { color: baseColor } : undefined}
                   >
@@ -153,18 +203,24 @@ class ActionSelectionBare extends React.PureComponent<IProps> {
                   </div>
                   <div className={styles.ActionDetails}>
                     <div className={styles.DetailRow}>
-                      <span className={styles.DetailLabel}>Coin ID:</span>
-                      <span className={styles.DetailValue}>{action.coinID}</span>
+                      <span className={styles.DetailLabel}>Horse ID:</span>
+                      <span className={styles.DetailValue}>
+                        {action.horseID}
+                      </span>
                     </div>
-                    {coinBase && (
+                    {horseBase && (
                       <div className={styles.DetailRow}>
                         <span className={styles.DetailLabel}>Base ID:</span>
-                        <span className={styles.DetailValue}>{coinBase.ID}</span>
+                        <span className={styles.DetailValue}>
+                          {horseBase.ID}
+                        </span>
                       </div>
                     )}
                   </div>
                   {action.description && (
-                    <div className={styles.ActionDescription}>{action.description}</div>
+                    <div className={styles.ActionDescription}>
+                      {action.description}
+                    </div>
                   )}
                 </button>
               );
@@ -183,4 +239,3 @@ export const ActionSelection = connect(
   mapStateToProps,
   mapDispatchToProps
 )(ActionSelectionBare) as unknown as React.ComponentClass<{}>;
-
